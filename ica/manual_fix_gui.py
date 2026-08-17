@@ -30,9 +30,16 @@ import os
 import re
 import sys
 import traceback
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+
+# This GUI is built on PySide6, but PyQt6 is also installed in some environments.
+# Matplotlib's Qt backend picks PyQt6 by default, which yields a toolbar whose C++
+# type is unrelated to our PySide6 window. Pin the binding before matplotlib loads.
+os.environ.setdefault("QT_API", "pyside6")
+from PySide6 import QtCore, QtGui, QtWidgets
 
 import matplotlib
 matplotlib.use("QtAgg")
@@ -44,20 +51,36 @@ from matplotlib.backends.backend_qtagg import (
     NavigationToolbar2QT as NavigationToolbar,
 )
 
-from PySide6 import QtCore, QtGui, QtWidgets
-
 _UNMASK_COLOR = QtGui.QColor(0, 120, 0)  # list-item text colour for unmask rows
 
 from ica.manual_fix import ICAManualFixProcessor
 from ica import run_ica
 from ica import civ_bal_regions as CIV_BAL_regions
-
-# Default location of the override store (kept next to the config it complements).
-DEFAULT_OVERRIDES_JSON = Path(__file__).resolve().parent / "manual_fix_overrides.json"
+from ica import manual_fix_store
+# Re-exported so existing callers of these names keep working; the store module
+# is now the single source of truth shared with the batch runner.
+from ica.manual_fix_store import (
+    DEFAULT_OVERRIDES_JSON, DEFAULT_MEASUREMENTS_CSV,
+    load_overrides, save_overrides, resolve_override, upsert_measurement)
 
 # Right mouse button for the SpanSelector so it never collides with the toolbar's
-# left-drag pan/zoom. Left-drag = zoom (toolbar); right-drag = add mask range.
+# left-drag pan/zoom. Left-drag = zoom (toolbar); right-drag = add mask range;
+# right-*click* (press and release without dragging) = mask the nearest pixel.
 _SPAN_BUTTON = 3
+
+# A right-button press/release that moves less than this many screen pixels counts
+# as a click rather than a drag, so it masks one pixel instead of a range. The
+# SpanSelector ignores zero-width spans, so the two gestures never both fire.
+_CLICK_SLOP_PX = 3
+
+# Scroll-wheel zoom: one notch shrinks/grows the visible span by this factor,
+# keeping the wavelength under the cursor fixed.
+_ZOOM_STEP = 1.3
+
+# Individual pixels (and the nearest-pixel hover cursor) are drawn only once the
+# view is zoomed in far enough that markers are distinguishable. This also keeps
+# hover redraws off the table when the whole spectrum is in view.
+_PIXEL_MARK_MAX = 400
 
 # Figure geometry matched to the batch diagnostic plot (create_diagnostic_plot
 # uses figsize=(18, 10.5) with the same GridSpec(7, 12) panel layout) so GUI
@@ -75,76 +98,20 @@ _STATUS_ERR = "QLabel{background:#f8d7da; color:#721c24; padding:6px; border:1px
 # Fit engine (headless; safe to call from a worker thread)
 # ---------------------------------------------------------------------------
 class GuiFixProcessor(ICAManualFixProcessor):
-    """ICAManualFixProcessor that fits from *explicit* overrides passed by the
-    GUI instead of the global MANUAL_FIX_CONFIG dict, and returns arrays for
-    plotting rather than writing a PNG.
+    """ICAManualFixProcessor fitted from overrides the GUI holds in memory.
 
-    fit_for_gui() reproduces process_object()'s numerical path exactly
-    (setup_object -> main_ICA -> get_CIV_parameters); only the source of the
-    mask/comps overrides differs, so a GUI fit == the batch fit for the same
-    override. No matplotlib is touched here, so it is safe off the UI thread.
+    The fit itself lives in ICAManualFixProcessor.fit_with_overrides(), which
+    process_object() also calls -- so this is literally the same code the batch
+    runner executes, not a parallel copy that has to be kept in step. Touches no
+    matplotlib, so it is safe to call off the UI thread.
     """
 
     def fit_for_gui(self, name, mask_ranges=None, mask_pixels=None, comps_use=None,
                     unmask_ranges=None, unmask_pixels=None):
-        mask_ranges = mask_ranges or []
-        mask_pixels = mask_pixels or []
-        unmask_ranges = unmask_ranges or []
-        unmask_pixels = unmask_pixels or []
-
-        # Reload from disk every fit -> guaranteed-clean mask state, no cross-fit
-        # mutation bugs. Cheap next to the ~5-10 s fit itself.
-        wave, flux, z, errs, mask, spec_name = self.setup_object(name)
-        mask = np.asarray(mask, dtype=float).copy()
-
-        for lo, hi in mask_ranges:
-            mask[(wave >= lo) & (wave <= hi)] = 1
-        for wl in mask_pixels:
-            mask[np.argmin(np.abs(wave - wl))] = 1
-
-        cu = None if comps_use in (None, "", "auto") else comps_use
-
-        (wave_arb, flux_arb, errs_arb, mask_arb,
-         wave_ica, flux_ica, f2500) = run_ica.main_ICA(
-            wave, flux, errs, mask, z, name="", ica_path=None, comps_use=cu)
-
-        # Force-unmask pixels the pipeline masked (NAL/BAL/input bad). Those masks
-        # are recomputed inside main_ICA, so honouring an unmask means re-fitting
-        # with them cleared. We reuse main_ICA's own outputs: flux_arb carries the
-        # *real* (not median-replaced) flux at NAL pixels, which is exactly what we
-        # want at an unmasked pixel; still-masked pixels are ignored either way.
-        # When nothing is unmasked we skip this entirely -> identical to the batch.
-        if unmask_ranges or unmask_pixels:
-            mask_ref = np.asarray(mask_arb, dtype=float).copy()
-            for lo, hi in unmask_ranges:
-                mask_ref[(wave_arb >= lo) & (wave_arb <= hi)] = 0
-            for wl in unmask_pixels:
-                mask_ref[np.argmin(np.abs(wave_arb - wl))] = 0
-
-            wave_ica2, flux_ica2 = run_ica.get_ICA(
-                wave_arb, flux_arb, errs_arb, mask_ref, z,
-                ica_path=None, use_priors=False, comps_use=cu)
-
-            # Rescale f2500 by the original fit's real-unit factor at 2500 A
-            # (norm/morph scaling is fixed by the data, not the fit).
-            i0 = np.argmin(np.abs(wave_ica - 2500.))
-            i2 = np.argmin(np.abs(wave_ica2 - 2500.))
-            if flux_ica[i0]:
-                f2500 = float(flux_ica2[i2] * (f2500 / flux_ica[i0]))
-            wave_ica, flux_ica = wave_ica2, flux_ica2
-            # Show the mask actually used for the fit so unmasked pixels no longer
-            # render as NAL/BAL (they were set to 0 in mask_ref).
-            mask_arb = mask_ref
-
-        civ_blue, civ_ew = self.get_CIV_parameters(
-            wave_arb, flux_arb, wave_ica, flux_ica, name)
-
-        return dict(
-            name=name, spec_name=spec_name, z=float(z),
-            wave_arb=wave_arb, flux_arb=flux_arb, errs_arb=errs_arb, mask_arb=mask_arb,
-            wave_ica=wave_ica, flux_ica=flux_ica,
-            f2500=float(f2500), civ_blue=float(civ_blue), civ_ew=float(civ_ew),
-        )
+        return self.fit_with_overrides(
+            name, mask_ranges=mask_ranges, mask_pixels=mask_pixels,
+            comps_use=comps_use, unmask_ranges=unmask_ranges,
+            unmask_pixels=unmask_pixels)
 
 
 # ---------------------------------------------------------------------------
@@ -238,15 +205,24 @@ class _AspectRatioWidget(QtWidgets.QWidget):
     the embedded canvas from stretching to the window shape, so the plot panels
     keep the same proportions as the batch diagnostic figure."""
 
-    def __init__(self, child, aspect):
+    def __init__(self, child, aspect, locked=True):
         super().__init__()
         self._aspect = aspect
+        self._locked = locked
         self._lay = QtWidgets.QHBoxLayout(self)
         self._lay.setContentsMargins(0, 0, 0, 0)
         self._lay.addWidget(child)
 
-    def resizeEvent(self, event):
-        w, h = event.size().width(), event.size().height()
+    def set_locked(self, locked):
+        """Toggle the aspect lock. Unlocked, the canvas fills the whole area,
+        which gives the full-width top panel every horizontal pixel available."""
+        self._locked = bool(locked)
+        if not self._locked:
+            self._lay.setContentsMargins(0, 0, 0, 0)
+        else:
+            self._apply(self.width(), self.height())
+
+    def _apply(self, w, h):
         if h > 0:
             if w / h > self._aspect:      # too wide -> pillarbox (side margins)
                 extra = max(0, w - int(round(h * self._aspect)))
@@ -254,6 +230,10 @@ class _AspectRatioWidget(QtWidgets.QWidget):
             else:                         # too tall -> letterbox (top/bottom)
                 extra = max(0, h - int(round(w / self._aspect)))
                 self._lay.setContentsMargins(0, extra // 2, 0, extra - extra // 2)
+
+    def resizeEvent(self, event):
+        if self._locked:
+            self._apply(event.size().width(), event.size().height())
         super().resizeEvent(event)
 
 
@@ -261,12 +241,23 @@ class _AspectRatioWidget(QtWidgets.QWidget):
 # Main window
 # ---------------------------------------------------------------------------
 class ManualFixWindow(QtWidgets.QMainWindow):
-    def __init__(self, proc, names, overrides_path):
+    def __init__(self, proc, names, overrides_path,
+                 measurements_path=None, plots_dir=None):
         super().__init__()
         self.proc = proc
         self.names = names
         self.overrides_path = overrides_path
+        self.measurements_path = measurements_path or str(DEFAULT_MEASUREMENTS_CSV)
+        # Diagnostic PNGs go in their own subfolder so they never clobber the
+        # batch runner's plots for the same objects.
+        self.plots_dir = plots_dir or os.path.join(
+            getattr(proc, "output_path", "."), "ManualFix")
         self.overrides = load_overrides(overrides_path)
+        # Point the processor at the GUI's live dict so both see the same state
+        # and nothing is re-read from disk mid-session.
+        self.proc._overrides = self.overrides
+        self.proc.overrides_path = overrides_path
+        self._override_source = "none"
         self.pool = QtCore.QThreadPool.globalInstance()
 
         # per-object working state
@@ -277,6 +268,21 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self.comps_use = "auto"
         self._saved_lims = None    # (xlim, ylim) per panel, to preserve zoom on refit
         self._busy = False
+
+        # Plotted grid, kept so a cursor position can be snapped to a real pixel.
+        # This is main_ICA's output grid (what is on screen), which equals the
+        # input grid unless the spectrum needed re-binning to 69 km/s.
+        self._wave_plot = None
+        self._flux_plot = None
+        self._hover_idx = None
+        self._default_lims = None  # per-panel (xlim, ylim) as _draw() set them
+
+        # Last completed fit, plus the override state that produced it. Save
+        # refuses to record measurements when the masks have moved on since,
+        # so a number in the CSV always corresponds to the override beside it.
+        self._last_res = None
+        self._fit_state = None
+        self._pending_state = None
 
         self.setWindowTitle("ICA Manual Fix")
         self.resize(1600, 820)  # landscape, close to the 18:10.5 plot aspect
@@ -298,17 +304,23 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
         left.addWidget(self.toolbar)
-        # Lock the canvas to the batch figure's aspect ratio so panels stay
-        # proportioned like the saved ICA plots instead of stretching.
-        left.addWidget(_AspectRatioWidget(self.canvas, _FIG_ASPECT), stretch=1)
+        # The aspect lock keeps the canvas proportioned like the saved batch ICA
+        # plots, but it pillarboxes away horizontal room the full-width top panel
+        # wants. Default to unlocked; the sidebar checkbox restores batch parity.
+        self._aspect_box = _AspectRatioWidget(self.canvas, _FIG_ASPECT, locked=False)
+        left.addWidget(self._aspect_box, stretch=1)
         root.addLayout(left, stretch=1)
 
+        # The full-spectrum panel spans all 12 columns (it used to stop at column
+        # 8, leaving the top-right quadrant empty) so single pixels are as wide
+        # apart on screen as possible when hunting for ones to mask.
         gs = GridSpec(7, 12, figure=self.fig)
-        self.ax_full = self.fig.add_subplot(gs[:3, :8])
+        self.ax_full = self.fig.add_subplot(gs[:3, :])
         self.ax_civ = self.fig.add_subplot(gs[3:6, :8])
         self.ax_err = self.fig.add_subplot(gs[6, :8], sharex=self.ax_civ)
         self.ax_fit = self.fig.add_subplot(gs[3:, 8:])
         self._panels = [self.ax_full, self.ax_civ, self.ax_err, self.ax_fit]
+        self._spec_panels = (self.ax_full, self.ax_civ)
 
         # right-drag on the two spectrum panels adds a mask range
         # useblit=False: blitting caches an axes-background bitmap that goes
@@ -318,8 +330,17 @@ class ManualFixWindow(QtWidgets.QMainWindow):
             SpanSelector(ax, self._on_span, "horizontal", useblit=False,
                          button=_SPAN_BUTTON,
                          props=dict(alpha=0.25, facecolor="orange"))
-            for ax in (self.ax_full, self.ax_civ)
+            for ax in self._spec_panels
         ]
+
+        # Nearest-pixel masking, scroll zoom and the hover cursor. Right-click
+        # is tracked press->release so a click can be told from a span drag.
+        self._press = None
+        self.canvas.mpl_connect("button_press_event", self._on_button_press)
+        self.canvas.mpl_connect("button_release_event", self._on_button_release)
+        self.canvas.mpl_connect("scroll_event", self._on_scroll)
+        self.canvas.mpl_connect("motion_notify_event", self._on_motion)
+        self._connect_xlim_callbacks()
 
         # --- right: sidebar (width-capped so the plot gets the room) ---
         side_widget = QtWidgets.QWidget()
@@ -350,7 +371,14 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         side.addLayout(row)
 
         # masks (ranges + single pixels)
-        side.addWidget(QtWidgets.QLabel("<b>Masks</b> (right-drag or type)"))
+        side.addWidget(QtWidgets.QLabel("<b>Masks</b> (right-click / right-drag / type)"))
+        hint = QtWidgets.QLabel(
+            "Right-<i>click</i> a plot to mask the single nearest pixel; "
+            "right-<i>drag</i> for a range. Scroll to zoom (shift+scroll = "
+            "vertical); individual pixels appear once zoomed in.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#555; font-size:11px;")
+        side.addWidget(hint)
         self.mask_list = QtWidgets.QListWidget()
         self.mask_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.mask_list.setMaximumHeight(160)
@@ -371,9 +399,28 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         # pipeline masked (e.g. a NAL flag) instead of adding a mask.
         self.unmask_mode_cb = QtWidgets.QCheckBox("Unmask mode (re-include pixels)")
         self.unmask_mode_cb.setToolTip(
-            "When checked, the text box / right-drag force-includes pixels the "
-            "pipeline masked (including NAL/BAL flags) instead of adding a mask.")
+            "When checked, the text box / right-click / right-drag force-include "
+            "pixels the pipeline masked (including NAL/BAL flags) instead of "
+            "adding a mask.")
         side.addWidget(self.unmask_mode_cb)
+
+        self.aspect_cb = QtWidgets.QCheckBox("Lock plot aspect (match batch PNG)")
+        self.aspect_cb.setToolTip(
+            "Letterbox the canvas to the 18:10.5 batch diagnostic figure shape. "
+            "Off (default) lets the plot fill the window, which gives the "
+            "full-width top panel more room for picking out single pixels.")
+        self.aspect_cb.toggled.connect(self._aspect_box.set_locked)
+        side.addWidget(self.aspect_cb)
+
+        self.reset_zoom_btn = QtWidgets.QPushButton("Reset zoom  (R)")
+        self.reset_zoom_btn.setToolTip(
+            "Return every panel to this object's default view. Use after "
+            "scrolling off the end of the spectrum.")
+        self.reset_zoom_btn.clicked.connect(self._reset_zoom)
+        side.addWidget(self.reset_zoom_btn)
+        # Shortcut too: the whole point is getting back quickly, and the pointer
+        # is over the plot (not the sidebar) when you scroll out of range.
+        QtGui.QShortcut(QtGui.QKeySequence("R"), self, self._reset_zoom)
 
         mrow = QtWidgets.QHBoxLayout()
         rm = QtWidgets.QPushButton("Remove selected")
@@ -404,9 +451,19 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self.refit_btn.clicked.connect(lambda: self._refit())
         side.addWidget(self.refit_btn)
 
-        self.save_btn = QtWidgets.QPushButton("Save override")
+        self.save_btn = QtWidgets.QPushButton("Save override + measurements")
+        self.save_btn.setToolTip(
+            "Write the masks to the override JSON, this object's CIV "
+            "measurements to the measurements CSV, and the diagnostic PNG.")
         self.save_btn.clicked.connect(self._save)
         side.addWidget(self.save_btn)
+
+        self.save_png_cb = QtWidgets.QCheckBox("Also save diagnostic PNG")
+        self.save_png_cb.setChecked(True)
+        self.save_png_cb.setToolTip(
+            "Render the plot to %s at the object's default view (not the "
+            "current zoom, so archived plots stay comparable)." % self.plots_dir)
+        side.addWidget(self.save_png_cb)
 
         self.status = QtWidgets.QLabel("Ready.")
         self.status.setWordWrap(True)
@@ -431,12 +488,16 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         if name not in self.names:
             return
         self.current = name
-        ov = self.overrides.get(name, {})
-        self.mask_ranges = [list(r) for r in ov.get("mask_ranges", [])]
-        self.mask_pixels = [float(w) for w in ov.get("mask_pixels", [])]
-        self.unmask_ranges = [list(r) for r in ov.get("unmask_ranges", [])]
-        self.unmask_pixels = [float(w) for w in ov.get("unmask_pixels", [])]
-        self.comps_use = ov.get("forced_components") or "auto"
+        # Resolve through the shared store so an object whose fix still lives in
+        # MANUAL_FIX_CONFIG opens with those masks visible and editable, instead
+        # of looking un-fixed and inviting a Save that would contradict the batch.
+        ov = resolve_override(name, overrides=self.overrides)
+        self.mask_ranges = ov["mask_ranges"]
+        self.mask_pixels = ov["mask_pixels"]
+        self.unmask_ranges = ov["unmask_ranges"]
+        self.unmask_pixels = ov["unmask_pixels"]
+        self.comps_use = ov["comps_use"] or "auto"
+        self._override_source = ov["source"]
         self._sync_mask_list()
         for rb in self.comp_group.buttons():
             if rb.text() == self.comps_use:
@@ -471,6 +532,21 @@ class ManualFixWindow(QtWidgets.QMainWindow):
     def _on_span(self, xmin, xmax):
         if xmax - xmin <= 0:
             return
+        # A drag narrower than the pixel spacing can fall entirely *between* two
+        # grid points: the mask is applied as (wave >= lo) & (wave <= hi), so it
+        # then selects nothing and silently does no masking at all. Zoomed in,
+        # a few pixels of hand-shake is well under one 0.36 A spectral pixel, so
+        # this is the common outcome of a click that wasn't quite still. Treat
+        # any span covering no pixel as the single-pixel pick it meant to be.
+        wave = self._wave_plot
+        if wave is not None and len(wave):
+            covered = int(np.searchsorted(wave, xmax, side="right")
+                          - np.searchsorted(wave, xmin, side="left"))
+            if covered == 0:
+                idx = self._nearest_index(0.5 * (xmin + xmax))
+                if idx is not None:
+                    self._add_pixel(float(wave[idx]))
+                    return
         rng = [round(float(xmin), 3), round(float(xmax), 3)]
         if self.unmask_mode_cb.isChecked():
             self.unmask_ranges.append(rng)
@@ -578,6 +654,10 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self._saved_lims = [(ax.get_xlim(), ax.get_ylim()) for ax in self._panels] \
             if (preserve_zoom and self._has_drawn()) else None
 
+        # Snapshot what is being fitted; promoted to _fit_state on completion so
+        # Save can tell whether the on-screen numbers still match the masks.
+        self._pending_state = self._override_snapshot()
+
         task = _FitTask(self.proc, self.current,
                         [list(r) for r in self.mask_ranges],
                         list(self.mask_pixels), self.comps_use,
@@ -590,8 +670,22 @@ class ManualFixWindow(QtWidgets.QMainWindow):
     def _has_drawn(self):
         return any(ax.lines for ax in self._panels)
 
+    def _override_snapshot(self):
+        """Hashable picture of the current override, for staleness comparison."""
+        return (tuple(tuple(r) for r in self.mask_ranges),
+                tuple(self.mask_pixels),
+                tuple(tuple(r) for r in self.unmask_ranges),
+                tuple(self.unmask_pixels),
+                self.comps_use, self.current)
+
+    def _fit_is_current(self):
+        return (self._last_res is not None and self._fit_state is not None
+                and self._fit_state == self._override_snapshot())
+
     @QtCore.Slot(dict)
     def _on_fit_done(self, res):
+        self._last_res = res
+        self._fit_state = self._pending_state
         try:
             self._draw(res)
             self.results.setText(
@@ -646,6 +740,171 @@ class ManualFixWindow(QtWidgets.QMainWindow):
             self.refit_btn.setText("Re-fit")
             QtWidgets.QApplication.restoreOverrideCursor()
 
+    # ---- nearest-pixel picking, zoom and hover ---------------------------
+    def _connect_xlim_callbacks(self):
+        """(Re)subscribe to xlim_changed on the zoomable panels.
+
+        Axes.clear() installs a brand-new CallbackRegistry, silently dropping
+        every prior connection, so this has to run again after each _draw().
+        """
+        for ax in (self.ax_full, self.ax_civ, self.ax_err):
+            ax.callbacks.connect("xlim_changed", self._on_xlim_changed)
+
+    def _nearest_index(self, x):
+        """Index of the plotted pixel whose wavelength is closest to x, or None."""
+        wave = self._wave_plot
+        if wave is None or x is None or len(wave) == 0:
+            return None
+        i = int(np.searchsorted(wave, x))
+        if i <= 0:
+            return 0
+        if i >= len(wave):
+            return len(wave) - 1
+        # searchsorted brackets x; pick whichever neighbour is actually closer
+        return i if abs(wave[i] - x) < abs(x - wave[i - 1]) else i - 1
+
+    def _visible_count(self, ax):
+        """How many plotted pixels fall inside ax's current x limits."""
+        wave = self._wave_plot
+        if wave is None or len(wave) == 0:
+            return 0
+        lo, hi = sorted(ax.get_xlim())
+        return int(np.searchsorted(wave, hi) - np.searchsorted(wave, lo))
+
+    def _picking_locked(self):
+        """True while the toolbar's Pan/Zoom modes own the mouse. Those bind the
+        right button too (right-drag = zoom out), and they take the canvas
+        widgetlock, which already suppresses the SpanSelector -- so pixel picking
+        has to stand down as well or one right-click would do two things."""
+        return bool(getattr(self.toolbar, "mode", "")) \
+            or self.canvas.widgetlock.locked()
+
+    def _on_button_press(self, event):
+        if (event.button == _SPAN_BUTTON and event.inaxes in self._spec_panels
+                and not self._picking_locked()):
+            self._press = (event.x, event.y)
+        else:
+            self._press = None
+
+    def _on_button_release(self, event):
+        """Right-click (no drag) masks the single pixel nearest the cursor.
+        A right-*drag* is left to the SpanSelector, which adds a range instead."""
+        press, self._press = self._press, None
+        if (event.button != _SPAN_BUTTON or press is None
+                or event.inaxes not in self._spec_panels):
+            return
+        if max(abs(event.x - press[0]), abs(event.y - press[1])) > _CLICK_SLOP_PX:
+            return  # a drag; the SpanSelector is handling it
+        idx = self._nearest_index(event.xdata)
+        if idx is None:
+            return
+        self._add_pixel(float(self._wave_plot[idx]))
+
+    def _add_pixel(self, wl):
+        """Record one nearest-pixel mask/unmask at the (snapped) wavelength wl."""
+        unmask = self.unmask_mode_cb.isChecked()
+        target = self.unmask_pixels if unmask else self.mask_pixels
+        kind = "Unmask" if unmask else "Mask"
+        # Clicking the same pixel twice is a mis-click far more often than it is
+        # a deliberate duplicate, so toggle it back off instead of stacking.
+        near = [w for w in target if abs(w - wl) < 1e-6]
+        if near:
+            for w in near:
+                target.remove(w)
+            msg = "%s removed at %.3f Å." % (kind, wl)
+        else:
+            target.append(wl)
+            msg = "%s pixel %.3f Å added. Re-fit to apply." % (kind, wl)
+        self._sync_mask_list()
+        self._draw_mask_overlays()
+        self.canvas.draw_idle()
+        self._set_status(msg, _STATUS_OK)
+
+    def _on_scroll(self, event):
+        """Scroll to zoom about the cursor: x by default, y with shift held.
+        ax_err shares x with ax_civ, so zooming either keeps them aligned."""
+        ax = event.inaxes
+        if ax is None or ax not in (self.ax_full, self.ax_civ, self.ax_err):
+            return
+        factor = 1.0 / _ZOOM_STEP if event.button == "up" else _ZOOM_STEP
+        vertical = bool(event.key and "shift" in event.key)
+        if vertical:
+            lo, hi = ax.get_ylim()
+            anchor = event.ydata
+        else:
+            lo, hi = ax.get_xlim()
+            anchor = event.xdata
+        if anchor is None:
+            return
+        # Keep the value under the cursor fixed while the span scales.
+        new_lo = anchor - (anchor - lo) * factor
+        new_hi = anchor + (hi - anchor) * factor
+        if vertical:
+            ax.set_ylim(new_lo, new_hi)
+        else:
+            ax.set_xlim(new_lo, new_hi)
+        self.canvas.draw_idle()
+
+    def _reset_zoom(self):
+        """Put every panel back to the limits _draw() chose for this object.
+
+        Scroll-zooming can easily wander off the spectrum entirely, and the
+        toolbar's Home button restores its own view stack, which a re-fit
+        invalidates -- so this is the reliable way back.
+        """
+        if self._default_lims is None:
+            return
+        for ax, (xl, yl) in zip(self._panels, self._default_lims):
+            ax.set_xlim(xl)
+            ax.set_ylim(yl)
+        # Don't let a stale zoom be re-applied by the next re-fit.
+        self._saved_lims = None
+        for ax in self._spec_panels:
+            self._on_xlim_changed(ax)
+            self._hide_hover(ax)
+        self.canvas.draw_idle()
+        self._set_status("Zoom reset to default view.", _STATUS_OK)
+
+    def _on_xlim_changed(self, ax):
+        """Reveal per-pixel markers once few enough pixels are in view."""
+        marks = getattr(ax, "_pix_marks", None)
+        if marks is None:
+            return
+        show = 0 < self._visible_count(ax) <= _PIXEL_MARK_MAX
+        if marks.get_visible() != show:
+            marks.set_visible(show)
+            if not show:
+                self._hide_hover(ax)
+
+    def _hide_hover(self, ax):
+        hov = getattr(ax, "_hover_mark", None)
+        if hov is not None and hov.get_visible():
+            hov.set_visible(False)
+
+    def _on_motion(self, event):
+        """Highlight the pixel that a right-click would mask, but only when
+        zoomed in far enough for the markers to be showing (a redraw per pixel
+        crossed would be far too slow with the whole spectrum in view)."""
+        ax = event.inaxes
+        changed = False
+        for other in self._spec_panels:
+            if other is not ax and getattr(other, "_hover_mark", None) is not None:
+                if other._hover_mark.get_visible():
+                    other._hover_mark.set_visible(False)
+                    changed = True
+        if ax in self._spec_panels and getattr(ax, "_pix_marks", None) is not None \
+                and ax._pix_marks.get_visible():
+            idx = self._nearest_index(event.xdata)
+            if idx is not None and (idx != self._hover_idx
+                                    or not ax._hover_mark.get_visible()):
+                self._hover_idx = idx
+                ax._hover_mark.set_data([self._wave_plot[idx]],
+                                        [self._flux_plot[idx]])
+                ax._hover_mark.set_visible(True)
+                changed = True
+        if changed:
+            self.canvas.draw_idle()
+
     # ---- drawing ---------------------------------------------------------
     def _draw(self, res):
         wave, flux = res["wave_arb"], res["flux_arb"]
@@ -653,8 +912,21 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         wave_ica, flux_ica = res["wave_ica"], res["flux_ica"]
         spec_name = res["spec_name"]
 
+        # Snap target for right-click masking and the hover cursor. This is the
+        # grid actually on screen; fit_for_gui() re-finds the nearest pixel on
+        # the pre-ICA grid, which is the same one unless main_ICA re-binned.
+        self._wave_plot, self._flux_plot = wave, flux
+        self._hover_idx = None
+
+        # Drop marker references *before* clear(): clearing resets the axis
+        # limits, which fires xlim_changed on artists that no longer exist.
+        for ax in self._spec_panels:
+            ax._pix_marks = None
+            ax._hover_mark = None
+
         for ax in self._panels:
             ax.clear()
+        self._connect_xlim_callbacks()   # clear() discarded the old registry
         # ax.clear() already removed the overlay artists; drop the stale
         # references so _draw_mask_overlays() doesn't try to remove them again
         # (that raises NotImplementedError: cannot remove artist).
@@ -696,11 +968,29 @@ class ManualFixWindow(QtWidgets.QMainWindow):
 
         self._draw_mask_overlays()
 
+        # Per-pixel markers + the nearest-pixel hover cursor, on the two panels
+        # that accept mask clicks. Both stay hidden until the view is zoomed in
+        # (see _on_xlim_changed), so the zoomed-out plot looks exactly as before.
+        for ax in self._spec_panels:
+            ax._pix_marks = ax.plot(wave, flux, linestyle="none", marker=".",
+                                    ms=3.5, color="#1f77b4", alpha=0.8,
+                                    zorder=3, visible=False)[0]
+            ax._hover_mark = ax.plot([], [], linestyle="none", marker="o",
+                                     ms=9, mfc="none", mec="red", mew=1.6,
+                                     zorder=5, visible=False)[0]
+
+        # Snapshot the limits this draw chose, *before* any saved zoom is put
+        # back -- this is what "Reset zoom" returns to.
+        self._default_lims = [(ax.get_xlim(), ax.get_ylim()) for ax in self._panels]
+
         # restore zoom if we saved it before this refit
         if self._saved_lims is not None:
             for ax, (xl, yl) in zip(self._panels, self._saved_lims):
                 ax.set_xlim(xl)
                 ax.set_ylim(yl)
+
+        for ax in self._spec_panels:
+            self._on_xlim_changed(ax)
 
         # Force a full synchronous repaint. draw_idle() can be coalesced away
         # when the restored zoom leaves the axis limits unchanged, so the new
@@ -746,34 +1036,156 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         else:
             self.overrides.pop(self.current, None)  # no-op fix -> don't store
         save_overrides(self.overrides_path, self.overrides)
-        self.status.setText("Saved override for %s → %s"
-                            % (self.current, os.path.basename(self.overrides_path)))
 
+        meas_note = self._record_measurement()
 
-# ---------------------------------------------------------------------------
-# feed_into_batch: how the saved JSON is meant to reach ica.run_all_objects
-# ---------------------------------------------------------------------------
-def feed_into_batch(overrides_path=DEFAULT_OVERRIDES_JSON):
-    """Return {name: {'custom_mask_pixels': None|array, 'forced_components': ...}}
-    in the shape ICAManualFixProcessor.apply_manual_fix expects, so the GUI's
-    JSON can be merged over MANUAL_FIX_CONFIG.
+        note = ""
+        if self._override_source == "config":
+            # The fix came from MANUAL_FIX_CONFIG and now also exists in the
+            # JSON, which takes precedence from here on. Say so, because the
+            # config entry silently stops being the operative one.
+            note = ("  (was MANUAL_FIX_CONFIG; the JSON entry now takes "
+                    "precedence for this object)")
+            self._override_source = "json"
+        self.status.setText("Saved override for %s → %s%s\n%s"
+                            % (self.current, os.path.basename(self.overrides_path),
+                               note, meas_note))
 
-    Note: the batch path masks by *pixel wavelength arrays* while the GUI stores
-    *ranges*. Ranges are the cleaner representation; wiring them into the batch
-    means teaching apply_manual_fix to also read 'mask_ranges'. That is a small,
-    backward-compatible change tracked separately. This helper documents the
-    contract and lets you inspect the mapping now.
-    """
-    ov = load_overrides(overrides_path)
-    out = {}
-    for name, entry in ov.items():
-        pixels = entry.get("mask_pixels")
-        out[name] = {
-            "mask_ranges": entry.get("mask_ranges"),
-            "custom_mask_pixels": np.array(pixels) if pixels else None,
-            "forced_components": entry.get("forced_components"),
+    # ---- measurement + plot record ---------------------------------------
+    @staticmethod
+    def _safe_stem(name):
+        """Object name as a filename: keep it recognisable, drop path-hostile
+        characters (object names contain spaces, '+' and '.')."""
+        return re.sub(r"[^A-Za-z0-9.+_-]+", "_", name).strip("_")
+
+    def _save_plot(self, path):
+        """Write the diagnostic PNG at the object's default view.
+
+        Saving whatever zoom happens to be on screen would make the archived
+        plots inconsistent with each other, so the default limits are restored
+        for the render and the working view is put back afterwards.
+        """
+        working = [(ax.get_xlim(), ax.get_ylim()) for ax in self._panels]
+        for ax in self._spec_panels:
+            self._hide_hover(ax)
+        try:
+            if self._default_lims is not None:
+                for ax, (xl, yl) in zip(self._panels, self._default_lims):
+                    ax.set_xlim(xl)
+                    ax.set_ylim(yl)
+            self.fig.savefig(path, dpi=110)
+        finally:
+            for ax, (xl, yl) in zip(self._panels, working):
+                ax.set_xlim(xl)
+                ax.set_ylim(yl)
+            self.canvas.draw_idle()
+
+    def _record_measurement(self):
+        """Append/update this object's row in the measurements CSV, and save the
+        diagnostic PNG. Returns a status line.
+
+        Refuses to write when the masks have changed since the last fit: the
+        numbers on screen would then describe a different override than the one
+        just saved, and a silently-stale row in a file that may feed the paper
+        is worse than no row at all.
+        """
+        if self._last_res is None:
+            return "⚠  No fit yet — measurements not recorded."
+        if not self._fit_is_current():
+            return ("⚠  Masks changed since the last fit — measurements NOT "
+                    "recorded. Re-fit, then Save again.")
+
+        res = self._last_res
+        plot_name = ""
+        if self.save_png_cb.isChecked():
+            try:
+                os.makedirs(self.plots_dir, exist_ok=True)
+                plot_name = self._safe_stem(self.current) + ".png"
+                self._save_plot(os.path.join(self.plots_dir, plot_name))
+            except Exception as exc:
+                plot_name = ""
+                traceback.print_exc()
+                return "⚠  Measurements recorded, but PNG failed: %s" % exc
+
+        row = {
+            "object_name": self.current,
+            "spec_name": res.get("spec_name", ""),
+            # repr() round-trips a float exactly; fixed-precision formatting
+            # would silently lose digits from numbers that feed the paper and
+            # would break exact comparison against the batch CSV.
+            "redshift": repr(float(res["z"])),
+            "CIV_blueshift": repr(float(res["civ_blue"])),
+            "CIV_EW": repr(float(res["civ_ew"])),
+            "f2500": repr(float(res["f2500"])),
+            "components_used": "" if self.comps_use == "auto" else self.comps_use,
+            "override_source": self._override_source,
+            "override_summary": manual_fix_store.describe(
+                resolve_override(self.current, overrides=self.overrides)),
+            "plot_file": plot_name,
+            "saved_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
-    return out
+        try:
+            n = upsert_measurement(row, path=self.measurements_path)
+        except Exception as exc:
+            traceback.print_exc()
+            return "⚠  Measurement write failed: %s" % exc
+        return "✓  Measurements → %s (%d objects)%s" % (
+            os.path.basename(self.measurements_path), n,
+            "; plot → %s" % plot_name if plot_name else "")
+
+
+# ---------------------------------------------------------------------------
+# Reproducibility check: a batch fit must equal the GUI fit for a saved override
+# ---------------------------------------------------------------------------
+def verify_reproducible(rebin_dir, names=None, overrides_path=DEFAULT_OVERRIDES_JSON,
+                        rtol=0.0, verbose=True):
+    """Refit every object with a saved override twice -- once through the GUI
+    entry point, once through the batch entry point (process_object) -- and
+    report whether CIV blueshift, CIV EW and f2500 agree.
+
+    Both routes now call ICAManualFixProcessor.fit_with_overrides(), so the only
+    way this can disagree is if the override *resolution* diverges. That is
+    exactly the regression worth guarding: the numbers in the paper come from the
+    batch runner, while the decisions are made in the GUI.
+
+    Returns (n_checked, failures); failures is a list of (name, field, gui, batch).
+    """
+    proc = _make_processor(rebin_dir)
+    proc.overrides_path = overrides_path
+    proc._overrides = load_overrides(overrides_path)
+
+    targets = names if names is not None else sorted(proc._overrides)
+    available = set(proc.list_master_objects())
+    skipped = [n for n in targets if n not in available]
+    targets = [n for n in targets if n in available]
+
+    failures = []
+    for name in targets:
+        ov = resolve_override(name, overrides=proc._overrides)
+        gui = proc.fit_for_gui(
+            name, mask_ranges=ov["mask_ranges"], mask_pixels=ov["mask_pixels"],
+            comps_use=ov["comps_use"], unmask_ranges=ov["unmask_ranges"],
+            unmask_pixels=ov["unmask_pixels"])
+        batch = proc.process_object(name, plot=False, save_plot=False)
+        for field, g, b in (("civ_blue", gui["civ_blue"], batch["CIV_blueshift"]),
+                            ("civ_ew", gui["civ_ew"], batch["CIV_EW"]),
+                            ("f2500", gui["f2500"], batch["f2500"])):
+            same = (g == b) if rtol == 0 else bool(np.isclose(g, b, rtol=rtol))
+            if not same:
+                failures.append((name, field, g, b))
+        if verbose:
+            mark = "OK " if not any(f[0] == name for f in failures) else "DIFF"
+            print("%s %-42s blue=%9.2f ew=%7.3f  [%s]"
+                  % (mark, name, gui["civ_blue"], gui["civ_ew"],
+                     manual_fix_store.describe(ov)))
+
+    if verbose:
+        if skipped:
+            print("\nSkipped (no spectrum in %s): %s" % (rebin_dir, ", ".join(skipped)))
+        print("\n%d/%d objects reproduce exactly; %d mismatched field(s)."
+              % (len(targets) - len({f[0] for f in failures}), len(targets),
+                 len(failures)))
+    return len(targets), failures
 
 
 # ---------------------------------------------------------------------------
@@ -795,6 +1207,19 @@ def main(argv=None):
         "--overrides", default=str(DEFAULT_OVERRIDES_JSON),
         help="Path to the override JSON store (read + written by Save).")
     parser.add_argument(
+        "--measurements", default=str(DEFAULT_MEASUREMENTS_CSV),
+        help="CSV that Save appends this object's CIV measurements to "
+             "(one row per object, updated in place on re-save).")
+    parser.add_argument(
+        "--fix-plots", default=None,
+        help="Directory for diagnostic PNGs written by Save. "
+             "Defaults to <plot output>/ManualFix.")
+    parser.add_argument(
+        "--verify-reproducible", action="store_true",
+        help="Headless check: refit every object with a saved override through "
+             "both the GUI and the batch entry points and confirm the CIV "
+             "measurements agree. Exits non-zero on any mismatch.")
+    parser.add_argument(
         "--selftest", metavar="OBJECT", default=None,
         help="Headless self-test: build the window offscreen, fit OBJECT, "
              "save a screenshot to manual_fix_gui_selftest.png, exit.")
@@ -802,6 +1227,14 @@ def main(argv=None):
 
     if not args.rebin_dir:
         parser.error("--rebin-dir is required (or set HST_PAPER_REBIN_DIR).")
+
+    if args.verify_reproducible:
+        # No Qt needed; this is pure numerics on both entry points.
+        n, failures = verify_reproducible(args.rebin_dir,
+                                          overrides_path=args.overrides)
+        for name, field, gui_val, batch_val in failures:
+            print("MISMATCH %s %s: gui=%r batch=%r" % (name, field, gui_val, batch_val))
+        return 1 if failures else 0
 
     if args.selftest:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -812,7 +1245,9 @@ def main(argv=None):
     if not names:
         parser.error("No FITS files found in %s" % args.rebin_dir)
 
-    win = ManualFixWindow(proc, names, args.overrides)
+    win = ManualFixWindow(proc, names, args.overrides,
+                          measurements_path=args.measurements,
+                          plots_dir=args.fix_plots)
 
     if args.selftest:
         target = args.selftest

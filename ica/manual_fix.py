@@ -42,6 +42,7 @@ import warnings
 
 # Import our manual fix configuration
 from ica.manual_fix_config import MANUAL_FIX_CONFIG
+from ica import manual_fix_store
 
 _DATA_DIR = Path(__file__).resolve().parent.parent / "Data"
 _QUALITY_JSON = Path(__file__).resolve().parent / "quality_classification.json"
@@ -63,7 +64,7 @@ class ICAManualFixProcessor:
     _MASTER_FOLDER = "All"
 
     def __init__(self, catalog_file=None, rebin_path=None, master_mode=False,
-                 output_path=None):
+                 output_path=None, overrides_path=None):
         """
         Initialize the processor with catalog data
 
@@ -108,6 +109,17 @@ class ICAManualFixProcessor:
         # Unused in master mode (objects are not classified), but cheap to load.
         with open(_QUALITY_JSON) as f:
             self.quality_map = json.load(f)
+
+        # GUI-authored overrides, read once per run rather than per object. The
+        # GUI replaces this with its live in-memory copy so an unsaved edit is
+        # never silently picked up from disk mid-session.
+        self.overrides_path = overrides_path if overrides_path is not None \
+            else manual_fix_store.DEFAULT_OVERRIDES_JSON
+        self._overrides = manual_fix_store.load_overrides(self.overrides_path)
+        conflicts = sorted(set(self._overrides) & set(MANUAL_FIX_CONFIG))
+        if conflicts:
+            print("WARNING: defined in both manual_fix_overrides.json and "
+                  "MANUAL_FIX_CONFIG; the JSON wins: %s" % ", ".join(conflicts))
 
     def list_master_objects(self):
         """
@@ -272,10 +284,88 @@ class ICAManualFixProcessor:
         
         return wave_orig, flux_orig, z, errs_orig, mask_orig, spec_name
     
+    def fit_with_overrides(self, name, mask_ranges=None, mask_pixels=None,
+                           comps_use=None, unmask_ranges=None, unmask_pixels=None):
+        """Run the full ICA fit for `name` under an explicit manual override and
+        return the arrays plus CIV parameters.
+
+        This is the single numerical path for the project: both process_object()
+        (batch) and the manual-fix GUI call it, so a batch fit reproduces a GUI
+        fit bit-for-bit given the same override. Touches no matplotlib, so it is
+        safe to call from a worker thread.
+
+        Masks are applied on the input grid *before* main_ICA. Unmasking has to
+        happen after, because the NAL/BAL masks being overridden are computed
+        inside main_ICA; honouring an unmask therefore means re-running the
+        reconstruction with those flags cleared. With nothing unmasked that whole
+        branch is skipped, leaving the original single-pass behaviour untouched.
+        """
+        mask_ranges = mask_ranges or []
+        mask_pixels = mask_pixels or []
+        unmask_ranges = unmask_ranges or []
+        unmask_pixels = unmask_pixels or []
+
+        # Reload from disk every fit -> guaranteed-clean mask state, no cross-fit
+        # mutation bugs. Cheap next to the ~5-10 s fit itself.
+        wave, flux, z, errs, mask, spec_name = self.setup_object(name)
+        mask = np.asarray(mask, dtype=float).copy()
+
+        for lo, hi in mask_ranges:
+            mask[(wave >= lo) & (wave <= hi)] = 1
+        for wl in mask_pixels:
+            mask[np.argmin(np.abs(wave - wl))] = 1
+
+        cu = None if comps_use in (None, "", "auto") else comps_use
+
+        (wave_arb, flux_arb, errs_arb, mask_arb,
+         wave_ica, flux_ica, f2500) = run_ICA_r20_components.main_ICA(
+            wave, flux, errs, mask, z, name="", ica_path=None, comps_use=cu)
+
+        if unmask_ranges or unmask_pixels:
+            # flux_arb carries the *real* (not median-replaced) flux at NAL
+            # pixels, which is exactly what is wanted at an unmasked pixel;
+            # still-masked pixels are ignored by get_ICA either way.
+            mask_ref = np.asarray(mask_arb, dtype=float).copy()
+            for lo, hi in unmask_ranges:
+                mask_ref[(wave_arb >= lo) & (wave_arb <= hi)] = 0
+            for wl in unmask_pixels:
+                mask_ref[np.argmin(np.abs(wave_arb - wl))] = 0
+
+            wave_ica2, flux_ica2 = run_ICA_r20_components.get_ICA(
+                wave_arb, flux_arb, errs_arb, mask_ref, z,
+                ica_path=None, use_priors=False, comps_use=cu)
+
+            # Rescale f2500 by the original fit's real-unit factor at 2500 A
+            # (norm/morph scaling is fixed by the data, not by the fit).
+            i0 = np.argmin(np.abs(wave_ica - 2500.))
+            i2 = np.argmin(np.abs(wave_ica2 - 2500.))
+            if flux_ica[i0]:
+                f2500 = float(flux_ica2[i2] * (f2500 / flux_ica[i0]))
+            wave_ica, flux_ica = wave_ica2, flux_ica2
+            # Report the mask actually used so unmasked pixels no longer render
+            # as NAL/BAL (they were set to 0 in mask_ref).
+            mask_arb = mask_ref
+
+        civ_blue, civ_ew = self.get_CIV_parameters(
+            wave_arb, flux_arb, wave_ica, flux_ica, name)
+
+        return dict(
+            name=name, spec_name=spec_name, z=float(z),
+            wave_arb=wave_arb, flux_arb=flux_arb, errs_arb=errs_arb,
+            mask_arb=mask_arb, wave_ica=wave_ica, flux_ica=flux_ica,
+            f2500=float(f2500), civ_blue=float(civ_blue), civ_ew=float(civ_ew),
+        )
+
     def apply_manual_fix(self, name, wave_orig, mask_orig):
         """
         Apply manual fix based on configuration
-        
+
+        LEGACY. process_object() no longer calls this -- it resolves overrides
+        through ica.manual_fix_store (which covers MANUAL_FIX_CONFIG *and* the
+        GUI's JSON, including ranges and unmasking) and fits via
+        fit_with_overrides(). Kept because it reads MANUAL_FIX_CONFIG directly
+        and is handy for inspecting the old behaviour in isolation.
+
         Parameters:
         -----------
         name : str
@@ -516,21 +606,25 @@ class ICAManualFixProcessor:
             Dictionary containing all fit results
         """
         print(f"\n=== Processing {name} ===")
-        
-        # Setup object data
-        wave_orig, flux_orig, z, errs_orig, mask_orig, spec_name = self.setup_object(name)
-        print(f'Median of flux_orig: {np.nanmedian(flux_orig)}')  # Debugging line
-        # Apply manual fixes
-        mask_orig, comps_use = self.apply_manual_fix(name, wave_orig, mask_orig)
-        
-        # Run ICA analysis
-        wave_arb, flux_arb, errs_arb, mask_arb, wave_ica, flux_ica, f2500_ica = \
-            run_ICA_r20_components.main_ICA(wave_orig, flux_orig, errs_orig, mask_orig, z,
-                                           name="", ica_path=None, comps_use=comps_use)
-        
-        # Extract CIV parameters
-        CIV_blue, CIV_EW = self.get_CIV_parameters(wave_arb, flux_arb, wave_ica, flux_ica, name)
-        
+
+        # Resolve the manual fix from the one shared store: the GUI's JSON if it
+        # has an entry, else MANUAL_FIX_CONFIG. Objects with no entry either way
+        # resolve to an empty override, i.e. the untouched automatic fit.
+        ov = manual_fix_store.resolve_override(name, overrides=self._overrides)
+        print(f"Manual fix for {name}: {manual_fix_store.describe(ov)}")
+
+        # One shared numerical path with the GUI -> a batch run reproduces it.
+        fit = self.fit_with_overrides(
+            name, mask_ranges=ov['mask_ranges'], mask_pixels=ov['mask_pixels'],
+            comps_use=ov['comps_use'], unmask_ranges=ov['unmask_ranges'],
+            unmask_pixels=ov['unmask_pixels'])
+
+        wave_arb, flux_arb, errs_arb = fit['wave_arb'], fit['flux_arb'], fit['errs_arb']
+        mask_arb, wave_ica, flux_ica = fit['mask_arb'], fit['wave_ica'], fit['flux_ica']
+        z, spec_name, f2500_ica = fit['z'], fit['spec_name'], fit['f2500']
+        CIV_blue, CIV_EW = fit['civ_blue'], fit['civ_ew']
+        comps_use = ov['comps_use']
+
         # Compile results
         results = {
             'object_name': name,
@@ -540,10 +634,14 @@ class ICAManualFixProcessor:
             'CIV_EW': CIV_EW,
             'f2500': f2500_ica,
             'components_used': comps_use,
-            'manual_masking_applied': name in MANUAL_FIX_CONFIG and MANUAL_FIX_CONFIG[name]['custom_mask_pixels'] is not None,
-            'forced_components': comps_use is not None
+            'manual_masking_applied': bool(ov['mask_ranges'] or ov['mask_pixels']),
+            'manual_unmasking_applied': bool(ov['unmask_ranges'] or ov['unmask_pixels']),
+            'forced_components': comps_use is not None,
+            # provenance: which store this object's fix came from, and what it was
+            'override_source': ov['source'],
+            'override_summary': manual_fix_store.describe(ov),
         }
-        
+
         print(f"Results: CIV_blue={CIV_blue:.1f} km/s, CIV_EW={CIV_EW:.2f} Å, F2500={f2500_ica:.3e}")
         
         # Create diagnostic plots if requested

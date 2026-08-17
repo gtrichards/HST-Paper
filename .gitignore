@@ -37,3 +37,11 @@ ICA_full/
 
 # Raw Data Directory
 raw_data/
+
+# Manual-fix GUI outputs. These are regenerable measurements, not code or
+# decisions, so they stay out of the repo (relocate with --measurements and
+# --fix-plots). The override JSON is deliberately NOT ignored: it records the
+# masking decisions that determine results, and versioning it is what makes a
+# run reproducible from the repo alone.
+ica/manual_fix_measurements.csv
+ica/manual_fix_overrides.json.bak-*
