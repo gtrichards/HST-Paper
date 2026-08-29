@@ -157,6 +157,75 @@ def upsert_measurement(row, path=DEFAULT_MEASUREMENTS_CSV):
     return len(rows)
 
 
+# ---------------------------------------------------------------------------
+# Systemic redshift overrides
+# ---------------------------------------------------------------------------
+# A sparse table of deliberate redshift corrections, layered over whatever the
+# rebinned FITS carries (which came from master_catalog best_z at rebin time).
+# Only objects listed here are changed; everything else is untouched.
+#
+# Deliberately NOT read from CIV_measurements_v22.xlsx: that column is rounded
+# to 4 decimal places for most objects, so using it wholesale would shift
+# hundreds of redshifts by up to ~14 km/s that nobody intended to change.
+# Edit there if you like, then import with sandbox/import_redshifts_from_xlsx.py.
+DEFAULT_REDSHIFT_CSV = Path(__file__).resolve().parent / "redshift_overrides.csv"
+
+REDSHIFT_COLUMNS = ["object", "z", "source", "note", "updated_utc"]
+
+
+def load_redshift_overrides(path=DEFAULT_REDSHIFT_CSV):
+    """{object key: {z, source, note}}. Keys may be a FITS stem
+    ('3C345_FOS') or a bare object name ('3C345'); the bare name applies to
+    every instrument of that object, which is what a systemic redshift means."""
+    import csv
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            key = str(row.get("object", "")).strip()
+            if not key:
+                continue
+            try:
+                z = float(row["z"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if z <= 0:
+                continue
+            out[key] = dict(z=z, source=str(row.get("source", "")).strip(),
+                            note=str(row.get("note", "")).strip())
+    return out
+
+
+def resolve_redshift(name, z_default, overrides=None,
+                     path=DEFAULT_REDSHIFT_CSV):
+    """Redshift to use for `name`, and where it came from.
+
+    Tries the full spectrum stem first, then the object name with the
+    instrument suffix stripped. Returns (z, source) where source is "catalog"
+    when no override applies.
+    """
+    if overrides is None:
+        overrides = load_redshift_overrides(path)
+    if not overrides:
+        return float(z_default), "catalog"
+    for key in (str(name).strip(), str(name).strip().rsplit("_", 1)[0]):
+        hit = overrides.get(key)
+        if hit is not None:
+            return float(hit["z"]), (hit["source"] or "override")
+    return float(z_default), "catalog"
+
+
+def save_redshift_overrides(rows, path=DEFAULT_REDSHIFT_CSV):
+    """Write the override table. `rows` is an iterable of dicts."""
+    import csv
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=REDSHIFT_COLUMNS)
+        w.writeheader()
+        for r in rows:
+            w.writerow({c: r.get(c, "") for c in REDSHIFT_COLUMNS})
+
+
 def check_conflicts(overrides_path=DEFAULT_OVERRIDES_JSON):
     """Objects defined in both stores. The JSON wins; this makes that visible
     instead of silent, so a stale config entry cannot quietly be ignored."""

@@ -116,6 +116,12 @@ class ICAManualFixProcessor:
         self.overrides_path = overrides_path if overrides_path is not None \
             else manual_fix_store.DEFAULT_OVERRIDES_JSON
         self._overrides = manual_fix_store.load_overrides(self.overrides_path)
+
+        # Systemic-redshift corrections, read once per run. Sparse: only the
+        # objects deliberately changed appear here.
+        self._redshift_overrides = manual_fix_store.load_redshift_overrides()
+        if self._redshift_overrides:
+            print("Loaded %d redshift override(s)" % len(self._redshift_overrides))
         conflicts = sorted(set(self._overrides) & set(MANUAL_FIX_CONFIG))
         if conflicts:
             print("WARNING: defined in both manual_fix_overrides.json and "
@@ -258,6 +264,22 @@ class ICAManualFixProcessor:
         wave_orig = spec[1].data["Rest-Frame Wavelength"]
         flux_orig = spec[1].data["Coadded Flux (Arbitrary Units)"]
         z         = spec[1].data["Redshift"][0]
+
+        # Systemic-redshift override. The FITS carries the redshift used at
+        # rebin time *and* a rest-frame grid already divided by (1+z), so the
+        # two must be changed together: rescaling the grid by
+        # (1+z_old)/(1+z_new) reproduces exactly what the rebin would have
+        # produced for the new redshift, without needing the raw data again.
+        # Objects with no override are untouched (z_src == "catalog").
+        z_new, z_src = manual_fix_store.resolve_redshift(
+            name, z, overrides=self._redshift_overrides)
+        if z_src != "catalog" and z_new != z:
+            dv = 299792.458 * (z_new - z) / (1.0 + z)
+            print("Redshift override for %s: %.6f -> %.6f (%+.0f km/s, %s)"
+                  % (name, z, z_new, dv, z_src))
+            wave_orig = np.asarray(wave_orig, dtype=float) * (1.0 + z) / (1.0 + z_new)
+            z = z_new
+
         flux_orig /= np.nanmedian(flux_orig)
         errs_orig = spec[1].data["Coadded Flux Errors"] / np.nanmedian(flux_orig)
         
