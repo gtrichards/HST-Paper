@@ -64,14 +64,17 @@ def get_fit(wave, flux, errs, mask, wave_comp, flux_comp):
     wave_fit        = wave_comp[comp_mask]
     composite_fit       = flux_comp[comp_mask]
 
-    if len(wave[wavecoverage_mask])==len(wave_fit):
-        fit_y  = fit_comp(composite_fit, wave[wavecoverage_mask], flux[wavecoverage_mask], 1/(errs[wavecoverage_mask]**2), mask[wavecoverage_mask])
-    else:
-        #input wave is greater by one pixel, cut components byb one
-        if len(wave[wavecoverage_mask])-len(wave_fit) == -1:
-            fit_y  = fit_comp(composite_fit[:,:-1], wave[wavecoverage_mask], flux[wavecoverage_mask], 1/(errs[wavecoverage_mask]**2), mask[wavecoverage_mask])
-        elif len(wave[wavecoverage_mask])-len(wave_fit) == 1:
-            fit_y  = fit_comp(composite_fit, wave[wavecoverage_mask][:-1], flux[wavecoverage_mask][:-1], 1/(errs[wavecoverage_mask][:-1]**2), mask[wavecoverage_mask][:-1])
+    # Truncate spectrum and composite to a common length. Previously only a
+    # difference of exactly +/-1 pixel was handled, so any larger mismatch fell
+    # through both branches and left fit_y unassigned (UnboundLocalError below);
+    # that happens as soon as the input grid is shifted by more than a pixel.
+    # The old -1 branch also sliced composite_fit[:,:-1], a two-index slice of a
+    # one-dimensional array, so it could never have run without raising.
+    # Taking the shorter length reproduces the intended behaviour in both cases.
+    sel = wavecoverage_mask
+    n = min(int(sel.sum()), composite_fit.shape[-1])
+    fit_y = fit_comp(composite_fit[..., :n], wave[sel][:n], flux[sel][:n],
+                     1/(errs[sel][:n]**2), mask[sel][:n])
 
     #compute weights
     weight  = fit_y.params["A"].value

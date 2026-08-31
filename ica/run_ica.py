@@ -335,35 +335,27 @@ def get_ICA(wave, flux, errs, mask, z, ica_path=None, use_priors=True, plot_spec
     #print(prior_low)
 
     # mod EW
-    #print(len(wave[mod_mask]), len(wave_mod_fit))
-    if len(wave[mod_mask])==len(wave_mod_fit):
-        fit_mod  = ICA_fit(components_mod_fit, wave[mod_mask], flux[mod_mask], 1/(errs[mod_mask]**2), mask[mod_mask], priors=prior_mod)
-    else:
-        #input wave is greater by one pixel, cut components byb one
-        if len(wave[mod_mask])-len(wave_mod_fit) == -1:
-            fit_mod  = ICA_fit(components_mod_fit[:,:-1], wave[mod_mask], flux[mod_mask], 1/(errs[mod_mask]**2), mask[mod_mask], priors=prior_mod)
-        elif len(wave[mod_mask])-len(wave_mod_fit) == 1:
-            fit_mod  = ICA_fit(components_mod_fit, wave[mod_mask][:-1], flux[mod_mask][:-1], 1/(errs[mod_mask][:-1]**2), mask[mod_mask][:-1], priors=prior_mod)
-    #low EW
-    if len(wave[low_mask])==len(wave_low_fit):
-        fit_low  = ICA_fit(components_low_fit, wave[low_mask], flux[low_mask], 1/(errs[low_mask]**2), mask[low_mask], priors=prior_low)
-    else:
-        #input wave is greater by one pixel, cut components byb one
-        if len(wave[low_mask])-len(wave_low_fit) == -1:
-            fit_low  = ICA_fit(components_low_fit[:,:-1], wave[low_mask], flux[low_mask], 1/(errs[low_mask]**2), mask[low_mask], priors=prior_low)
-        elif len(wave[low_mask])-len(wave_low_fit) == 1:
-            fit_low  = ICA_fit(components_low_fit, wave[low_mask][:-1], flux[low_mask][:-1], 1/(errs[low_mask][:-1]**2), mask[low_mask][:-1], priors=prior_low)
+    def _fit_aligned(components, sel, priors):
+        """Fit after truncating spectrum and components to a common length.
 
-    #high EW
-    if len(wave[high_mask])==len(wave_high_fit):
-        fit_high  = ICA_fit(components_high_fit, wave[high_mask], flux[high_mask], 1/(errs[high_mask]**2), mask[high_mask], priors=prior_high)
-    else:
-        #input wave is greater by one pixel, cut components byb one
-        if len(wave[high_mask])-len(wave_high_fit) == -1:
-            fit_high  = ICA_fit(components_high_fit[:,:-1], wave[high_mask], flux[high_mask], 1/(errs[high_mask]**2), mask[high_mask], priors=prior_high)
-        elif len(wave[high_mask])-len(wave_high_fit) == 1:
-            #print(wave_high_fit.shape, wave[high_mask].shape)
-            fit_high  = ICA_fit(components_high_fit, wave[high_mask][:-1], flux[high_mask][:-1], 1/(errs[high_mask][:-1]**2), mask[high_mask][:-1], priors=prior_high)
+        The spectrum and the component grid can differ in length, and previously
+        only a difference of exactly +/-1 pixel was handled: any larger mismatch
+        fell through every branch and left the fit variable unassigned, raising
+        UnboundLocalError further down. That happens as soon as the input grid is
+        shifted or resampled by more than a pixel.
+
+        Truncating both to min(len) reproduces the old +/-1 behaviour exactly --
+        when the spectrum was one pixel short the components were trimmed by one,
+        and when it was one long the spectrum was trimmed by one, which is what
+        taking the shorter length does in each case.
+        """
+        n = min(int(sel.sum()), components.shape[1])
+        return ICA_fit(components[:, :n], wave[sel][:n], flux[sel][:n],
+                       1/(errs[sel][:n]**2), mask[sel][:n], priors=priors)
+
+    fit_mod  = _fit_aligned(components_mod_fit,  mod_mask,  prior_mod)
+    fit_low  = _fit_aligned(components_low_fit,  low_mask,  prior_low)
+    fit_high = _fit_aligned(components_high_fit, high_mask, prior_high)
 
     #this is what all branches above would look like w/o index problems
     #fit_mod   = ICA_fit(components_mod[:,mod_comp_mask], wave[mod_mask], flux[mod_mask], 1/(errs[mod_mask]**2), mask[mod_mask]) if len(wave[mod_mask])==len(wave_mod) else ICA_fit(components_mod[:,:-1], wave[mod_mask], flux[mod_mask], 1/(errs[mod_mask]**2), mask[mod_mask])
@@ -444,7 +436,17 @@ def maskIterate(wave, flux, errs, mask, z, ica_path=None):
                 # print(i_left)
                 # print(i_right)
 
-                badpix = (flux_ica[ir_left:ir_right+1]-flux[i_left:i_right+1]) > N*errs[i_left:i_right+1]
+                # The two slices are paired by offset from independent
+                # nearest-wavelength anchors on two different grids, so their
+                # lengths can differ (they did not only when the input grid was
+                # exactly as expected). Both grids share the same 69 km/s
+                # spacing, so equal index offsets are equal wavelength offsets
+                # and the pairing is right -- only the unpaired tail needs
+                # dropping. A no-op whenever the lengths already agree.
+                _n = min(ir_right + 1 - ir_left, i_right + 1 - i_left)
+                badpix = ((flux_ica[ir_left:ir_left + _n]
+                           - flux[i_left:i_left + _n])
+                          > N * errs[i_left:i_left + _n])
                 if badpix.sum() > (len(badpix)//2) and mask[i]==0 and maskBAL[i]==99:
                     #print("found a bad pix")
                     nbad += 1
