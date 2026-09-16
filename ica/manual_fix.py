@@ -464,15 +464,25 @@ class ICAManualFixProcessor:
         
         # Calculate EW
         EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
-        
+
+        # Index the continuum with the same mask as the flux. Previously this
+        # read continuum[i] while stepping flux_r[EW][i], so the continuum was
+        # taken from the start of the reconstruction instead of from the C IV
+        # window -- on the component grid that is index 757, about 240 A
+        # blueward. The continuum falls redward, so too much was subtracted and
+        # the EW came out low by 13-36% (median 23%) across the objects fit so
+        # far. The blueshift moved with it, by up to one 69 km/s grid pixel,
+        # since it is the half-flux point of the cumulative sum below.
+        continuum_EW = continuum[EW]
+
         CIV_EW = 0
         ew_list = [0.]
         for i in range(len(wave_r[EW])):
             try:
-                CIV_EW += max(((flux_r[EW][i] - continuum[i]) / continuum[i]) * 
+                CIV_EW += max(((flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i]) * 
                              (wave_r[EW][i+1] - wave_r[EW][i]), 0)
             except IndexError:
-                CIV_EW += max(((flux_r[EW][i] - continuum[i]) / continuum[i]) * 
+                CIV_EW += max(((flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i]) * 
                              (wave_r[EW][i] - wave_r[EW][i-1]), 0)
             ew_list.append(CIV_EW)
         
@@ -582,13 +592,14 @@ class ICAManualFixProcessor:
         
         # Show EW region and blueshift
         EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
+        continuum_EW = continuum[EW]   # same alignment fix as get_CIV_parameters
         CIV_EW = 0
         ew_list = [0.]
         for i in range(len(wave_r[EW])):
             try:
-                CIV_EW += max(( (flux_r[EW][i] - continuum[i]) / continuum[i] ) * ( wave_r[EW][i+1] - wave_r[EW][i] ), 0) #no absorption
+                CIV_EW += max(( (flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i] ) * ( wave_r[EW][i+1] - wave_r[EW][i] ), 0) #no absorption
             except IndexError:
-                CIV_EW += max(( (flux_r[EW][i] - continuum[i]) / continuum[i] ) * ( wave_r[EW][i] - wave_r[EW][i-1] ), 0)
+                CIV_EW += max(( (flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i] ) * ( wave_r[EW][i] - wave_r[EW][i-1] ), 0)
 
             ew_list.append(CIV_EW)
 
