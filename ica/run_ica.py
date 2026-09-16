@@ -541,7 +541,27 @@ def main_ICA(waveSpec, fluxSpec, errsSpec, maskSpec, z, name="", ica_path=None, 
     mask_NAL, flux_NAL, flux_median_61p = maskNAL(wave, flux, errs, mask)
 
     #standard-ize spectrum shape by morphing
-    flux_morph_NAL, morph_coeff = spec_morph.morph2(wave*(1+z), flux_NAL, errs, z, "") #note NAL pixels replaces in flux array
+    # The morph's continuum fit must not see masked pixels. It fits through
+    # fixed windows (1350-1360, 1435-1465, 1695-1705 A, ...) on whatever flux
+    # it is handed, and until now that was the raw NAL-replaced flux -- so a
+    # user mask overlapping a window was silently ignored at this stage even
+    # though the ICA fit itself honoured it. On 2MASX-J00391586-5117013_COS,
+    # whose BAL reaches the 1435-1465 A window, that moved the morph
+    # coefficient by 5-11% across 1300-1600 A and, since the reconstruction
+    # is de-morphed by dividing by that coefficient, stamped a mask-immune
+    # depression into the model's C IV blue wing. continuum_fit2 skips NaN
+    # pixels inside its windows, so handing the morph a copy with masked
+    # pixels set to NaN is the whole fix; the fit still uses flux_NAL.
+    flux_for_cont = flux_NAL.copy()
+    flux_for_cont[mask > 0] = np.nan
+    try:
+        _, morph_coeff = spec_morph.morph2(wave*(1+z), flux_for_cont, errs, z, "")
+        if not np.all(np.isfinite(morph_coeff)):
+            raise ValueError("non-finite morph coefficient with masked pixels removed")
+    except Exception as exc:       # a window left empty by the mask, or similar
+        print("Morph with masked pixels removed failed (%s); falling back to raw flux" % exc)
+        _, morph_coeff = spec_morph.morph2(wave*(1+z), flux_NAL, errs, z, "")
+    flux_morph_NAL = flux_NAL * morph_coeff  #note NAL pixels replaced in flux array
     flux_morph = flux * morph_coeff
     errs_morph = errs * morph_coeff
 
