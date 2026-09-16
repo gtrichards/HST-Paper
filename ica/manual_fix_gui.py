@@ -172,6 +172,21 @@ def _robust_flux_ylims(flux, wave):
     sub = flux[wave > 1400]
     if not np.any(np.isfinite(sub)):
         sub = flux
+    # Drop wild pixels before taking percentiles. A percentile is no defence
+    # against a block of garbage: 2MASX-J00391586-5117013_COS carries 723
+    # unflagged pixels at 2000-2360 A reaching 92,704 on a median of 2.9 --
+    # 23% of the spectrum -- so its 99th percentile put the top of the panel
+    # at 30,000 and the object could not be worked by hand. Anything above
+    # 40x the median is not the object: the sharpest real line in the sample
+    # (Mrk 1310's C IV) peaks at ~33x continuum and survives this cut.
+    finite = flux[np.isfinite(flux)]
+    if finite.size:
+        med = float(np.nanmedian(finite))
+        if med > 0:
+            keep = sub[np.isfinite(sub) & (sub < 40.0 * med)]
+            if keep.size >= 0.5 * np.isfinite(sub).sum():
+                sub = keep
+            flux = flux[np.isfinite(flux) & (flux < 40.0 * med)] if np.isfinite(flux).sum() else flux
     ylow = max(0.0, float(np.nanpercentile(flux, 1))) if np.any(np.isfinite(flux)) else 0.0
     yhigh = (float(np.nanpercentile(sub, 99) + np.nanmedian(sub))
              if np.any(np.isfinite(sub)) else ylow + 1.0)
