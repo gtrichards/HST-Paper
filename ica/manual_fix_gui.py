@@ -374,7 +374,7 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         side.addWidget(QtWidgets.QLabel("<b>Masks</b> (right-click / right-drag / type)"))
         hint = QtWidgets.QLabel(
             "Right-<i>click</i> a plot to mask the single nearest pixel; "
-            "right-<i>drag</i> for a range. Scroll to zoom (shift+scroll = "
+            "right-<i>drag</i> for a range. Scroll to zoom (option+scroll = "
             "vertical); individual pixels appear once zoomed in.")
         hint.setWordWrap(True)
         hint.setStyleSheet("color:#555; font-size:11px;")
@@ -821,13 +821,20 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self._set_status(msg, _STATUS_OK)
 
     def _on_scroll(self, event):
-        """Scroll to zoom about the cursor: x by default, y with shift held.
+        """Scroll to zoom about the cursor: x by default, y with a modifier held.
+
+        Any modifier -- Option/Alt, Control, Command or Shift -- selects the
+        vertical axis. Shift alone was the original binding, but macOS remaps
+        Shift+wheel to a horizontal scroll before Qt sees it, so the event
+        arrives with a zero vertical delta and matplotlib emits nothing; on a
+        Mac the binding was simply dead. Option is the one to reach for there.
         ax_err shares x with ax_civ, so zooming either keeps them aligned."""
         ax = event.inaxes
         if ax is None or ax not in (self.ax_full, self.ax_civ, self.ax_err):
             return
         factor = 1.0 / _ZOOM_STEP if event.button == "up" else _ZOOM_STEP
-        vertical = bool(event.key and "shift" in event.key)
+        mods = ("shift", "alt", "ctrl", "control", "cmd", "super", "meta")
+        vertical = bool(event.key and any(m in event.key for m in mods))
         if vertical:
             lo, hi = ax.get_ylim()
             anchor = event.ydata
@@ -952,7 +959,22 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self.ax_civ.plot(wave_ica, flux_ica, "-r")
         self.proc.plot_HST(wave, flux, mask, self.ax_civ)
         self.ax_civ.set_xlim(1500, 1600)
-        self.ax_civ.set_ylim(ylow, yhigh + 5)
+        # Scale this panel to what is actually inside the C IV window. The
+        # shared percentile formula caps the top at the 99th percentile of
+        # flux above 1400 A, which clips a sharp narrow peak clean off the
+        # plot -- on NGC 4395 the peak was not visible at all, so there was no
+        # way to judge the fit. Data and model both count, so the model's peak
+        # is never lost either.
+        w_civ = (wave >= 1500) & (wave <= 1600) & np.isfinite(flux)
+        i_civ = (wave_ica >= 1500) & (wave_ica <= 1600) & np.isfinite(flux_ica)
+        if np.any(w_civ) or np.any(i_civ):
+            top = max(float(np.nanmax(flux[w_civ])) if np.any(w_civ) else ylow,
+                      float(np.nanmax(flux_ica[i_civ])) if np.any(i_civ) else ylow)
+            bot = min(float(np.nanmin(flux[w_civ])) if np.any(w_civ) else ylow, 0.0)
+            pad = 0.06 * max(top - bot, 1e-6)
+            self.ax_civ.set_ylim(bot - pad, top + pad)
+        else:
+            self.ax_civ.set_ylim(ylow, yhigh + 5)
         self.ax_civ.set_ylabel("Flux (arb.)")
 
         # errors
