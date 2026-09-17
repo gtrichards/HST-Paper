@@ -150,8 +150,31 @@ def coadd(stems):
 
     flux = np.where(wsum > 0, fsum / np.where(wsum > 0, wsum, 1.0), np.nan)
     errs = np.where(wsum > 0, 1.0 / np.sqrt(np.where(wsum > 0, wsum, 1.0)), np.nan)
-    wave = np.exp(ref + ks * STEP)
     mask = np.where(wsum > 0, 0.0, 1.0)
+
+    # Write the merge on the FULL lattice from its first to its last pixel, with
+    # gap pixels carried as NaN flux and a set bad flag -- exactly how the
+    # single-spectrum rebin files carry their own detector gaps. Until now only
+    # pixels that had a contributor were written, so a merge whose spectra do
+    # not touch (Mrk 486: COS to 1414 A, FOS from 1509) came out with a hole in
+    # its wavelength array. Both spec_morph.morph2 (reference continuum aligned
+    # by index from the first pixel) and run_ica.get_ICA (component grid
+    # truncated to the spectrum's length, pixel i paired with component i)
+    # assume a contiguous grid, so every pixel after a hole was fit against the
+    # wrong wavelength: on Mrk 486 that turned a clean FOS fit (473.5 / 46) into
+    # 1093.5 / 5.6 with a 77% trough. Mrk 110, Mrk 290 and NGC 3783 had holes
+    # inside the fit range too; the UGC 12163 splices were nothing but holes.
+    full = np.arange(ks.min(), ks.max() + 1)
+    at = np.searchsorted(ks, full)
+    hit = (at < ks.size) & (ks[np.minimum(at, ks.size - 1)] == full)
+    def lift(arr, fill):
+        out = np.full(full.size, fill, dtype=float)
+        out[hit] = arr[at[hit]]
+        return out
+    flux, errs = lift(flux, np.nan), lift(errs, np.nan)
+    mask = lift(mask, 1.0)
+    nspec = lift(nspec.astype(float), 0.0).astype(int)
+    wave = np.exp(ref + full * STEP)
     return wave, flux, errs, mask, specs[0][4], nspec
 
 

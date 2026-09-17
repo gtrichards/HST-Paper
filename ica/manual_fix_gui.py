@@ -161,7 +161,7 @@ def save_overrides(path, overrides):
         json.dump(overrides, f, indent=2)
 
 
-def _robust_flux_ylims(flux, wave):
+def _robust_flux_ylims(flux, wave, errs=None):
     """ylow/yhigh for the flux panels, matching create_diagnostic_plot's formula
     (ylow = 1st pct; yhigh = 99th pct + median over wave>1400) but NaN-safe.
 
@@ -179,6 +179,23 @@ def _robust_flux_ylims(flux, wave):
     # at 30,000 and the object could not be worked by hand. Anything above
     # 40x the median is not the object: the sharpest real line in the sample
     # (Mrk 1310's C IV) peaks at ~33x continuum and survives this cut.
+    # Pixels whose ERROR is non-physical are not measurements and must not set
+    # the scale either: the garbage blocks near 2050 A in Mrk 231_COS and
+    # NGC 985_COS carry NEGATIVE errors (medians -661 and -90,604), and the
+    # one in 2MASX-J00391586-5117013_COS errors of 161,499 on a median of
+    # 0.42. A flux cut alone leaves the low tail of such a block in, which on
+    # Mrk 231 put the panel top at 32 on a continuum of 2.9 and squashed
+    # everything below 1900 A. Real sharp lines carry positive errors within
+    # ~12x the median (Mrk 1310, Mrk 40), so they are untouched by this.
+    if errs is not None:
+        errs = np.asarray(errs, dtype=float)
+        if errs.shape == flux.shape and np.any(np.isfinite(errs) & (errs > 0)):
+            med_e = float(np.nanmedian(errs[np.isfinite(errs) & (errs > 0)]))
+            junk = ~np.isfinite(errs) | (errs <= 0) | (errs > 100.0 * med_e)
+            flux = np.where(junk, np.nan, flux)
+            sub = flux[wave > 1400]
+            if not np.any(np.isfinite(sub)):
+                sub = flux
     finite = flux[np.isfinite(flux)]
     if finite.size:
         med = float(np.nanmedian(finite))
@@ -955,7 +972,7 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         for ax in (self.ax_full, self.ax_civ):
             ax._mask_patches = []
 
-        ylow, yhigh = _robust_flux_ylims(flux, wave)
+        ylow, yhigh = _robust_flux_ylims(flux, wave, errs=errs)
         # flag objects with no flux in the CIV window (e.g. COS coverage < 1400 A)
         self._civ_has_data = bool(
             np.any(np.isfinite(flux[(wave >= 1500) & (wave <= 1600)])))

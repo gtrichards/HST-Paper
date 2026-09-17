@@ -499,9 +499,32 @@ class ICAManualFixProcessor:
         Create diagnostic plots for the ICA fit
         """
         c4mask = wave_arb > 1400
-        ylow, yhigh = max(0, np.nanpercentile(flux_arb, 1)), \
-                      np.nanpercentile(flux_arb[c4mask], 99) + np.nanmedian(flux_arb[c4mask])
-        ylow_err, yhigh_err = max(0, np.nanpercentile(errs_arb, 1)), np.nanpercentile(errs_arb, 99)
+        # Scale the panels from the object, not from blocks of garbage. Some
+        # rebinned spectra carry unflagged junk -- NGC 985_COS reaches 3.6e6 at
+        # 2000-2060 A with NEGATIVE errors, Mrk 231_COS 1.7e5 at 2030-2070 A
+        # (errors -661), 2MASX-J00391586-5117013_COS 9.3e4 at 2000-2360 A --
+        # which a percentile cannot survive: the overview panel topped out at
+        # 160,000 and the spectrum was a line along the axis. Pixels with a
+        # non-positive error, an error above 100x the median error, or a flux
+        # above 40x the median are left out of the percentiles only; nothing
+        # about the fit or the data drawn changes. A real sharp line survives
+        # (Mrk 1310's C IV is ~33x continuum with errors within 12x the median).
+        _f = np.asarray(flux_arb, dtype=float).copy()
+        _e = np.asarray(errs_arb, dtype=float)
+        _ok = np.isfinite(_e) & (_e > 0)
+        if _ok.any():
+            _med_e = float(np.nanmedian(_e[_ok]))
+            _junk = ~_ok | (_e > 100.0 * _med_e)
+            _f[_junk] = np.nan
+        if np.isfinite(_f).any():
+            _med_f = float(np.nanmedian(_f))
+            if _med_f > 0:
+                _f[_f > 40.0 * _med_f] = np.nan
+        _fc = _f[c4mask] if np.isfinite(_f[c4mask]).any() else _f
+        ylow, yhigh = max(0, np.nanpercentile(_f, 1)), \
+                      np.nanpercentile(_fc, 99) + np.nanmedian(_fc)
+        _ec = _e[_ok] if _ok.any() else _e
+        ylow_err, yhigh_err = max(0, np.nanpercentile(_ec, 1)), np.nanpercentile(_ec, 99)
         
         xlow, xhigh = 1500, 1600
         xlow0, xhigh0 = max(min(wave_arb), 1250), min(max(wave_arb), max(wave_ica))
