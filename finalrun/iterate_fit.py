@@ -335,8 +335,29 @@ def main():
     # to apply, and prefer an external narrow-line redshift where one exists.
     from model_data_shift import xcorr_shift
     CIII = 1908.73
+
+    # Pixels that are not measurements must not set an anchor. Some rebinned
+    # spectra carry blocks the bad-pixel mask does not flag: Mrk 231_COS has
+    # NEGATIVE errors across 1861-2341 A, which is 226 of the 228 pixels in the
+    # C III] window, and NGC 985_COS and 2MASX-J00391586-5117013_COS carry
+    # similar blocks just redward of it. A negative or zero error is not a
+    # measurement at all, and an error orders of magnitude above the window's
+    # own median is the detector falling off the end. Both are excluded here;
+    # everything else the mask already handles. Note this is a change to a
+    # DIAGNOSTIC only -- the fit never sees it, and no measurement moves.
+    finite_e = np.isfinite(e) & (e > 0)
+    usable = (m == 0) & np.isfinite(f) & finite_e
+
+    def _anchor_ok(lo, hi):
+        """Usable pixels in a window, minus any whose error is wild for it."""
+        sel = usable & (w >= lo) & (w <= hi)
+        if sel.sum() < 10:
+            return sel
+        med_e = float(np.median(e[sel]))
+        return sel & (e <= 100.0 * med_e)
+
     zdiag = {}
-    sel = (w >= 1880) & (w <= 1940) & (m == 0) & np.isfinite(f)
+    sel = _anchor_ok(1880, 1940)
     if sel.sum() >= 25:
         ww, ff = w[sel], f[sel]
         k = np.ones(5) / 5.0
@@ -344,10 +365,25 @@ def main():
         pk = float(ww[np.argmax(sm[2:-2]) + 2])
         zdiag["ciii_peak_dv"] = round(299792.458 * (pk - CIII) / CIII, 0)
     for lab, lo, hi in (("ciii_xcorr_dv", 1860, 1960), ("mgii_xcorr_dv", 2740, 2860)):
-        v, n_ = xcorr_shift(w, np.where(m == 0, f, np.nan), model, lo, hi)
+        ok = _anchor_ok(lo, hi)
+        v, n_ = xcorr_shift(w, np.where(ok, f, np.nan), model, lo, hi)
         zdiag[lab] = None if not np.isfinite(v) else round(float(v), 0)
+        # Carry the health of the anchor with the anchor. NGC 985's C III]
+        # window sits at the blue edge of the COS spectrum where the errors run
+        # from 0.6 to 7.4 across the window, so its +2000 km/s is a low-S/N
+        # number rather than a corrupted one -- no cut fixes that, and the only
+        # honest remedy is to report the S/N beside the shift.
+        if ok.sum():
+            zdiag[lab.replace("_dv", "_snr")] = round(float(np.median(f[ok] / e[ok])), 1)
+            zdiag[lab.replace("_dv", "_npx")] = int(ok.sum())
+    def _zfmt(k_, v):
+        if v is None:
+            return "--"
+        if k_.endswith("_dv"):
+            return "%+.0f km/s" % v
+        return ("%.1f" % v) if k_.endswith("_snr") else "%d" % v
     zline = "   redshift check   " + "  ".join(
-        "%s=%s" % (k_, ("%+.0f km/s" % v) if v is not None else "--") for k_, v in zdiag.items())
+        "%s=%s" % (k_, _zfmt(k_, v)) for k_, v in zdiag.items())
 
     record = {
         "name": args.name, "iteration": n, "label": args.label,
