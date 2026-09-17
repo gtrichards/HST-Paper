@@ -163,7 +163,11 @@ def coadd(stems):
     # assume a contiguous grid, so every pixel after a hole was fit against the
     # wrong wavelength: on Mrk 486 that turned a clean FOS fit (473.5 / 46) into
     # 1093.5 / 5.6 with a 77% trough. Mrk 110, Mrk 290 and NGC 3783 had holes
-    # inside the fit range too; the UGC 12163 splices were nothing but holes.
+    # inside the fit range too; the UGC 12163 splices were nothing but holes --
+    # and, not being merges, those splice files were missed by the replay that
+    # rebuilt the 22 merges after this fix, so the diagnosis recorded against
+    # them (a slope kink between epochs) stood on broken fits for a day. Rebuild
+    # every artefact this function wrote, not just the ones named "merge".
     full = np.arange(ks.min(), ks.max() + 1)
     at = np.searchsorted(ks, full)
     hit = (at < ks.size) & (ks[np.minimum(at, ks.size - 1)] == full)
