@@ -86,6 +86,14 @@ def main():
     for o in args.orders:
         q = queue[o]
         stems = [s for s in q["stems"].split(";") if s]
+        if not stems:
+            # No HST spectrum at all (the IUE-only objects). Nothing to fit, but
+            # the object still gets its look and its decision row (manmask 1,
+            # iue_only) -- entered by hand in decisions.csv, not here.
+            print("[%d] %s: no HST spectra (IUE-only) -- skipped, needs an iue_only row"
+                  % (o, q["name_pub"]), flush=True)
+            summary.append(dict(order=o, name=q["name_pub"], folder="", nspec=0, pick="iue_only"))
+            continue
         if len(stems) > 1:
             name = "%s_COMBINED" % q["name_mast_key"]
             fits_path = os.path.join(WORKDIR, name + ".fits")
@@ -157,7 +165,10 @@ def main():
 
     out = args.summary or os.path.join(OUTDIR, "batch_summary.csv")
     with open(out, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(summary[0].keys()))
+        keys = []
+        for row in summary:
+            keys += [k for k in row if k not in keys]
+        w = csv.DictWriter(fh, fieldnames=keys)
         w.writeheader()
         w.writerows(summary)
     print("\n-> %s" % out)
