@@ -187,7 +187,7 @@ def _prefer_exposures(prods):
 
 
 def filter_products(prods):
-    """SCIENCE products at calibration level 2-3, extracted spectra only.
+    """Public SCIENCE products at calibration level 2-3, extracted spectra only.
 
     The type, level and subgroup filters are identical to `_filter_products` in
     download_spectra.py, so spectra retrieved by either route are
@@ -199,6 +199,21 @@ def filter_products(prods):
         return prods
     prods = prods[(prods['productType'] == 'SCIENCE') &
                   (prods['calib_level'].isin(CALIB_LEVELS))]
+    # Exclusive-access products cannot be retrieved without the PI's
+    # permissions: the archive answers HTTP 401 for every one of them.  Keeping
+    # them in the plan turns a data-rights fact into 426 download errors, which
+    # is how ESO 113-45's proprietary STIS programme first appeared.  Drop them
+    # here and say so, so the manifest lists what is actually obtainable and the
+    # sample is defined by public data.
+    if 'dataRights' in prods.columns:
+        rights = prods['dataRights'].astype(str).str.upper()
+        n_excl = int((rights != 'PUBLIC').sum())
+        if n_excl:
+            for (nm, fam), grp in prods[rights != 'PUBLIC'].groupby(
+                    ['common_name', 'inst_family'], sort=True):
+                print('    NOTE  %s / %s: %d exclusive-access product(s) skipped'
+                      % (nm, fam, len(grp)), flush=True)
+        prods = prods[rights == 'PUBLIC']
     keep = []
     for inst, subgroups in PRODUCT_SUBGROUPS.items():
         m = prods['inst_family'] == inst
