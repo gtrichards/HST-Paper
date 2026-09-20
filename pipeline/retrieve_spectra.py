@@ -33,7 +33,7 @@ For every object in the catalogue:
      HASP/HLSP co-add, excluded because the pipeline does its own co-addition --
      and, for COS and STIS, only the extracted-spectrum subgroups;
   4. download what is not already on disk, into
-     <data-dir>/MAST_v23/<common_name>/;
+     <data-dir>/MAST_v23/<common_name>/<inst_family>/;
   5. write a manifest naming every product retrieved, so completeness can be
      checked without re-querying.
 
@@ -143,29 +143,47 @@ def query_observations(obs_module, name, ra, dec):
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def _prefer_summed(prods):
-    """Within one observation, keep X1DSUM in preference to its X1D siblings.
+def _prefer_exposures(prods):
+    """Within one COS association, keep the X1D sub-exposures, drop the X1DSUM.
 
-    For COS, X1DSUM is the sum of the sub-exposures of an association and X1D
-    holds those sub-exposures individually; retrieving both fetches the same
-    photons twice and, if both reach the co-adder, would double-weight them.
-    Measured on the 64-object repair set, this is the common case: 1046 of 1327
-    exposures returned two products each.
+    X1DSUM is CalCOS's sum of the sub-exposures of an association; X1D holds
+    those sub-exposures individually.  Retrieving both fetches the same photons
+    twice.  The sub-exposures are the ones to keep, for two reasons: the
+    co-adder combines exposures with inverse-variance weighting itself, and
+    `rebinning/read_spec_data.read_cos_flat` globs `*_x1d.fits` only, so an
+    X1DSUM is invisible to the rebinning step and a directory holding nothing
+    else rebins to nothing.
 
-    Applied per obsID so that an observation without a summed product keeps its
-    X1Ds. STIS is left alone -- its X1D and SX1 are different extraction modes
+    The link is `parent_obsid`: an association's X1DSUM carries
+    obsID == parent_obsid, and its member X1Ds carry the same parent_obsid.
+    Measured on the 64-object repair set, all 228 associations offering an
+    X1DSUM also offer their X1Ds, so nothing is lost; the fallback below keeps
+    an X1DSUM anyway where a group somehow has no X1D, and says so, since that
+    case needs the reader taught before it can be used.
+
+    STIS is left alone -- its X1D and SX1 are different extraction modes
     (MAMA versus CCD ACCUM), not a sum and its parts.
     """
-    if prods.empty or 'obsID' not in prods.columns:
+    if prods.empty or 'parent_obsid' not in prods.columns:
         return prods
-    keep_idx = []
-    for _, grp in prods.groupby(['obsID', 'inst_family'], sort=False):
-        sub = grp['productSubGroupDescription'].astype(str)
-        if (grp['inst_family'] == 'COS').any() and (sub == 'X1DSUM').any():
-            keep_idx.extend(grp.index[sub == 'X1DSUM'])
-        else:
-            keep_idx.extend(grp.index)
-    return prods.loc[sorted(keep_idx)]
+    sub = prods['productSubGroupDescription'].astype(str)
+    is_cos = prods['inst_family'] == 'COS'
+    drop = []
+    orphan = []
+    for pid, grp in prods[is_cos].groupby('parent_obsid', sort=False):
+        g_sub = grp['productSubGroupDescription'].astype(str)
+        has_exp = (g_sub == 'X1D').any()
+        has_sum = (g_sub == 'X1DSUM').any()
+        if has_sum and has_exp:
+            drop.extend(grp.index[g_sub == 'X1DSUM'])
+        elif has_sum:
+            orphan.extend(grp.index[g_sub == 'X1DSUM'])
+    if orphan:
+        print('    NOTE  %d X1DSUM product(s) kept with no X1D sibling; '
+              'read_cos_flat will not read them: %s'
+              % (len(orphan),
+                 ', '.join(prods.loc[orphan, 'productFilename'].head(4))))
+    return prods.drop(index=drop) if drop else prods
 
 
 def filter_products(prods):
@@ -173,8 +191,9 @@ def filter_products(prods):
 
     The type, level and subgroup filters are identical to `_filter_products` in
     download_spectra.py, so spectra retrieved by either route are
-    interchangeable.  The one deliberate difference is `_prefer_summed`: where
-    COS offers both an X1DSUM and its constituent X1Ds, only the sum is taken.
+    interchangeable.  The one deliberate difference is `_prefer_exposures`:
+    where COS offers both an X1DSUM and its constituent X1Ds, only the X1Ds are
+    taken, because that is what the rebinning step reads.
     """
     if prods.empty:
         return prods
@@ -188,7 +207,7 @@ def filter_products(prods):
         else:
             keep.append(prods[m & prods['productSubGroupDescription'].isin(subgroups)])
     out = pd.concat(keep, ignore_index=False) if keep else pd.DataFrame()
-    return _prefer_summed(out).reset_index(drop=True)
+    return _prefer_exposures(out).reset_index(drop=True)
 
 
 def products_for(obs_module, obs):
@@ -215,7 +234,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[3],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--data-dir', default=os.environ.get('HST_PAPER_DATA_DIR'),
-                    help='root for downloaded FITS; files land in <data-dir>/MAST_v23/<object>/')
+                    help='root for downloaded FITS; files land in '
+                         '<data-dir>/MAST_v23/<object>/<inst_family>/')
     ap.add_argument('--catalog', default=str(DEFAULT_CATALOG),
                     help='object catalogue: needs common_name, ra_deg, dec_deg (default: %s)'
                          % DEFAULT_CATALOG.name)
@@ -284,13 +304,18 @@ def main():
 
     print('\n[3/4] Downloading into %s ...' % out_root)
     statuses = []
-    for name, grp in plan.groupby('common_name'):
-        dest = out_root / str(name).replace('/', '_')
+    # Layout is <data-dir>/MAST_v23/<object>/<inst_family>/, one instrument
+    # per directory.  That is what rebinning/run_rebin.py's --master-catalog
+    # route expects of its raw data (pipeline/catalog_bridge.py builds
+    # data_path as <root>/<common_name>/<inst_family> and globs *.fits in it),
+    # so retrieved data can be rebinned without moving anything first.
+    for (name, fam), grp in plan.groupby(['common_name', 'inst_family']):
+        dest = out_root / str(name).replace('/', '_') / str(fam)
         dest.mkdir(parents=True, exist_ok=True)
         todo = [r for _, r in grp.iterrows() if not (dest / r['productFilename']).exists()]
         if not todo:
             statuses += [('cached', r['dataURI']) for _, r in grp.iterrows()]
-            print('  %-30s all %d products already present' % (name, len(grp)))
+            print('  %-26s %-4s all %d products already present' % (name, fam, len(grp)))
             continue
         # One file at a time via download_file, NOT download_products.
         # download_products wants the astropy product Table it produced itself;
@@ -316,8 +341,8 @@ def main():
                 print('    ! %s: %s' % (r['productFilename'], exc))
             if args.sleep:
                 time.sleep(args.sleep)
-        print('  %-30s fetched %d of %d%s'
-              % (name, n_ok, len(grp), '  (%d FAILED)' % n_bad if n_bad else ''))
+        print('  %-26s %-4s fetched %d of %d%s'
+              % (name, fam, n_ok, len(grp), '  (%d FAILED)' % n_bad if n_bad else ''))
 
     st = dict((uri, s) for s, uri in statuses)
     plan['status'] = plan['dataURI'].map(lambda u: st.get(u, 'cached'))
