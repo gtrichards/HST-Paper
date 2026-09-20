@@ -102,7 +102,7 @@ def load_catalog(path):
           (cat['ra_deg'] != -1.0) & (cat['dec_deg'] != -1.0))
     dropped = (~ok).sum()
     if dropped:
-        print('  %d object(s) dropped for invalid coordinates' % dropped)
+        print('  %d object(s) dropped for invalid coordinates' % dropped, flush=True)
     return cat[ok].drop_duplicates('common_name').reset_index(drop=True)
 
 
@@ -112,7 +112,7 @@ def restrict_to_audit(cat, audit_path):
     want = set(aud['common_name'].astype(str))
     out = cat[cat['common_name'].astype(str).isin(want)].reset_index(drop=True)
     print('  restricted to %d of %d objects listed in %s'
-          % (len(out), len(cat), os.path.basename(audit_path)))
+          % (len(out), len(cat), os.path.basename(audit_path)), flush=True)
     return out
 
 
@@ -132,7 +132,7 @@ def query_observations(obs_module, name, ra, dec):
                 s_dec=[dec - radius_deg, dec + radius_deg],
             )
         except Exception as exc:
-            print('    WARNING  %s / %s: query failed: %s' % (name, inst, exc))
+            print('    WARNING  %s / %s: query failed: %s' % (name, inst, exc), flush=True)
             continue
         if len(t) == 0:
             continue
@@ -182,7 +182,7 @@ def _prefer_exposures(prods):
         print('    NOTE  %d X1DSUM product(s) kept with no X1D sibling; '
               'read_cos_flat will not read them: %s'
               % (len(orphan),
-                 ', '.join(prods.loc[orphan, 'productFilename'].head(4))))
+                 ', '.join(prods.loc[orphan, 'productFilename'].head(4))), flush=True)
     return prods.drop(index=drop) if drop else prods
 
 
@@ -218,7 +218,7 @@ def products_for(obs_module, obs):
             p = obs_module.get_product_list(o['obsid']).to_pandas()
         except Exception as exc:
             print('    WARNING  %s / %s: product list failed: %s'
-                  % (o['common_name'], o.get('obs_id', '?'), exc))
+                  % (o['common_name'], o.get('obs_id', '?'), exc), flush=True)
             continue
         if p.empty:
             continue
@@ -255,18 +255,18 @@ def main():
 
     from astroquery.mast import Observations
 
-    print('[1/4] Catalogue: %s' % args.catalog)
+    print('[1/4] Catalogue: %s' % args.catalog, flush=True)
     cat = load_catalog(args.catalog)
     if args.objects_from:
         cat = restrict_to_audit(cat, args.objects_from)
-    print('      %d objects to retrieve' % len(cat))
+    print('      %d objects to retrieve' % len(cat), flush=True)
 
     out_root = Path(args.data_dir) / 'MAST_v23' if args.data_dir else None
     manifest_path = Path(args.manifest) if args.manifest else (
         out_root / 'retrieval_manifest.csv' if out_root else Path('retrieval_manifest.csv'))
 
     print('\n[2/4] Querying MAST (cone radius %.1f", instruments %s) ...'
-          % (SEARCH_RADIUS_ARCSEC, '/'.join(INSTRUMENTS)))
+          % (SEARCH_RADIUS_ARCSEC, '/'.join(INSTRUMENTS)), flush=True)
     rows, no_obs, no_prod = [], [], []
     for i, o in cat.iterrows():
         name = str(o['common_name'])
@@ -282,27 +282,27 @@ def main():
                              dataURI=p['dataURI'], calib_level=p['calib_level'],
                              size_mb=round(float(p.get('size', 0) or 0) / 1e6, 3)))
         print('  %-30s %3d products  (%s)'
-              % (name, len(prods), '/'.join(sorted(set(prods['inst_family'])))))
+              % (name, len(prods), '/'.join(sorted(set(prods['inst_family'])))), flush=True)
         if args.sleep:
             time.sleep(args.sleep)
 
     plan = pd.DataFrame(rows)
-    print('\n      %d products across %d objects' % (len(plan), plan['common_name'].nunique() if len(plan) else 0))
+    print('\n      %d products across %d objects' % (len(plan), plan['common_name'].nunique() if len(plan) else 0), flush=True)
     if no_obs:
         print('      %d object(s) with NO matching observation: %s'
-              % (len(no_obs), ', '.join(no_obs[:8]) + (' ...' if len(no_obs) > 8 else '')))
+              % (len(no_obs), ', '.join(no_obs[:8]) + (' ...' if len(no_obs) > 8 else '')), flush=True)
     if no_prod:
         print('      %d object(s) whose observations yielded no products passing the filter: %s'
-              % (len(no_prod), ', '.join(no_prod[:8]) + (' ...' if len(no_prod) > 8 else '')))
+              % (len(no_prod), ', '.join(no_prod[:8]) + (' ...' if len(no_prod) > 8 else '')), flush=True)
 
     if args.dry_run:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         plan.assign(status='planned').to_csv(manifest_path, index=False)
-        print('\n[3/4] dry run: nothing downloaded')
-        print('[4/4] plan -> %s' % manifest_path)
+        print('\n[3/4] dry run: nothing downloaded', flush=True)
+        print('[4/4] plan -> %s' % manifest_path, flush=True)
         return 0
 
-    print('\n[3/4] Downloading into %s ...' % out_root)
+    print('\n[3/4] Downloading into %s ...' % out_root, flush=True)
     statuses = []
     # Layout is <data-dir>/MAST_v23/<object>/<inst_family>/, one instrument
     # per directory.  That is what rebinning/run_rebin.py's --master-catalog
@@ -315,7 +315,7 @@ def main():
         todo = [r for _, r in grp.iterrows() if not (dest / r['productFilename']).exists()]
         if not todo:
             statuses += [('cached', r['dataURI']) for _, r in grp.iterrows()]
-            print('  %-26s %-4s all %d products already present' % (name, fam, len(grp)))
+            print('  %-26s %-4s all %d products already present' % (name, fam, len(grp)), flush=True)
             continue
         # One file at a time via download_file, NOT download_products.
         # download_products wants the astropy product Table it produced itself;
@@ -335,14 +335,14 @@ def main():
                     statuses.append(('ok', r['dataURI'])); n_ok += 1
                 else:
                     statuses.append(('error', r['dataURI'])); n_bad += 1
-                    print('    ! %s: %s %s' % (r['productFilename'], st_, msg or ''))
+                    print('    ! %s: %s %s' % (r['productFilename'], st_, msg or ''), flush=True)
             except Exception as exc:
                 statuses.append(('error', r['dataURI'])); n_bad += 1
-                print('    ! %s: %s' % (r['productFilename'], exc))
+                print('    ! %s: %s' % (r['productFilename'], exc), flush=True)
             if args.sleep:
                 time.sleep(args.sleep)
         print('  %-26s %-4s fetched %d of %d%s'
-              % (name, fam, n_ok, len(grp), '  (%d FAILED)' % n_bad if n_bad else ''))
+              % (name, fam, n_ok, len(grp), '  (%d FAILED)' % n_bad if n_bad else ''), flush=True)
 
     st = dict((uri, s) for s, uri in statuses)
     plan['status'] = plan['dataURI'].map(lambda u: st.get(u, 'cached'))
@@ -350,9 +350,9 @@ def main():
     plan.to_csv(manifest_path, index=False)
     n_err = (plan['status'] == 'error').sum()
     print('\n[4/4] manifest -> %s   (%d ok/cached, %d errors)'
-          % (manifest_path, len(plan) - n_err, n_err))
+          % (manifest_path, len(plan) - n_err, n_err), flush=True)
     if n_err:
-        print('      re-run to retry the failures; existing files are skipped')
+        print('      re-run to retry the failures; existing files are skipped', flush=True)
     return 0
 
 

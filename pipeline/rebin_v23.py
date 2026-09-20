@@ -57,7 +57,7 @@ from pathlib import Path
 import pandas as pd
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_CATALOG = _REPO_ROOT / 'pipeline_output' / 'master_catalog_v22.csv'
+_DEFAULT_CATALOG = _REPO_ROOT / 'Data' / 'master_catalog_v22.csv'
 
 
 def _load_catalog(path):
