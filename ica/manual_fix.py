@@ -134,7 +134,7 @@ class ICAManualFixProcessor:
         rebin_path. One entry per spectrum, so multi-instrument objects yield
         one identifier per instrument (each fit independently).
         """
-        files = sorted(glob.glob(os.path.join(self.rebin_path, "*.fits")))
+        files = sorted(glob.glob(os.path.join(glob.escape(self.rebin_path), "*.fits")))
         return [os.path.splitext(os.path.basename(f))[0] for f in files]
 
     def _ensure_output_dirs(self):
@@ -254,7 +254,8 @@ class ICAManualFixProcessor:
             spec_name = self.names_spec[index]
             inst = self.inst_final[index]
 
-            fn_list = glob.glob("%s/%s*%s.fits"%(self.rebin_path, spec_name, inst))
+            fn_list = glob.glob("%s/%s*%s.fits" % (glob.escape(self.rebin_path),
+                                                  glob.escape(spec_name), glob.escape(inst)))
             fn = fn_list[0]
 
         spec = fits.open(fn)

@@ -52,6 +52,37 @@ def _cos_median_snr(fn):
     return float(np.nanmedian(flux[good] / err[good])) if good.any() else -np.inf
 
 
+def _is_cumulative_accum(flux_arr, index=-1):
+    """Are an FOS exposure's groups cumulative readouts rather than independent?
+
+    FOS ACCUM data can be written either as independent sub-integrations or as
+    running sums, in which case each group is larger than the one before and the
+    last group alone is the whole exposure.  The original test compared three
+    consecutive group means, `mean(g[-1]) > mean(g[-2]) > mean(g[-3])`, which
+    raises IndexError on an exposure with fewer than three groups -- and one such
+    exposure aborts the whole object.  Of 92 FOS exposures in the first repair
+    batch, 13 have exactly two groups, and they broke 7 of the 9 FOS objects.
+
+    The comparison is generalised to however many groups exist, so the
+    three-or-more case is bit-for-bit what it always was:
+
+      >= 3 groups   mean(g[-1]) > mean(g[-2]) > mean(g[-3])   (unchanged)
+         2 groups   mean(g[-1]) > mean(g[-2])
+         1 group    True -- with a single group both branches return that group
+
+    This is a fix to an implementation defect, not a change to the method: no
+    exposure that the old code could read is read differently.
+    """
+    n = flux_arr.shape[0]
+    idx = index if index >= 0 else n + index
+    if idx <= 0:
+        return True
+    if idx == 1:
+        return np.mean(flux_arr[idx]) > np.mean(flux_arr[idx - 1])
+    return (np.mean(flux_arr[idx]) > np.mean(flux_arr[idx - 1]) and
+            np.mean(flux_arr[idx - 1]) > np.mean(flux_arr[idx - 2]))
+
+
 def read_data(Identifier, path, data_origin, z):
     if data_origin == "FOS":
         return read_fos(Identifier, path, z)
@@ -95,7 +126,7 @@ def read_data_flat(name, path, data_origin, z):
 
 
 def read_sdssrm(Identifier, path, z):
-    fn_list = glob.glob(path+"%s/*.fits"%Identifier)
+    fn_list = glob.glob(os.path.join(glob.escape(path), glob.escape(Identifier), '*.fits'))
     array_lens = []
     for i in range(len(fn_list)):
         wavelength = 10.**fits.open(fn_list[i])[1].data["LOGLAM"]
@@ -303,7 +334,7 @@ def read_fos(Identifier, path, z):
     masks     = np.zeros((len(spec_names), array_len))
 
     def accum_flag(index):
-        return np.mean(flux[index]) > np.mean(flux[index-1]) and np.mean(flux[index-1]) > np.mean(flux[index-2])
+        return _is_cumulative_accum(flux, index)
 
     for i in range(len(spec_names)):
         wave = fits.open(path+"%s/%s/%s_c0f.fits" % (Identifier, spec_names[i], spec_names[i]))[0].data
@@ -388,7 +419,7 @@ def read_cos_flat(name, path, z):
     # Only use per-exposure _x1d.fits products (matches Trevor's legacy convention).
     # _x1dsum.fits files are CalCOS per-visit coadds of the same exposures, so
     # including them would double-count the same photons in coadd.py.
-    fn_list = sorted(glob.glob(os.path.join(path, '*_x1d.fits')))
+    fn_list = sorted(glob.glob(os.path.join(glob.escape(path), '*_x1d.fits')))
     if not fn_list:
         raise FileNotFoundError("No COS x1d files found in %s" % path)
 
@@ -477,8 +508,8 @@ def read_stis_flat(name, path, z):
     # CCD modes with CR-SPLIT (G430L/M, G750L/M, G230LB, G230MB) → _sx1.fits.
     # They are mutually exclusive per rootname, so include both.
     fn_list = sorted(
-        glob.glob(os.path.join(path, '*_x1d.fits')) +
-        glob.glob(os.path.join(path, '*_sx1.fits'))
+        glob.glob(os.path.join(glob.escape(path), '*_x1d.fits')) +
+        glob.glob(os.path.join(glob.escape(path), '*_sx1.fits'))
     )
     if not fn_list:
         raise FileNotFoundError("No STIS x1d/sx1 files found in %s" % path)
@@ -553,7 +584,7 @@ def read_fos_flat(name, path, z):
     Read FOS c0f/c1f/c2f/cqf files from a flat directory (no NecessaryParams.csv).
     Discovers exposures by globbing *_c0f.fits; algorithm is identical to read_fos().
     """
-    wave_files = sorted(glob.glob(os.path.join(path, '*_c0f.fits')))
+    wave_files = sorted(glob.glob(os.path.join(glob.escape(path), '*_c0f.fits')))
     if not wave_files:
         raise FileNotFoundError("No FOS c0f files found in %s" % path)
 
@@ -571,8 +602,7 @@ def read_fos_flat(name, path, z):
     masks     = np.zeros((len(spec_names), array_len))
 
     def accum_flag(index, flux_arr):
-        return (np.mean(flux_arr[index]) > np.mean(flux_arr[index-1]) and
-                np.mean(flux_arr[index-1]) > np.mean(flux_arr[index-2]))
+        return _is_cumulative_accum(flux_arr, index)
 
     for i, sn in enumerate(spec_names):
         wave        = fits.open(os.path.join(path, '%s_c0f.fits' % sn))[0].data

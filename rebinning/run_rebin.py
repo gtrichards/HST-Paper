@@ -245,7 +245,8 @@ def run_hsla(sul, data_dir, output_dir, sdss_spec_dir, skip_existing=True,
         else:
             fn_sdss = None
 
-        matches = glob.glob(os.path.join(hsla_data_path, "original", "%s*.fits" % spec_name[i]))
+        matches = glob.glob(os.path.join(glob.escape(hsla_data_path), "original",
+                                         "%s*.fits" % glob.escape(spec_name[i])))
         if len(matches) == 0:
             print("SKIP HSLA %s: no file found for prefix '%s'" % (spec_name[i], spec_name[i]))
             n_fail += 1
