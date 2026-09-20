@@ -37,7 +37,8 @@ OUTDIR = os.path.join(HERE, "pipeline_output")
 ITERDIR = os.path.join(OUTDIR, "fit_iterations")
 WORKDIR = os.path.join(OUTDIR, "coadd_work")
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
-REBIN = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN = _REBIN_DEFAULT
 GTR_PLOTS = "/Users/gtr/Work/git/HST-Paper/ICA_Plots_Rebin_master/ManualFix"
 AP_PLOTS = "/Users/gtr/Dropbox/HST/Pratsos/ICA_Plots_Rebin_master"
 

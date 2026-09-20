@@ -22,7 +22,8 @@ from ica.manual_fix import ICAManualFixProcessor
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "pipeline_output", "fit_iterations", "032_Z_291-51_STIS")
 WORK = os.path.join(HERE, "pipeline_output", "coadd_work")
-REBIN = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN = _REBIN_DEFAULT
 STEM = "Z 291-51_STIS"
 C = 299792.458
 Z_CAT = 0.027870

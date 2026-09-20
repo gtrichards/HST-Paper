@@ -51,7 +51,8 @@ WORKDIR = os.path.join(OUTDIR, "coadd_work")
 PLOTS = os.path.join(OUTDIR, "mask_proposal_plots")
 OUT_JSON = os.path.join(OUTDIR, "mask_proposals.json")
 OUT_CSV = os.path.join(OUTDIR, "mask_proposals.csv")
-REBIN = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN = _REBIN_DEFAULT
 
 CIV_LO, CIV_HI = 1500.0, 1600.0
 

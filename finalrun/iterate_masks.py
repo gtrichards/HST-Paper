@@ -35,7 +35,8 @@ sys.path.insert(0, "/Users/gtr/Work/git/HST-Paper")
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTDIR = os.path.join(HERE, "pipeline_output")
 WORKDIR = os.path.join(OUTDIR, "coadd_work")
-REBIN = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN = _REBIN_DEFAULT
 STEP = np.log(10) / 10000.0
 
 

@@ -30,7 +30,8 @@ import sys
 import numpy as np
 from astropy.io import fits
 
-REBIN_DIR = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN_DIR = _REBIN_DEFAULT
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                    "pipeline_output", "master_line_coverage.csv")
 

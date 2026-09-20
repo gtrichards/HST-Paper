@@ -58,7 +58,8 @@ OUTDIR = os.path.join(HERE, "pipeline_output")
 WORKDIR = os.path.join(OUTDIR, "coadd_work")
 PLOTS = os.path.join(OUTDIR, "coadd_plots")
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
-REBIN = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN = _REBIN_DEFAULT
 
 STEP = np.log(10) / 10000.0      # 1e-4 dex == 69.03 km/s
 

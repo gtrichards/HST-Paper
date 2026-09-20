@@ -39,7 +39,8 @@ sys.path.insert(0, "/Users/gtr/Work/git/HST-Paper")
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTDIR = os.path.join(HERE, "pipeline_output")
 WORKDIR = os.path.join(OUTDIR, "coadd_work")
-REBIN = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"   # single spectra live here
+from rebin_path import REBIN as _REBIN_DEFAULT
+REBIN = _REBIN_DEFAULT   # single spectra live here
 ITERDIR = os.path.join(OUTDIR, "fit_iterations")
 C = 299792.458
 
