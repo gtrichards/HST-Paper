@@ -143,11 +143,38 @@ def query_observations(obs_module, name, ra, dec):
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
+def _prefer_summed(prods):
+    """Within one observation, keep X1DSUM in preference to its X1D siblings.
+
+    For COS, X1DSUM is the sum of the sub-exposures of an association and X1D
+    holds those sub-exposures individually; retrieving both fetches the same
+    photons twice and, if both reach the co-adder, would double-weight them.
+    Measured on the 64-object repair set, this is the common case: 1046 of 1327
+    exposures returned two products each.
+
+    Applied per obsID so that an observation without a summed product keeps its
+    X1Ds. STIS is left alone -- its X1D and SX1 are different extraction modes
+    (MAMA versus CCD ACCUM), not a sum and its parts.
+    """
+    if prods.empty or 'obsID' not in prods.columns:
+        return prods
+    keep_idx = []
+    for _, grp in prods.groupby(['obsID', 'inst_family'], sort=False):
+        sub = grp['productSubGroupDescription'].astype(str)
+        if (grp['inst_family'] == 'COS').any() and (sub == 'X1DSUM').any():
+            keep_idx.extend(grp.index[sub == 'X1DSUM'])
+        else:
+            keep_idx.extend(grp.index)
+    return prods.loc[sorted(keep_idx)]
+
+
 def filter_products(prods):
     """SCIENCE products at calibration level 2-3, extracted spectra only.
 
-    Identical to `_filter_products` in download_spectra.py, so that spectra
-    retrieved by either route are interchangeable.
+    The type, level and subgroup filters are identical to `_filter_products` in
+    download_spectra.py, so spectra retrieved by either route are
+    interchangeable.  The one deliberate difference is `_prefer_summed`: where
+    COS offers both an X1DSUM and its constituent X1Ds, only the sum is taken.
     """
     if prods.empty:
         return prods
@@ -160,7 +187,8 @@ def filter_products(prods):
             keep.append(prods[m])
         else:
             keep.append(prods[m & prods['productSubGroupDescription'].isin(subgroups)])
-    return pd.concat(keep, ignore_index=True) if keep else pd.DataFrame()
+    out = pd.concat(keep, ignore_index=False) if keep else pd.DataFrame()
+    return _prefer_summed(out).reset_index(drop=True)
 
 
 def products_for(obs_module, obs):
@@ -264,16 +292,32 @@ def main():
             statuses += [('cached', r['dataURI']) for _, r in grp.iterrows()]
             print('  %-30s all %d products already present' % (name, len(grp)))
             continue
-        try:
-            res = Observations.download_products(
-                pd.DataFrame(todo).to_records(index=False),
-                download_dir=str(dest), flat=True)
-            ok = set(res['Local Path'].astype(str)) if res is not None else set()
-            statuses += [('ok', r['dataURI']) for r in todo]
-            print('  %-30s fetched %d of %d' % (name, len(todo), len(grp)))
-        except Exception as exc:
-            statuses += [('error', r['dataURI']) for r in todo]
-            print('  %-30s DOWNLOAD FAILED: %s' % (name, exc))
+        # One file at a time via download_file, NOT download_products.
+        # download_products wants the astropy product Table it produced itself;
+        # handing it anything else (a pandas frame, a numpy recarray) fails
+        # deep inside its own filtering with "Cannot compare structured or void
+        # to non-void arrays", which is what silently lost the whole first
+        # Tier A run.  download_file takes a plain dataURI and a destination
+        # path, which is all the manifest carries anyway, and it lets a single
+        # bad product fail without taking the object's other exposures with it.
+        n_ok = n_bad = 0
+        for r in todo:
+            target = dest / r['productFilename']
+            try:
+                st_, msg, _url = Observations.download_file(
+                    r['dataURI'], local_path=str(target), cache=True)
+                if str(st_).upper() == 'COMPLETE' and target.exists():
+                    statuses.append(('ok', r['dataURI'])); n_ok += 1
+                else:
+                    statuses.append(('error', r['dataURI'])); n_bad += 1
+                    print('    ! %s: %s %s' % (r['productFilename'], st_, msg or ''))
+            except Exception as exc:
+                statuses.append(('error', r['dataURI'])); n_bad += 1
+                print('    ! %s: %s' % (r['productFilename'], exc))
+            if args.sleep:
+                time.sleep(args.sleep)
+        print('  %-30s fetched %d of %d%s'
+              % (name, n_ok, len(grp), '  (%d FAILED)' % n_bad if n_bad else ''))
 
     st = dict((uri, s) for s, uri in statuses)
     plan['status'] = plan['dataURI'].map(lambda u: st.get(u, 'cached'))
