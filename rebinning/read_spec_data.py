@@ -52,6 +52,35 @@ def _cos_median_snr(fn):
     return float(np.nanmedian(flux[good] / err[good])) if good.any() else -np.inf
 
 
+def _carries_flux(fn):
+    """Does this extracted spectrum contain any non-zero flux at all?
+
+    Short COS and STIS acquisition exposures are archived with
+    productType SCIENCE and a full-length, correctly-shaped table whose FLUX
+    column is zero in every pixel.  They survive the empty-BinTable check above,
+    then fail the edge-pixel quality cut with "No good pixels found", and that
+    exception aborts the whole object -- five objects in the first repair batch,
+    among them NGC 3516, NGC 3783 and Ton 469, each lost to a single 12-second
+    exposure.
+
+    Dropping them carries no information loss: a spectrum of zeros contributes
+    nothing to an inverse-variance-weighted co-add, and the alternative is not
+    a different co-add but no co-add at all.  This is the same treatment the
+    empty-BinTable files already get, for the same reason.
+    """
+    try:
+        data = fits.open(fn)[1].data
+        if data is None or len(data) == 0:
+            return False
+        for row in data:
+            f = np.asarray(row['FLUX'], float)
+            if np.any(np.isfinite(f) & (f != 0.0)):
+                return True
+    except Exception:
+        return True          # unreadable for another reason: let the reader say so
+    return False
+
+
 def _is_cumulative_accum(flux_arr, index=-1):
     """Are an FOS exposure's groups cumulative readouts rather than independent?
 
@@ -431,6 +460,15 @@ def read_cos_flat(name, path, z):
     if not fn_list:
         raise FileNotFoundError("No non-empty COS x1d files found in %s" % path)
 
+    kept = [fn for fn in fn_list if _carries_flux(fn)]
+    if len(kept) < len(fn_list):
+        print("  %s COS: skipping %d exposure(s) with no non-zero flux: %s"
+              % (name, len(fn_list) - len(kept),
+                 ", ".join(os.path.basename(f) for f in fn_list if f not in kept)))
+    fn_list = kept
+    if not fn_list:
+        raise FileNotFoundError("No COS x1d files carrying flux in %s" % path)
+
     # AP 2026-06-17: TEMP cap for monitoring targets -- see _COS_EXPOSURE_CAP above.
     if name in _COS_EXPOSURE_CAP and len(fn_list) > _COS_EXPOSURE_CAP[name]:
         n_keep = _COS_EXPOSURE_CAP[name]
@@ -520,6 +558,15 @@ def read_stis_flat(name, path, z):
                and len(fits.open(fn)[1].data) > 0]
     if not fn_list:
         raise FileNotFoundError("No non-empty STIS x1d/sx1 files found in %s" % path)
+
+    kept = [fn for fn in fn_list if _carries_flux(fn)]
+    if len(kept) < len(fn_list):
+        print("  %s STIS: skipping %d exposure(s) with no non-zero flux: %s"
+              % (name, len(fn_list) - len(kept),
+                 ", ".join(os.path.basename(f) for f in fn_list if f not in kept)))
+    fn_list = kept
+    if not fn_list:
+        raise FileNotFoundError("No STIS x1d/sx1 files carrying flux in %s" % path)
 
     gratings = []
     for fn in fn_list:
