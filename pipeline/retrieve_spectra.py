@@ -399,10 +399,19 @@ def main():
                 try:
                     st_, msg, _url = Observations.download_file(
                         r['dataURI'], local_path=str(target), cache=True)
-                    if str(st_).upper() == 'COMPLETE' and target.exists():
+                    # A download can report COMPLETE and leave a zero-byte
+                    # file; one such file reached the rebin as "Empty or
+                    # corrupt FITS file" and cost that object its whole COS
+                    # spectrum.  Treat an empty file as a failure so the
+                    # manifest records it and a re-run fetches it again.
+                    if str(st_).upper() == 'COMPLETE' and target.exists() \
+                            and target.stat().st_size > 0:
                         r['status'] = 'ok'; got += 1
                     else:
                         r['status'] = 'error'; bad += 1
+                        if target.exists() and target.stat().st_size == 0:
+                            target.unlink()
+                            msg = 'zero-byte download removed'
                         print('    ! %s: %s %s' % (r['productFilename'], st_, msg or ''),
                               flush=True)
                 except Exception as exc:
