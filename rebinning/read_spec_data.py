@@ -52,6 +52,10 @@ def _cos_median_snr(fn):
     return float(np.nanmedian(flux[good] / err[good])) if good.any() else -np.inf
 
 
+#: Below this the wavelength solution is not physical for any HST UV mode.
+_MIN_PHYSICAL_WAVE = 500.0
+
+
 def _stack_rows(data):
     """Every row of an extracted spectrum, concatenated and sorted by wavelength.
 
@@ -77,6 +81,18 @@ def _stack_rows(data):
     flux = np.concatenate([np.asarray(data['FLUX'][t], float) for t in range(data.size)])
     fluxerr = np.concatenate([np.asarray(data['ERROR'][t], float) for t in range(data.size)])
     DQ = np.concatenate([np.asarray(data['DQ'][t], float) for t in range(data.size)])
+
+    # Drop pixels whose wavelength is not physical.  COS G140L segment FUVB is
+    # written with a wavelength solution running from -28 A: the segment is
+    # largely unilluminated at that grating and the solution there is
+    # meaningless, but the DQ flags do not mark it.  Taking row 0 alone hid this,
+    # and reading every row exposed it -- NGC 985 picked up 12209 such pixels,
+    # which stretched the co-addition lattice from about 3000 points to 20923 and
+    # broke the morph against its 11177-point reference continuum.  Nothing real
+    # is lost: HST ultraviolet coverage begins near 900 A.
+    ok = np.isfinite(wavelength) & (wavelength > _MIN_PHYSICAL_WAVE)
+    wavelength, flux, fluxerr, DQ = wavelength[ok], flux[ok], fluxerr[ok], DQ[ok]
+
     order = np.argsort(wavelength, kind='stable')
     return wavelength[order], flux[order], fluxerr[order], DQ[order]
 
