@@ -1,0 +1,26 @@
+index,common_name,reject_reason,files_old,files_new,civ_px_old,civ_px_new,ica_px_old,ica_px_new,snr_old,snr_new,what_changed
+2,NGC-4051,insufficient_coverage;civ_unphysical;fit_unstable,2,2,139,139,3768,3768,19.83,12.87,nothing
+6,NGC1566-NUC,low_snr;civ_unphysical,1,1,139,139,3768,3768,2.59,2.54,nothing
+13,ESO 499-41,insufficient_coverage;low_snr;civ_unphysical,1,1,0,0,1459,1459,1.75,1.75,nothing
+15,Mrk 352,no_civ_data;low_snr,1,1,0,0,1486,1486,0.0,0.0,nothing
+20,3C 84,insufficient_coverage;low_snr;civ_unphysical,2,3,140,140,978,3767,1.74,9.22,ICA range +2789 px; S/N x5.3; +1 spectra
+22,ESO 462-9,insufficient_coverage;civ_unphysical,1,1,25,25,1427,1427,5.16,4.73,nothing
+27,ICRF J171914.4+485849,low_snr,1,2,141,141,3767,3767,2.25,2.18,+1 spectra
+28,UGC 12163,civ_unphysical,3,3,140,140,3768,3768,8.05,8.05,nothing
+31,ESO 31-8,insufficient_coverage;civ_unphysical,1,1,58,58,1398,1398,8.13,8.13,nothing
+40,AKN120,no_civ_data,1,2,0,140,237,3768,0.0,14.2,"C IV now covered (140 px, was 0); ICA range +3531 px; S/N now measurable; +1 spectra"
+50,Mrk 1179,no_civ_data,1,1,0,0,1416,1416,0.0,0.0,nothing
+58,IRASF12397+3333,no_civ_data,1,1,0,0,2785,2785,0.0,0.0,nothing
+65,ICRF J183503.3+324146,no_civ_data,1,1,0,0,237,610,0.0,0.0,ICA range +373 px
+68,LEDA 89176,no_civ_data,1,1,0,0,1241,1241,0.0,0.0,nothing
+69,Mrk 1298,no_civ_data,1,1,0,0,1208,1208,0.0,0.0,nothing
+76,Ton 951,insufficient_coverage,2,2,0,0,3767,3767,7.04,7.04,nothing
+77,Mrk 771,no_civ_data,2,2,0,0,429,429,0.0,0.0,nothing
+78,2MASS J16151905-0936132,no_civ_data,1,1,0,0,1243,1243,0.0,0.0,nothing
+80,LEDA 3095694,no_civ_data,1,1,0,0,1199,1199,0.0,0.0,nothing
+84,LEDA 3096578,no_civ_data,1,1,0,0,1184,1184,0.0,0.0,nothing
+85,LEDA 2100384,no_civ_data,1,1,0,0,1243,1243,0.0,0.0,nothing
+87,2MASS J12323582+0603098,no_civ_data,1,1,0,0,1198,1198,0.0,0.0,nothing
+91,Mrk 1501,no_civ_data,2,2,0,0,3767,3767,0.0,0.0,nothing
+97,Ton S 210,insufficient_coverage;fit_unstable,1,2,69,141,3023,3023,6.17,15.75,S/N x2.6; +1 spectra
+109,LEDA 82580,low_snr;insufficient_coverage,1,1,84,108,953,954,1.14,1.36,nothing
