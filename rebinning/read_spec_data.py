@@ -52,6 +52,35 @@ def _cos_median_snr(fn):
     return float(np.nanmedian(flux[good] / err[good])) if good.any() else -np.inf
 
 
+def _stack_rows(data):
+    """Every row of an extracted spectrum, concatenated and sorted by wavelength.
+
+    COS writes one row per detector segment -- two for the FUV (FUVA, FUVB) and
+    three for the NUV stripes (NUVA, NUVB, NUVC) -- and STIS echelle modes write
+    one row per order.  The readers used to take row 0 alone for every grating
+    except E140M, which silently discarded about half of each FUV spectrum and
+    two thirds of each NUV spectrum.  It is not a small loss of edge coverage:
+    for [VV2006] J104839.4+442820 at z=0.999, stripe NUVB spans rest
+    1391-1639 A and holds C IV with 129 good pixels, while the rebinned spectrum
+    built from row 0 stopped at 1277 A.  Objects were excluded for having no
+    C IV when the line was in the file all along, and GTR's own notes in the v22
+    sheet had flagged several of them with "CIV coverage in G230L, why missing?".
+
+    Rows are sorted because segments are not stored in wavelength order -- NUVA
+    runs 1692-2189 A, NUVB 2780-3276, NUVC 1959-2206 -- and everything
+    downstream assumes wavelength increases.  Where stripes overlap the
+    duplicate pixels are left in: they land in the same bin of the log lattice
+    and are combined there, which is what the co-addition is for.
+    """
+    wavelength = np.concatenate([np.asarray(data['WAVELENGTH'][t], float)
+                                 for t in range(data.size)])
+    flux = np.concatenate([np.asarray(data['FLUX'][t], float) for t in range(data.size)])
+    fluxerr = np.concatenate([np.asarray(data['ERROR'][t], float) for t in range(data.size)])
+    DQ = np.concatenate([np.asarray(data['DQ'][t], float) for t in range(data.size)])
+    order = np.argsort(wavelength, kind='stable')
+    return wavelength[order], flux[order], fluxerr[order], DQ[order]
+
+
 def _carries_flux(fn):
     """Does this extracted spectrum contain any non-zero flux at all?
 
@@ -485,10 +514,7 @@ def read_cos_flat(name, path, z):
     array_sizes = []
     for i, fn in enumerate(fn_list):
         data = fits.open(fn)[1].data
-        if gratings[i] == 'E140M':
-            array_sizes.append(data.size * 1024)
-        else:
-            array_sizes.append(len(data['Wavelength'][0]))
+        array_sizes.append(sum(len(data['WAVELENGTH'][t]) for t in range(data.size)))
     array_len = max(array_sizes)
 
     waves     = np.zeros((len(fn_list), array_len))
@@ -500,21 +526,7 @@ def read_cos_flat(name, path, z):
         spec_id = os.path.basename(fn).replace('_x1d.fits', '').replace('_x1dsum.fits', '')
         data = fits.open(fn)[1].data
 
-        if gratings[i] == "E140M":
-            wavelength = []
-            flux       = []
-            fluxerr    = []
-            DQ         = []
-            for t in range(data.size):
-                wavelength = np.append(wavelength, data['WAVELENGTH'][t])
-                flux       = np.append(flux, data['FLUX'][t])
-                fluxerr    = np.append(fluxerr, data['ERROR'][t])
-                DQ         = np.append(DQ, data['DQ'][t])
-        else:
-            wavelength = data['WAVELENGTH'][0]
-            flux       = data['FLUX'][0]
-            fluxerr    = data['ERROR'][0]
-            DQ         = data['DQ'][0]
+        wavelength, flux, fluxerr, DQ = _stack_rows(data)
 
         flux_wmask = flux.copy()
         err_wmask  = fluxerr.copy()
@@ -576,10 +588,7 @@ def read_stis_flat(name, path, z):
     array_sizes = []
     for i, fn in enumerate(fn_list):
         data = fits.open(fn)[1].data
-        if gratings[i] == 'E140M':
-            array_sizes.append(data.size * 1024)
-        else:
-            array_sizes.append(len(data['Wavelength'][0]))
+        array_sizes.append(sum(len(data['WAVELENGTH'][t]) for t in range(data.size)))
     array_len = max(array_sizes)
 
     waves     = np.zeros((len(fn_list), array_len))
@@ -591,21 +600,7 @@ def read_stis_flat(name, path, z):
         spec_id = os.path.basename(fn).replace('_x1d.fits', '').replace('_sx1.fits', '')
         data = fits.open(fn)[1].data
 
-        if gratings[i] == "E140M":
-            wavelength = []
-            flux       = []
-            fluxerr    = []
-            DQ         = []
-            for t in range(data.size):
-                wavelength = np.append(wavelength, data['WAVELENGTH'][t])
-                flux       = np.append(flux, data['FLUX'][t])
-                fluxerr    = np.append(fluxerr, data['ERROR'][t])
-                DQ         = np.append(DQ, data['DQ'][t])
-        else:
-            wavelength = data['WAVELENGTH'][0]
-            flux       = data['FLUX'][0]
-            fluxerr    = data['ERROR'][0]
-            DQ         = data['DQ'][0]
+        wavelength, flux, fluxerr, DQ = _stack_rows(data)
 
         flux_wmask = flux.copy()
         err_wmask  = fluxerr.copy()
