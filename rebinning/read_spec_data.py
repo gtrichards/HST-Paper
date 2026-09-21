@@ -56,45 +56,38 @@ def _cos_median_snr(fn):
 _MIN_PHYSICAL_WAVE = 500.0
 
 
-def _stack_rows(data):
-    """Every row of an extracted spectrum, concatenated and sorted by wavelength.
+def _rows_of(data):
+    """Each row of an extracted spectrum, cleaned, as its own arrays.
 
     COS writes one row per detector segment -- two for the FUV (FUVA, FUVB) and
-    three for the NUV stripes (NUVA, NUVB, NUVC) -- and STIS echelle modes write
-    one row per order.  The readers used to take row 0 alone for every grating
-    except E140M, which silently discarded about half of each FUV spectrum and
-    two thirds of each NUV spectrum.  It is not a small loss of edge coverage:
-    for [VV2006] J104839.4+442820 at z=0.999, stripe NUVB spans rest
-    1391-1639 A and holds C IV with 129 good pixels, while the rebinned spectrum
-    built from row 0 stopped at 1277 A.  Objects were excluded for having no
-    C IV when the line was in the file all along, and GTR's own notes in the v22
-    sheet had flagged several of them with "CIV coverage in G230L, why missing?".
+    three for the NUV stripes -- and STIS echelle modes one row per order.  The
+    readers used to take row 0 alone for every grating except E140M, discarding
+    about half of each FUV spectrum and two thirds of each NUV spectrum.  For
+    [VV2006] J104839.4+442820 at z=0.999 that lost stripe NUVB, rest
+    1391-1639 A, which holds C IV with 129 good pixels, and the object was
+    excluded for having no C IV while the line sat in the file.
 
-    Rows are sorted because segments are not stored in wavelength order -- NUVA
-    runs 1692-2189 A, NUVB 2780-3276, NUVC 1959-2206 -- and everything
-    downstream assumes wavelength increases.  Where stripes overlap the
-    duplicate pixels are left in: they land in the same bin of the log lattice
-    and are combined there, which is what the co-addition is for.
+    Pixels whose wavelength is not physical are dropped.  COS G140L writes
+    segment FUVB with a solution running from -28 A: the segment is largely
+    unilluminated there and the solution meaningless, but the DQ flags do not
+    say so.  NGC 985 picked up 12209 such pixels, which stretched the
+    co-addition lattice from about 3000 points to 20923 and broke the morph
+    against its 11177-point reference continuum.  HST ultraviolet coverage
+    begins near 900 A, so nothing real is lost.
     """
-    wavelength = np.concatenate([np.asarray(data['WAVELENGTH'][t], float)
-                                 for t in range(data.size)])
-    flux = np.concatenate([np.asarray(data['FLUX'][t], float) for t in range(data.size)])
-    fluxerr = np.concatenate([np.asarray(data['ERROR'][t], float) for t in range(data.size)])
-    DQ = np.concatenate([np.asarray(data['DQ'][t], float) for t in range(data.size)])
-
-    # Drop pixels whose wavelength is not physical.  COS G140L segment FUVB is
-    # written with a wavelength solution running from -28 A: the segment is
-    # largely unilluminated at that grating and the solution there is
-    # meaningless, but the DQ flags do not mark it.  Taking row 0 alone hid this,
-    # and reading every row exposed it -- NGC 985 picked up 12209 such pixels,
-    # which stretched the co-addition lattice from about 3000 points to 20923 and
-    # broke the morph against its 11177-point reference continuum.  Nothing real
-    # is lost: HST ultraviolet coverage begins near 900 A.
-    ok = np.isfinite(wavelength) & (wavelength > _MIN_PHYSICAL_WAVE)
-    wavelength, flux, fluxerr, DQ = wavelength[ok], flux[ok], fluxerr[ok], DQ[ok]
-
-    order = np.argsort(wavelength, kind='stable')
-    return wavelength[order], flux[order], fluxerr[order], DQ[order]
+    out = []
+    for t in range(data.size):
+        w = np.asarray(data['WAVELENGTH'][t], float)
+        f = np.asarray(data['FLUX'][t], float)
+        e = np.asarray(data['ERROR'][t], float)
+        q = np.asarray(data['DQ'][t], float)
+        ok = np.isfinite(w) & (w > _MIN_PHYSICAL_WAVE)
+        if ok.sum() < 2:
+            continue
+        w, f, e, q = w[ok], f[ok], e[ok], q[ok]
+        order = np.argsort(w, kind='stable')
+        out.append((w[order], f[order], e[order], q[order]))
+    return out
 
 
 def _carries_flux(fn):
@@ -528,41 +521,54 @@ def read_cos_flat(name, path, z):
         gratings.append(hdr.get('OPT_ELEM', hdr.get('FILTER', 'UNKNOWN')))
 
     array_sizes = []
+    n_rows = 0
     for i, fn in enumerate(fn_list):
         data = fits.open(fn)[1].data
-        array_sizes.append(sum(len(data['WAVELENGTH'][t]) for t in range(data.size)))
+        for _w, _f, _e, _q in _rows_of(data):
+            array_sizes.append(len(_w))
+            n_rows += 1
     array_len = max(array_sizes)
 
-    waves     = np.zeros((len(fn_list), array_len))
-    fluxes    = np.zeros((len(fn_list), array_len))
-    flux_errs = np.zeros((len(fn_list), array_len))
-    masks     = np.zeros((len(fn_list), array_len))
+    waves     = np.zeros((n_rows, array_len))
+    fluxes    = np.zeros((n_rows, array_len))
+    flux_errs = np.zeros((n_rows, array_len))
+    masks     = np.zeros((n_rows, array_len))
 
-    for i, fn in enumerate(fn_list):
-        spec_id = os.path.basename(fn).replace('_x1d.fits', '').replace('_x1dsum.fits', '')
+    # One entry per detector segment, not per file.  COS segments overlap
+    # and each carries roughly 2000 dead pixels at its edges whose flux is
+    # zero but whose error is not, so the err==0 mask rule does not catch
+    # them.  Concatenated into a single row those zeros land inside the
+    # other segment's range, where edge trimming cannot reach, and the
+    # co-addition averages them into the line: Mrk 290 came out with flux
+    # pinned to zero straight across C IV.  Kept as separate rows they are
+    # trimmed and inverse-variance weighted like any other spectrum.
+    i = -1
+    for fn in fn_list:
+        base = os.path.basename(fn).replace('_x1d.fits', '').replace('_x1dsum.fits', '')
         data = fits.open(fn)[1].data
-
-        wavelength, flux, fluxerr, DQ = _stack_rows(data)
-
-        flux_wmask = flux.copy()
-        err_wmask  = fluxerr.copy()
-        # Slice to len(err_wmask) so that COS NUV stripes (1274 px) don't crash
-        # when this object also has COS FUV segments (16384 px) and array_len is
-        # the max. Matches the FOS/STIS reader pattern; padding stays as zeros
-        # and coadd.py filters with waves[waves!=0].
-        masks[i,:len(err_wmask)][(err_wmask == 0.0)] = 1
-        waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                wavelength, array_len, "wavelength", False, z,
-                                                "%s - %s" % (name, spec_id), "COS")
-        fluxes[i,:len(err_wmask)]    = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                flux_wmask, array_len, "flux", False, z,
-                                                "%s - %s" % (name, spec_id), "COS")
-        flux_errs[i,:len(err_wmask)] = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                err_wmask, array_len, "flux error", False, z,
-                                                "%s - %s" % (name, spec_id), "COS")
-        masks[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                masks[i,:len(err_wmask)], array_len, "masks", False, z,
-                                                "%s - %s" % (name, spec_id), "COS")
+        rows = _rows_of(data)
+        for t, (wavelength, flux, fluxerr, DQ) in enumerate(rows):
+            i += 1
+            spec_id = base if len(rows) == 1 else '%s.%d' % (base, t)
+            flux_wmask = flux.copy()
+            err_wmask  = fluxerr.copy()
+            # Slice to len(err_wmask) so that COS NUV stripes (1274 px) don't crash
+            # when this object also has COS FUV segments (16384 px) and array_len is
+            # the max. Matches the FOS/STIS reader pattern; padding stays as zeros
+            # and coadd.py filters with waves[waves!=0].
+            masks[i,:len(err_wmask)][(err_wmask == 0.0)] = 1
+            waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    wavelength, array_len, "wavelength", False, z,
+                                                    "%s - %s" % (name, spec_id), "COS")
+            fluxes[i,:len(err_wmask)]    = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    flux_wmask, array_len, "flux", False, z,
+                                                    "%s - %s" % (name, spec_id), "COS")
+            flux_errs[i,:len(err_wmask)] = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    err_wmask, array_len, "flux error", False, z,
+                                                    "%s - %s" % (name, spec_id), "COS")
+            masks[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    masks[i,:len(err_wmask)], array_len, "masks", False, z,
+                                                    "%s - %s" % (name, spec_id), "COS")
 
     return waves, fluxes, flux_errs, masks
 
@@ -602,37 +608,50 @@ def read_stis_flat(name, path, z):
         gratings.append(hdr.get('OPT_ELEM', hdr.get('FILTER', 'UNKNOWN')))
 
     array_sizes = []
+    n_rows = 0
     for i, fn in enumerate(fn_list):
         data = fits.open(fn)[1].data
-        array_sizes.append(sum(len(data['WAVELENGTH'][t]) for t in range(data.size)))
+        for _w, _f, _e, _q in _rows_of(data):
+            array_sizes.append(len(_w))
+            n_rows += 1
     array_len = max(array_sizes)
 
-    waves     = np.zeros((len(fn_list), array_len))
-    fluxes    = np.zeros((len(fn_list), array_len))
-    flux_errs = np.zeros((len(fn_list), array_len))
-    masks     = np.zeros((len(fn_list), array_len))
+    waves     = np.zeros((n_rows, array_len))
+    fluxes    = np.zeros((n_rows, array_len))
+    flux_errs = np.zeros((n_rows, array_len))
+    masks     = np.zeros((n_rows, array_len))
 
-    for i, fn in enumerate(fn_list):
-        spec_id = os.path.basename(fn).replace('_x1d.fits', '').replace('_sx1.fits', '')
+    # One entry per detector segment, not per file.  COS segments overlap
+    # and each carries roughly 2000 dead pixels at its edges whose flux is
+    # zero but whose error is not, so the err==0 mask rule does not catch
+    # them.  Concatenated into a single row those zeros land inside the
+    # other segment's range, where edge trimming cannot reach, and the
+    # co-addition averages them into the line: Mrk 290 came out with flux
+    # pinned to zero straight across C IV.  Kept as separate rows they are
+    # trimmed and inverse-variance weighted like any other spectrum.
+    i = -1
+    for fn in fn_list:
+        base = os.path.basename(fn).replace('_x1d.fits', '').replace('_sx1.fits', '')
         data = fits.open(fn)[1].data
-
-        wavelength, flux, fluxerr, DQ = _stack_rows(data)
-
-        flux_wmask = flux.copy()
-        err_wmask  = fluxerr.copy()
-        masks[i,:len(err_wmask)][err_wmask == 0.] = 1
-        waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                wavelength, array_len, "wavelength", False, z,
-                                                "%s - %s" % (name, spec_id), "STIS")
-        fluxes[i,:len(err_wmask)]    = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                flux_wmask, array_len, "flux", False, z,
-                                                "%s - %s" % (name, spec_id), "STIS")
-        flux_errs[i,:len(err_wmask)] = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                err_wmask, array_len, "flux error", False, z,
-                                                "%s - %s" % (name, spec_id), "STIS")
-        masks[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
-                                                masks[i,:len(err_wmask)], array_len, "masks", False, z,
-                                                "%s - %s" % (name, spec_id), "STIS")
+        rows = _rows_of(data)
+        for t, (wavelength, flux, fluxerr, DQ) in enumerate(rows):
+            i += 1
+            spec_id = base if len(rows) == 1 else '%s.%d' % (base, t)
+            flux_wmask = flux.copy()
+            err_wmask  = fluxerr.copy()
+            masks[i,:len(err_wmask)][err_wmask == 0.] = 1
+            waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    wavelength, array_len, "wavelength", False, z,
+                                                    "%s - %s" % (name, spec_id), "STIS")
+            fluxes[i,:len(err_wmask)]    = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    flux_wmask, array_len, "flux", False, z,
+                                                    "%s - %s" % (name, spec_id), "STIS")
+            flux_errs[i,:len(err_wmask)] = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    err_wmask, array_len, "flux error", False, z,
+                                                    "%s - %s" % (name, spec_id), "STIS")
+            masks[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
+                                                    masks[i,:len(err_wmask)], array_len, "masks", False, z,
+                                                    "%s - %s" % (name, spec_id), "STIS")
 
     return waves, fluxes, flux_errs, masks
 
