@@ -270,7 +270,7 @@ def main():
 
     from astroquery.mast import Observations
 
-    print('[1/4] Catalogue: %s' % args.catalog, flush=True)
+    print('[1/3] Catalogue: %s' % args.catalog, flush=True)
     cat = load_catalog(args.catalog)
     if args.objects_from:
         cat = restrict_to_audit(cat, args.objects_from)
@@ -280,92 +280,153 @@ def main():
     manifest_path = Path(args.manifest) if args.manifest else (
         out_root / 'retrieval_manifest.csv' if out_root else Path('retrieval_manifest.csv'))
 
-    print('\n[2/4] Querying MAST (cone radius %.1f", instruments %s) ...'
+    print('\n[2/3] Querying and retrieving (cone radius %.1f", instruments %s) ...'
           % (SEARCH_RADIUS_ARCSEC, '/'.join(INSTRUMENTS)), flush=True)
-    rows, no_obs, no_prod = [], [], []
-    for i, o in cat.iterrows():
+    # One object at a time: query, filter, download, append to the manifest.
+    #
+    # This used to run as two passes -- query every object into a list, then
+    # download the lot.  Over 474 objects that accumulated every product row
+    # and every intermediate frame in memory until the run was killed for it,
+    # and because the manifest was only written at the very end, the kill threw
+    # away four hours of queries.  Streaming per object bounds the memory and
+    # makes the manifest a running record, so an interrupted run resumes from
+    # where it stopped instead of starting over.
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    done = set()
+    if manifest_path.exists() and not args.dry_run:
+        try:
+            prev = pd.read_csv(manifest_path)
+            # An object counts as done only if none of its rows still say error,
+            # so a partly failed object is retried rather than left broken.
+            for nm, grp in prev.groupby('common_name'):
+                if not (grp.get('status', pd.Series(dtype=str)) == 'error').any():
+                    done.add(str(nm))
+            if done:
+                print('  resuming: %d object(s) already complete in %s'
+                      % (len(done), manifest_path.name), flush=True)
+        except Exception as exc:
+            print('  could not read the existing manifest (%s); starting fresh' % exc,
+                  flush=True)
+
+    COLUMNS = ['common_name', 'inst_family', 'obs_id', 'productFilename',
+               'dataURI', 'calib_level', 'size_mb', 'status']
+    if done:
+        # Rewrite the manifest with only the completed objects' rows.  An object
+        # being retried had rows from its failed attempt; appending the retry's
+        # rows on top would leave the manifest carrying both, so the same
+        # product would appear once as an error and once as ok.  Keep what is
+        # finished, drop what is about to be done again.
+        keep = prev[prev['common_name'].astype(str).isin(done)]
+        for c in COLUMNS:
+            if c not in keep.columns:
+                keep[c] = ''
+        keep[COLUMNS].to_csv(manifest_path, index=False)
+    else:
+        pd.DataFrame(columns=COLUMNS).to_csv(manifest_path, index=False)
+
+    def append(rows):
+        if rows:
+            pd.DataFrame(rows)[COLUMNS].to_csv(manifest_path, mode='a',
+                                               header=False, index=False)
+
+    n_obj = n_prod = n_ok = n_err = 0
+    no_obs, no_prod = [], []
+
+    for _, o in cat.iterrows():
         name = str(o['common_name'])
+        if name in done:
+            continue
         obs = query_observations(Observations, name, float(o['ra_deg']), float(o['dec_deg']))
         if obs.empty:
-            no_obs.append(name); continue
-        prods = filter_products(products_for(Observations, obs))
-        if prods.empty:
-            no_prod.append(name); continue
-        for _, p in prods.iterrows():
-            rows.append(dict(common_name=name, inst_family=p['inst_family'],
-                             obs_id=p.get('obs_id', ''), productFilename=p['productFilename'],
-                             dataURI=p['dataURI'], calib_level=p['calib_level'],
-                             size_mb=round(float(p.get('size', 0) or 0) / 1e6, 3)))
-        print('  %-30s %3d products  (%s)'
-              % (name, len(prods), '/'.join(sorted(set(prods['inst_family'])))), flush=True)
-        if args.sleep:
-            time.sleep(args.sleep)
-
-    plan = pd.DataFrame(rows)
-    print('\n      %d products across %d objects' % (len(plan), plan['common_name'].nunique() if len(plan) else 0), flush=True)
-    if no_obs:
-        print('      %d object(s) with NO matching observation: %s'
-              % (len(no_obs), ', '.join(no_obs[:8]) + (' ...' if len(no_obs) > 8 else '')), flush=True)
-    if no_prod:
-        print('      %d object(s) whose observations yielded no products passing the filter: %s'
-              % (len(no_prod), ', '.join(no_prod[:8]) + (' ...' if len(no_prod) > 8 else '')), flush=True)
-
-    if args.dry_run:
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        plan.assign(status='planned').to_csv(manifest_path, index=False)
-        print('\n[3/4] dry run: nothing downloaded', flush=True)
-        print('[4/4] plan -> %s' % manifest_path, flush=True)
-        return 0
-
-    print('\n[3/4] Downloading into %s ...' % out_root, flush=True)
-    statuses = []
-    # Layout is <data-dir>/MAST_v23/<object>/<inst_family>/, one instrument
-    # per directory.  That is what rebinning/run_rebin.py's --master-catalog
-    # route expects of its raw data (pipeline/catalog_bridge.py builds
-    # data_path as <root>/<common_name>/<inst_family> and globs *.fits in it),
-    # so retrieved data can be rebinned without moving anything first.
-    for (name, fam), grp in plan.groupby(['common_name', 'inst_family']):
-        dest = out_root / str(name).replace('/', '_') / str(fam)
-        dest.mkdir(parents=True, exist_ok=True)
-        todo = [r for _, r in grp.iterrows() if not (dest / r['productFilename']).exists()]
-        if not todo:
-            statuses += [('cached', r['dataURI']) for _, r in grp.iterrows()]
-            print('  %-26s %-4s all %d products already present' % (name, fam, len(grp)), flush=True)
+            no_obs.append(name)
             continue
-        # One file at a time via download_file, NOT download_products.
-        # download_products wants the astropy product Table it produced itself;
-        # handing it anything else (a pandas frame, a numpy recarray) fails
-        # deep inside its own filtering with "Cannot compare structured or void
-        # to non-void arrays", which is what silently lost the whole first
-        # Tier A run.  download_file takes a plain dataURI and a destination
-        # path, which is all the manifest carries anyway, and it lets a single
-        # bad product fail without taking the object's other exposures with it.
-        n_ok = n_bad = 0
-        for r in todo:
-            target = dest / r['productFilename']
-            try:
-                st_, msg, _url = Observations.download_file(
-                    r['dataURI'], local_path=str(target), cache=True)
-                if str(st_).upper() == 'COMPLETE' and target.exists():
-                    statuses.append(('ok', r['dataURI'])); n_ok += 1
-                else:
-                    statuses.append(('error', r['dataURI'])); n_bad += 1
-                    print('    ! %s: %s %s' % (r['productFilename'], st_, msg or ''), flush=True)
-            except Exception as exc:
-                statuses.append(('error', r['dataURI'])); n_bad += 1
-                print('    ! %s: %s' % (r['productFilename'], exc), flush=True)
+        prods = filter_products(products_for(Observations, obs))
+        del obs
+        if prods.empty:
+            no_prod.append(name)
+            continue
+
+        # One row per file, not per listing.  A product that belongs to more
+        # than one observation is returned once per observation, and since they
+        # all land at the same path only the first is a download: leaving the
+        # repeats in makes the manifest count listings rather than files (474
+        # of Tier B's 2337 rows, 185 of Tier A's 942).
+        rows, seen = [], set()
+        for _, p in prods.iterrows():
+            key = (p['inst_family'], p['productFilename'])
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(dict(common_name=name, inst_family=p['inst_family'],
+                             obs_id=p.get('obs_id', ''),
+                             productFilename=p['productFilename'],
+                             dataURI=p['dataURI'], calib_level=p['calib_level'],
+                             size_mb=round(float(p.get('size', 0) or 0) / 1e6, 3),
+                             status='planned'))
+        fams = '/'.join(sorted(set(prods['inst_family'])))
+        del prods
+        n_obj += 1
+        n_prod += len(rows)
+
+        if args.dry_run:
+            append(rows)
+            print('  %-30s %3d products  (%s)' % (name, len(rows), fams), flush=True)
             if args.sleep:
                 time.sleep(args.sleep)
-        print('  %-26s %-4s fetched %d of %d%s'
-              % (name, fam, n_ok, len(grp), '  (%d FAILED)' % n_bad if n_bad else ''), flush=True)
+            continue
 
-    st = dict((uri, s) for s, uri in statuses)
-    plan['status'] = plan['dataURI'].map(lambda u: st.get(u, 'cached'))
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    plan.to_csv(manifest_path, index=False)
-    n_err = (plan['status'] == 'error').sum()
-    print('\n[4/4] manifest -> %s   (%d ok/cached, %d errors)'
-          % (manifest_path, len(plan) - n_err, n_err), flush=True)
+        by_fam = {}
+        for r in rows:
+            by_fam.setdefault(r['inst_family'], []).append(r)
+        for fam, frows in sorted(by_fam.items()):
+            dest = out_root / name.replace('/', '_') / str(fam)
+            dest.mkdir(parents=True, exist_ok=True)
+            got = bad = 0
+            for r in frows:
+                target = dest / r['productFilename']
+                if target.exists():
+                    r['status'] = 'cached'; got += 1
+                    continue
+                try:
+                    st_, msg, _url = Observations.download_file(
+                        r['dataURI'], local_path=str(target), cache=True)
+                    if str(st_).upper() == 'COMPLETE' and target.exists():
+                        r['status'] = 'ok'; got += 1
+                    else:
+                        r['status'] = 'error'; bad += 1
+                        print('    ! %s: %s %s' % (r['productFilename'], st_, msg or ''),
+                              flush=True)
+                except Exception as exc:
+                    r['status'] = 'error'; bad += 1
+                    print('    ! %s: %s' % (r['productFilename'], exc), flush=True)
+                if args.sleep:
+                    time.sleep(args.sleep)
+            n_ok += got; n_err += bad
+            print('  %-26s %-4s %d of %d%s'
+                  % (name, fam, got, len(frows), '  (%d FAILED)' % bad if bad else ''),
+                  flush=True)
+
+        append(rows)
+        del rows, by_fam
+
+    print('', flush=True)
+    if no_obs:
+        print('      %d object(s) with NO matching observation: %s'
+              % (len(no_obs), ', '.join(no_obs[:8]) + (' ...' if len(no_obs) > 8 else '')),
+              flush=True)
+    if no_prod:
+        print('      %d object(s) whose observations yielded no products passing the filter: %s'
+              % (len(no_prod), ', '.join(no_prod[:8]) + (' ...' if len(no_prod) > 8 else '')),
+              flush=True)
+
+    if args.dry_run:
+        print('[3/3] dry run: %d products across %d objects planned -> %s'
+              % (n_prod, n_obj, manifest_path), flush=True)
+        return 0
+
+    print('[3/3] manifest -> %s   (%d ok/cached, %d errors, %d objects)'
+          % (manifest_path, n_ok, n_err, n_obj), flush=True)
     if n_err:
         print('      re-run to retry the failures; existing files are skipped', flush=True)
     return 0
