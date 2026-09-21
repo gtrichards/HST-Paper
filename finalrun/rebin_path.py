@@ -7,26 +7,44 @@ pass to a different rebin tree a nine-file edit, with the obvious risk that one
 script is left pointing at the old one and quietly measures different data from
 its neighbours.
 
-Default is the rebinned master the students produced, which is read-only as far
-as this project is concerned.  Override it for a whole session with
+Default is the regenerated tree.  The master the students produced is still
+named here as MASTER, read-only, as the reference the regenerated tree was
+checked against.  Override the choice for a whole session with
 
-    export HSTICA_REBIN=/path/to/RebinnedSpec_v23
+    export HSTICA_REBIN=/path/to/some/other/tree
 
-so that a regenerated tree can be adopted, or reverted, in one place.  Scripts
-that take an explicit path on the command line still win over both.
+so that the working tree can be changed, or reverted to MASTER, in one place.
+Scripts that take an explicit path on the command line still win over both.
 """
 
 import os
 
+#: The students' rebinned spectra. Kept as the reference to compare against and
+#: never written to; superseded as the working tree on 2026-09-21.
 MASTER = "/Users/gtr/Dropbox/HST/Pratsos/RebinnedSpec_master"
 
-REBIN = os.environ.get("HSTICA_REBIN", MASTER)
+#: The regenerated tree: every object retrieved from MAST by
+#: pipeline/retrieve_spectra.py and rebinned by pipeline/rebin_v23.py, 647
+#: spectra against the master's 576. It reproduces all 576 of the master's
+#: files -- 183 bit-identical, 161 agreeing to 0.1% -- and where it differs the
+#: cause is archive recalibration since the master was built, or a master file
+#: that was truncated. Adopted as the default by GTR on 2026-09-21.
+V23 = "/Users/gtr/Work/projects/hstica/finalrun/data_v23/RebinnedSpec_v23"
 
-#: True when the directory in use is not the master, so a script can say so.
-IS_OVERRIDDEN = REBIN != MASTER
+DEFAULT = V23
+
+REBIN = os.environ.get("HSTICA_REBIN", DEFAULT)
+
+#: True when the directory in use is not the default one.
+IS_OVERRIDDEN = REBIN != DEFAULT
 
 
 def describe():
     """One line naming the directory in use, for a run's log header."""
-    return "rebin directory: %s%s" % (
-        REBIN, "   (HSTICA_REBIN override)" if IS_OVERRIDDEN else "   (master)")
+    if IS_OVERRIDDEN:
+        tag = "   (HSTICA_REBIN override)"
+    elif REBIN == V23:
+        tag = "   (regenerated v23 tree)"
+    else:
+        tag = ""
+    return "rebin directory: %s%s" % (REBIN, tag)
