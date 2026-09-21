@@ -261,6 +261,11 @@ def main():
                     help='query and write the plan, download nothing')
     ap.add_argument('--manifest', default=None,
                     help='where to write the manifest (default: <data-dir>/MAST_v23/retrieval_manifest.csv)')
+    ap.add_argument('--limit', type=int, default=0, metavar='N',
+                    help='stop after N objects have been retrieved this run '
+                         '(0 = no limit).  The manifest is a running record and '
+                         'a later run resumes, so a long retrieval can be taken '
+                         'in short pieces on a busy machine.')
     ap.add_argument('--sleep', type=float, default=0.0,
                     help='seconds to pause between objects, if MAST is rate-limiting')
     args = ap.parse_args()
@@ -374,6 +379,9 @@ def main():
             print('  %-30s %3d products  (%s)' % (name, len(rows), fams), flush=True)
             if args.sleep:
                 time.sleep(args.sleep)
+            if args.limit and n_obj >= args.limit:
+                print('  stopping after %d object(s) this run (--limit)' % n_obj, flush=True)
+                break
             continue
 
         by_fam = {}
@@ -409,6 +417,10 @@ def main():
 
         append(rows)
         del rows, by_fam
+
+        if args.limit and n_obj >= args.limit:
+            print('  stopping after %d object(s) this run (--limit)' % n_obj, flush=True)
+            break
 
     print('', flush=True)
     if no_obs:
