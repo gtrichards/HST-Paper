@@ -72,6 +72,72 @@ from rebinning import spec_morph
 _SDSS_REF_SPEC = Path(__file__).parent.parent / "Data" / "spec-0266-51630-0080.fits"
 
 
+def _combined_error(weights):
+    """Uncertainty of the inverse-variance weighted median, from its weights."""
+    w = np.asarray(weights, float)
+    w = w[np.isfinite(w) & (w > 0)]
+    if w.size == 0:
+        return 0.0
+    n_eff = (w.sum() ** 2) / (w ** 2).sum()
+    factor = 1.2533 if n_eff >= 3.0 else 1.0
+    return factor / np.sqrt(w.sum())
+
+
+def screen_exposures(binned_fluxes, binned_errs, binned_masks, identifier, origin,
+                     max_abs_z=3.0, min_overlap=40, min_keep=2):
+    """Drop exposures whose shape disagrees with the others far beyond their errors.
+
+    Exposures are continuum-normalised before this point, so ordinary AGN
+    variability in overall brightness has already been divided out and what is
+    compared is shape.  An exposure that still departs from the consensus by
+    many times its own errors is not a different flux state, it is bad data --
+    a failed guide-star lock, a wavelength-solution slip, a segment that was
+    barely illuminated.
+
+    For each exposure the statistic is the median over overlapping pixels of
+    |f_i - median_i(f)| / e_i.  For an exposure consistent with the others that
+    is about 0.67, the median |z| of a normal distribution.  The default cut of
+    3.0 is four to five times that, so it catches gross disagreement and leaves
+    ordinary scatter alone.
+
+    Nothing is dropped unless at least `min_keep` exposures would remain, and
+    every drop is printed: silently discarding an epoch would be worse than
+    including it.
+    """
+    n = binned_fluxes.shape[0]
+    if n < 3:
+        return np.ones(n, dtype=bool), []
+
+    good = (binned_masks == 0) & (binned_errs > 0) & np.isfinite(binned_fluxes)
+    with np.errstate(invalid='ignore'):
+        consensus = np.nanmedian(np.where(good, binned_fluxes, np.nan), axis=0)
+
+    scores, overlap = np.full(n, np.nan), np.zeros(n, dtype=int)
+    for i in range(n):
+        sel = good[i] & np.isfinite(consensus)
+        overlap[i] = int(sel.sum())
+        if overlap[i] >= min_overlap:
+            scores[i] = np.nanmedian(np.abs(binned_fluxes[i][sel] - consensus[sel])
+                                     / binned_errs[i][sel])
+
+    keep = np.ones(n, dtype=bool)
+    dropped = []
+    order = np.argsort(np.where(np.isnan(scores), -1.0, scores))[::-1]
+    for i in order:
+        if np.isnan(scores[i]) or scores[i] <= max_abs_z:
+            continue
+        if keep.sum() - 1 < min_keep:
+            break
+        keep[i] = False
+        dropped.append((int(i), float(scores[i]), int(overlap[i])))
+
+    for i, sc, ov in dropped:
+        print("   %s %s: dropping exposure %d -- median |z| = %.1f against the other "
+              "exposures over %d pixels (cut %.1f)"
+              % (identifier, origin, i, sc, ov, max_abs_z), flush=True)
+    return keep, dropped
+
+
 def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
           output_dir="RebinnedSpec", sdss_spec_dir=None, flat=False):
     #Identifier: string; name of object; helps you find files
@@ -187,6 +253,14 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
             to get the variance-weighted median spectrum.
     """
     if data_origin=="FOS" or data_origin=="STIS" or data_origin=="COS" or data_origin=="SDSS-RM":
+        keep_exp, _dropped = screen_exposures(old_binned_fluxes, old_binned_errs,
+                                              old_binned_masks, Identifier, data_origin)
+        if not keep_exp.all():
+            old_binned_waves  = old_binned_waves[keep_exp]
+            old_binned_fluxes = old_binned_fluxes[keep_exp]
+            old_binned_errs   = old_binned_errs[keep_exp]
+            old_binned_masks  = old_binned_masks[keep_exp]
+
         #Initialize - note we want weights for each exposure
         varweighted_flux = np.zeros(old_binned_waves.shape[1])*np.nan
         varweighted_errs = np.zeros(old_binned_waves.shape[1])
@@ -208,7 +282,20 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         #the masking portion need not be co-added; just mask final pixel if that pixel from all exposures is masked
         for i in range(old_binned_waves.shape[1]):
             varweighted_flux[i] = ws.numpy_weighted_median(old_binned_fluxes[:,i], weights=my_weights[:,i])
-            varweighted_errs[i] = ws.numpy_weighted_median(old_binned_errs[:,i], weights=my_weights[:,i])
+            # The uncertainty ON THE COMBINATION, not the typical uncertainty of
+            # one exposure.  This used to be the weighted median of the input
+            # errors, which is a single-exposure error however many exposures
+            # went in: LEDA 29208's co-add of 11 overlapping exposures reported
+            # 90% of the single-exposure error where variance weighting predicts
+            # 30%.  Signal-to-noise was understated across the sample, and with
+            # it every sigma quoted from a window residual or a veto.
+            #
+            # sum(w) with w = 1/e^2 gives the inverse-variance-weighted-mean
+            # error as 1/sqrt(sum w).  A median is noisier than a mean, by a
+            # factor approaching 1.2533 for large samples; for one or two values
+            # the median is the mean, so the factor is applied only from three
+            # effective exposures upward.
+            varweighted_errs[i] = _combined_error(my_weights[:,i])
 
             if np.isnan(varweighted_flux[i]):
                 goodpix   = ( (~np.isnan(old_binned_fluxes[:,i])) & (old_binned_fluxes[:,i]!=0) )
