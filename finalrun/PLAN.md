@@ -106,3 +106,24 @@ boundaries in both directions.
   an emission-line exclusion window. Levels match their neighbours to first
   order; the within-order slope is what is lost. Worth a look if echelle
   co-adds look stepped.
+
+## The veto's continuum can be anchored on model, not data (found 2026-09-22)
+
+The C IV equivalent width and the sub-continuum veto both use Rankine's linear
+continuum, drawn between the reconstruction's values at 1445-1465 and
+1700-1705 A. When the data end before 1705 A -- which is every low-redshift
+COS-only object, since G160M stops near 1800 A observed -- the red anchor sits
+on the extrapolated model. The model's red end need not fall as fast as the
+real spectrum, so the straight line is too high at 1580-1600 and the veto
+reports the model "below the continuum" there even where it tracks the data
+pixel for pixel. GTR spotted it on index 78 ("why the continuum is so high at
+1600"). This is the mechanism behind the recurring red-edge veto failures on
+15, 68 and 78 today. It is Rankine's prescription and is not to be changed,
+but a red-edge run on an object with no data at 1700-1705 is a property of the
+continuum definition, not of the fit, and should be judged as such.
+- 2MASS J16171142+0638333 (index 236, row 413) COS: co-added flux reaches -30 at
+  1520-1560 A with errors of order 1e15. An exposure with a wrecked background
+  got through; the shape screening does not catch negative flux. Upstream
+  diagnosis needed (Opus). Marked manmask 0 as bad_data meanwhile.
+- The controlled vocabulary now needs `bad_data` (index 236) alongside the
+  still-missing term for Ton 951's no-extracted-product case.
