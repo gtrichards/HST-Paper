@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ITERDIR = os.path.join(HERE, "pipeline_output", "fit_iterations")
+from rebin_path import ITERDIR   # env HSTICA_ITERDIR overrides
 NOISE = re.compile(r"^(File column|    name =|\)|Debug|Loaded|Using|Median)")
 
 

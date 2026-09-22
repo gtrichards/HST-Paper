@@ -40,7 +40,7 @@ sys.path.insert(0, "/Users/gtr/Work/git/HST-Paper")
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTDIR = os.path.join(HERE, "pipeline_output")
 WORKDIR = os.path.join(OUTDIR, "coadd_work")
-ITERDIR = os.path.join(OUTDIR, "fit_iterations")
+from rebin_path import ITERDIR   # env HSTICA_ITERDIR overrides
 PROPOSALS = os.path.join(OUTDIR, "mask_proposals.json")
 from rebin_path import REBIN as _REBIN_DEFAULT
 REBIN = _REBIN_DEFAULT

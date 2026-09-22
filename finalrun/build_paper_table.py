@@ -39,7 +39,7 @@ import openpyxl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTDIR = os.path.join(HERE, "pipeline_output")
-ITERDIR = os.path.join(OUTDIR, "fit_iterations")
+from rebin_path import ITERDIR   # env HSTICA_ITERDIR overrides
 FINAL = os.path.join(OUTDIR, "final")
 DECISIONS = os.path.join(FINAL, "decisions.csv")
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")

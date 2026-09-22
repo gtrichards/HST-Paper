@@ -48,3 +48,17 @@ def describe():
     else:
         tag = ""
     return "rebin directory: %s%s" % (REBIN, tag)
+
+
+#: Where per-object fit iterations are written.  Overridable so a fresh first
+#: pass can be run without colliding with records already adopted: run_batch.py
+#: adds iterations to an object's folder and renames its pick to BEST_, so a
+#: second pass into the same folder would leave two BEST_ records and make the
+#: adopted fit ambiguous.
+#:
+#:     export HSTICA_ITERDIR=/path/to/pipeline_output/fit_iterations_v23
+#:
+_HERE = os.path.dirname(os.path.abspath(__file__))
+ITERDIR = os.environ.get("HSTICA_ITERDIR",
+                         os.path.join(_HERE, "pipeline_output", "fit_iterations"))
+ITERDIR_IS_OVERRIDDEN = ITERDIR != os.path.join(_HERE, "pipeline_output", "fit_iterations")

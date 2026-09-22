@@ -34,7 +34,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable
 OUTDIR = os.path.join(HERE, "pipeline_output")
-ITERDIR = os.path.join(OUTDIR, "fit_iterations")
+from rebin_path import ITERDIR   # env HSTICA_ITERDIR overrides
 WORKDIR = os.path.join(OUTDIR, "coadd_work")
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
 from rebin_path import REBIN as _REBIN_DEFAULT
