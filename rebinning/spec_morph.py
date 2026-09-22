@@ -376,9 +376,29 @@ def cont_filtered(wave, flux, z, Identifier):
         ends_at_last = (jf_list[i] == len(wave) - 1)
 
         if starts_at_zero and ends_at_last:
-            # Edge case: emission spans entire spectrum - use median of any valid flux
+            # Emission-line exclusion covers the whole exposure, so there is no
+            # continuum pixel to anchor the running median.  This used to fill
+            # with 0.0, and the exposure was then divided by that continuum:
+            # every pixel became inf, was masked, and the exposure vanished from
+            # the co-add.  A COS G160M segment at z < 0.1 lies wholly inside the
+            # C IV exclusion window (1460-1685 A rest), so every such object
+            # lost the very segment that carries C IV -- LEDA 89176's four
+            # G160M exposures among them, each with ~3800 clean pixels on the
+            # line in the raw file and none in the rebinned one.  That is why
+            # those objects were recorded as no_civ_data in the master.
+            #
+            # Fall back to the exposure's own median positive flux: a constant
+            # rather than a fitted shape, but a real level.  The exposure is then
+            # normalised to order unity like its siblings instead of destroyed.
             valid_flux = med_flux[~np.isnan(med_flux)]
-            fill_value = np.nanmedian(valid_flux) if len(valid_flux) > 0 else 0.0
+            if len(valid_flux) > 0:
+                fill_value = np.nanmedian(valid_flux)
+            else:
+                pos = flux[np.isfinite(flux) & (flux > 0)]
+                fill_value = float(np.nanmedian(pos)) if pos.size else 1.0
+                print("   %s: no continuum pixels in this exposure (%.0f-%.0f A rest); "
+                      "normalising by its median flux %.3g instead of a fitted continuum"
+                      % (Identifier, wave.min()/(1+z), wave.max()/(1+z), fill_value), flush=True)
             med_flux[jp_list[i]:jf_list[i]+1] = fill_value
         elif starts_at_zero:
             # Emission starts at first pixel - use value after emission region
