@@ -84,58 +84,65 @@ def _combined_error(weights):
 
 
 def screen_exposures(binned_fluxes, binned_errs, binned_masks, identifier, origin,
-                     max_abs_z=3.0, min_overlap=40, min_keep=2):
-    """Drop exposures whose shape disagrees with the others far beyond their errors.
+                     max_abs_z=5.0, min_overlap=300, min_overlap_frac=0.3,
+                     min_keep=2, drop=False):
+    """Score each exposure against the others and report, by default without dropping.
 
     Exposures are continuum-normalised before this point, so ordinary AGN
-    variability in overall brightness has already been divided out and what is
-    compared is shape.  An exposure that still departs from the consensus by
-    many times its own errors is not a different flux state, it is bad data --
-    a failed guide-star lock, a wavelength-solution slip, a segment that was
-    barely illuminated.
+    variability in brightness has been divided out and what is compared is
+    shape.  The statistic is the median over shared pixels of
+    |f_i - median_i(f)| / e_i, about 0.67 for an exposure consistent with the
+    rest.
 
-    For each exposure the statistic is the median over overlapping pixels of
-    |f_i - median_i(f)| / e_i.  For an exposure consistent with the others that
-    is about 0.67, the median |z| of a normal distribution.  The default cut of
-    3.0 is four to five times that, so it catches gross disagreement and leaves
-    ordinary scatter alone.
+    WHY IT ONLY REPORTS.  A first version dropped anything above 3.0 and threw
+    out 2604 exposures across 78 objects, 95 per cent of them scoring between 3
+    and 5 and almost all of them STIS.  The cause was the statistic, not the
+    data: each STIS echelle order is its own row here, and orders cover
+    different wavelengths, so an order overlaps the others only at its edges
+    where the signal-to-noise is worst.  Comparing a row against a consensus
+    built where it barely overlaps measures the edges, not the exposure.
 
-    Nothing is dropped unless at least `min_keep` exposures would remain, and
-    every drop is printed: silently discarding an epoch would be worse than
-    including it.
+    The consensus is therefore built only where at least three rows have good
+    data, and a row is scored only if it overlaps that consensus by both
+    `min_overlap` pixels and `min_overlap_frac` of its own good pixels.  Even
+    so the statistic is left as a diagnostic: pass drop=True to act on it, once
+    its distribution has been looked at on real data.
     """
     n = binned_fluxes.shape[0]
     if n < 3:
         return np.ones(n, dtype=bool), []
 
     good = (binned_masks == 0) & (binned_errs > 0) & np.isfinite(binned_fluxes)
+    shared = good.sum(axis=0) >= 3
     with np.errstate(invalid='ignore'):
         consensus = np.nanmedian(np.where(good, binned_fluxes, np.nan), axis=0)
+    consensus[~shared] = np.nan
 
     scores, overlap = np.full(n, np.nan), np.zeros(n, dtype=int)
     for i in range(n):
         sel = good[i] & np.isfinite(consensus)
         overlap[i] = int(sel.sum())
-        if overlap[i] >= min_overlap:
+        own = max(1, int(good[i].sum()))
+        if overlap[i] >= min_overlap and overlap[i] / own >= min_overlap_frac:
             scores[i] = np.nanmedian(np.abs(binned_fluxes[i][sel] - consensus[sel])
                                      / binned_errs[i][sel])
 
     keep = np.ones(n, dtype=bool)
-    dropped = []
-    order = np.argsort(np.where(np.isnan(scores), -1.0, scores))[::-1]
-    for i in order:
+    flagged = []
+    for i in np.argsort(np.where(np.isnan(scores), -1.0, scores))[::-1]:
         if np.isnan(scores[i]) or scores[i] <= max_abs_z:
             continue
-        if keep.sum() - 1 < min_keep:
-            break
-        keep[i] = False
-        dropped.append((int(i), float(scores[i]), int(overlap[i])))
+        flagged.append((int(i), float(scores[i]), int(overlap[i])))
+        if drop and keep.sum() - 1 >= min_keep:
+            keep[i] = False
 
-    for i, sc, ov in dropped:
-        print("   %s %s: dropping exposure %d -- median |z| = %.1f against the other "
-              "exposures over %d pixels (cut %.1f)"
-              % (identifier, origin, i, sc, ov, max_abs_z), flush=True)
-    return keep, dropped
+    for i, sc, ov in flagged:
+        print("   %s %s: exposure %d disagrees with the others -- median |z| = %.1f "
+              "over %d shared pixels (cut %.1f)%s"
+              % (identifier, origin, i, sc, ov, max_abs_z,
+                 "; DROPPED" if drop and not keep[i] else "; kept, reported only"),
+              flush=True)
+    return keep, flagged
 
 
 def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
