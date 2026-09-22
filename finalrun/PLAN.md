@@ -89,3 +89,20 @@ in parallel (Opus).
 Fable 5.1 for fitting and per-object judgement; Opus 5 for the mechanical work,
 the notebook entries and the block-end commits. Prompt for the switch at block
 boundaries in both directions.
+
+## Open, found 2026-09-22 during the reopened-exclusion work
+
+- **Ton S 210 STIS loses its C IV pixels inside the co-addition step.** They
+  survive the reader (about 1000 raw-good per order), the rebin (47 and 23 per
+  order) and the continuum (positive throughout), and are dead in the output.
+  Not diagnosed. Index 97 has COS covering C IV so it is not blocked.
+  `finalrun/trace_civ.py OBJ INST Z` reproduces the first three stages.
+- Four G140L objects (2MASS J11190530+5925140, FBQS J2226-0901, Q1130+6026,
+  [VV98] J102847.0+391758) lose C IV at the reader's edge trim: the line sits
+  on the far red end of G140L, which GTR's notes already call noisy. Treated
+  as marginal rather than as a defect.
+- The zero-continuum fallback normalises 10,804 exposure-segments by a constant
+  in the current tree, most of them STIS echelle orders that sit wholly inside
+  an emission-line exclusion window. Levels match their neighbours to first
+  order; the within-order slope is what is lost. Worth a look if echelle
+  co-adds look stepped.

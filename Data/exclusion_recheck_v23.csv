@@ -1,27 +1,71 @@
 index,common_name,reject_reason,files_old,files_new,civ_px_old,civ_px_new,ica_px_old,ica_px_new,snr_old,snr_new,what_changed
-2,NGC-4051,insufficient_coverage;civ_unphysical;fit_unstable,2,2,139,140,3768,3768,19.83,14.2,nothing
-6,NGC1566-NUC,low_snr;civ_unphysical,1,1,139,139,3768,3768,2.59,2.54,nothing
-13,ESO 499-41,insufficient_coverage;low_snr;civ_unphysical,1,1,0,134,1459,1519,1.75,2.13,"C IV now covered (134 px, was 0)"
-15,Mrk 352,no_civ_data;low_snr,1,1,0,140,1486,1513,0.0,2.52,"C IV now covered (140 px, was 0); S/N now measurable"
-20,3C 84,insufficient_coverage;low_snr;civ_unphysical,2,3,140,140,978,3767,1.74,10.54,ICA range +2789 px; S/N x6.1; +1 spectra
-22,ESO 462-9,insufficient_coverage;civ_unphysical,1,1,25,128,1427,1434,5.16,6.34,nothing
-27,ICRF J171914.4+485849,low_snr,1,2,141,141,3767,3767,2.25,2.18,+1 spectra
-28,UGC 12163,civ_unphysical,3,3,140,140,3768,3768,8.05,8.05,nothing
-31,ESO 31-8,insufficient_coverage;civ_unphysical,1,1,58,133,1398,1398,8.13,8.08,nothing
-40,AKN120,no_civ_data,1,2,0,140,237,3768,0.0,14.2,"C IV now covered (140 px, was 0); ICA range +3531 px; S/N now measurable; +1 spectra"
-50,Mrk 1179,no_civ_data,1,1,0,132,1416,1416,0.0,1.31,"C IV now covered (132 px, was 0); S/N now measurable"
-58,IRASF12397+3333,no_civ_data,1,1,0,0,2785,2785,0.0,0.0,nothing
+2,NGC-4051,insufficient_coverage;civ_unphysical;fit_unstable,2,2,139,140,3768,3768,19.83,33.76,S/N x1.7
+6,NGC1566-NUC,low_snr;civ_unphysical,1,1,139,140,3768,3768,2.59,3.42,S/N x1.3
+13,ESO 499-41,insufficient_coverage;low_snr;civ_unphysical,1,1,0,140,1459,1519,1.75,3.77,"C IV now covered (140 px, was 0); S/N x2.1"
+15,Mrk 352,no_civ_data;low_snr,1,1,0,140,1486,1513,0.0,9.58,"C IV now covered (140 px, was 0); S/N now measurable"
+20,3C 84,insufficient_coverage;low_snr;civ_unphysical,2,3,140,140,978,3767,1.74,15.11,ICA range +2789 px; S/N x8.7; +1 spectra
+22,ESO 462-9,insufficient_coverage;civ_unphysical,1,1,25,119,1427,1434,5.16,11.83,S/N x2.3
+27,ICRF J171914.4+485849,low_snr,1,2,141,141,3767,3767,2.25,3.2,S/N x1.4; +1 spectra
+28,UGC 12163,civ_unphysical,3,3,140,140,3768,3768,8.05,42.47,S/N x5.3
+31,ESO 31-8,insufficient_coverage;civ_unphysical,1,1,58,101,1398,1398,8.13,11.96,S/N x1.5
+40,AKN120,no_civ_data,1,2,0,140,237,3768,0.0,16.2,"C IV now covered (140 px, was 0); ICA range +3531 px; S/N now measurable; +1 spectra"
+50,Mrk 1179,no_civ_data,1,1,0,140,1416,1416,0.0,5.22,"C IV now covered (140 px, was 0); S/N now measurable"
+58,IRASF12397+3333,no_civ_data,1,1,0,140,2785,2785,0.0,0.02,"C IV now covered (140 px, was 0); S/N now measurable"
 65,ICRF J183503.3+324146,no_civ_data,1,1,0,0,237,610,0.0,0.0,ICA range +373 px
-68,LEDA 89176,no_civ_data,1,1,0,140,1241,1241,0.0,25.22,"C IV now covered (140 px, was 0); S/N now measurable"
-69,Mrk 1298,no_civ_data,1,1,0,140,1208,1208,0.0,7.61,"C IV now covered (140 px, was 0); S/N now measurable"
-76,Ton 951,insufficient_coverage,2,2,0,0,3767,3767,7.04,7.04,nothing
+68,LEDA 89176,no_civ_data,1,1,0,140,1241,1241,0.0,40.32,"C IV now covered (140 px, was 0); S/N now measurable"
+69,Mrk 1298,no_civ_data,1,1,0,140,1208,1208,0.0,16.7,"C IV now covered (140 px, was 0); S/N now measurable"
+76,Ton 951,insufficient_coverage,2,2,0,0,3767,3767,7.04,9.49,S/N x1.3
 77,Mrk 771,no_civ_data,2,2,0,0,429,429,0.0,0.0,nothing
-78,2MASS J16151905-0936132,no_civ_data,1,1,0,140,1243,1242,0.0,9.37,"C IV now covered (140 px, was 0); S/N now measurable"
-80,LEDA 3095694,no_civ_data,1,1,0,141,1199,1199,0.0,9.42,"C IV now covered (141 px, was 0); S/N now measurable"
-84,LEDA 3096578,no_civ_data,1,1,0,141,1184,1184,0.0,14.44,"C IV now covered (141 px, was 0); S/N now measurable"
-85,LEDA 2100384,no_civ_data,1,1,0,140,1243,1243,0.0,4.05,"C IV now covered (140 px, was 0); S/N now measurable"
-87,2MASS J12323582+0603098,no_civ_data,1,1,0,140,1198,1198,0.0,7.12,"C IV now covered (140 px, was 0); S/N now measurable"
+78,2MASS J16151905-0936132,no_civ_data,1,1,0,140,1243,1242,0.0,15.0,"C IV now covered (140 px, was 0); S/N now measurable"
+80,LEDA 3095694,no_civ_data,1,1,0,141,1199,1199,0.0,12.55,"C IV now covered (141 px, was 0); S/N now measurable"
+84,LEDA 3096578,no_civ_data,1,1,0,141,1184,1184,0.0,21.81,"C IV now covered (141 px, was 0); S/N now measurable"
+85,LEDA 2100384,no_civ_data,1,1,0,140,1243,1243,0.0,9.13,"C IV now covered (140 px, was 0); S/N now measurable"
+87,2MASS J12323582+0603098,no_civ_data,1,1,0,140,1198,1198,0.0,14.62,"C IV now covered (140 px, was 0); S/N now measurable"
 91,Mrk 1501,no_civ_data,2,2,0,0,3767,3767,0.0,0.0,nothing
-97,Ton S 210,insufficient_coverage;fit_unstable,1,2,69,141,3023,3023,6.17,16.31,S/N x2.6; +1 spectra
-109,LEDA 82580,low_snr;insufficient_coverage,1,1,84,108,953,954,1.14,1.36,nothing
-111,3C 273,no_civ_data,1,3,0,140,61,3768,0.0,37.49,"C IV now covered (140 px, was 0); ICA range +3707 px; S/N now measurable; +2 spectra"
+97,Ton S 210,insufficient_coverage;fit_unstable,1,2,69,141,3023,3023,6.17,27.58,S/N x4.5; +1 spectra
+109,LEDA 82580,low_snr;insufficient_coverage,1,1,84,108,953,954,1.14,3.74,S/N x3.3
+111,3C 273,no_civ_data,1,3,0,140,61,3768,0.0,78.36,"C IV now covered (140 px, was 0); ICA range +3707 px; S/N now measurable; +2 spectra"
+166,Ton 730,no_civ_data,2,2,0,0,18,18,0.0,0.0,nothing
+171,6C 134441+623604,no_civ_data,2,2,0,140,2491,2491,0.0,0.36,"C IV now covered (140 px, was 0); S/N now measurable"
+198,Mrk 1014,no_civ_data,2,2,0,0,44,44,0.0,0.0,nothing
+208,LEDA 3095876,no_civ_data,1,1,0,141,2261,2261,0.0,0.08,"C IV now covered (141 px, was 0); S/N now measurable"
+210,2MASS J08013157+3544362,no_civ_data,1,1,0,141,2255,2255,0.0,0.08,"C IV now covered (141 px, was 0); S/N now measurable"
+213,RX J1131.6+1557,no_civ_data,1,1,0,76,754,1236,0.0,3.5,"C IV now covered (76 px, was 0); ICA range +482 px; S/N now measurable"
+220,2MASS J10215235+4645158,no_civ_data,1,1,0,141,2258,3767,0.0,0.06,"C IV now covered (141 px, was 0); ICA range +1509 px; S/N now measurable"
+226,E1423+201,no_civ_data,0,1,False,0,0,0,0.0,0.0,+1 spectra
+228,2MASS J09503674+5128382,no_civ_data,1,1,0,140,2126,2126,0.0,0.37,"C IV now covered (140 px, was 0); S/N now measurable"
+231,2MASS J09460395+0139235,no_civ_data,2,2,0,140,2108,2108,0.0,0.1,"C IV now covered (140 px, was 0); S/N now measurable"
+234,QSO J0936+5331,no_civ_data,2,2,0,141,2080,2080,0.15,0.42,"C IV now covered (141 px, was 0); S/N x2.8"
+236,2MASS J16171142+0638333,no_civ_data,1,1,0,140,679,2038,0.0,2.31,"C IV now covered (140 px, was 0); ICA range +1359 px; S/N now measurable"
+240,[VV2006] J075620.1+304535,no_civ_data,0,1,False,140,0,2016,0.0,1.26,"C IV now covered (140 px, was 0); ICA range +2016 px; S/N now measurable; +1 spectra"
+243,Q 1217+023,no_civ_data,0,1,False,0,0,583,0.0,0.0,ICA range +583 px; +1 spectra
+247,2MASS J10115298+5442063,no_civ_data,1,1,140,140,1292,3653,0.58,0.58,ICA range +2361 px
+251,US 1329,no_civ_data,0,1,False,0,0,0,0.0,0.0,+1 spectra
+252,J0833+1005-OFFNUCLEUS,no_civ_data,1,1,0,70,1699,3166,0.0,0.47,"C IV now covered (70 px, was 0); ICA range +1467 px; S/N now measurable"
+262,SDSSJ1602+1410,no_civ_data,1,1,0,0,969,969,0.0,0.0,nothing
+263,2MASS J12465925+3126196,no_civ_data,1,1,0,0,969,969,0.0,0.0,nothing
+264,2MASS J12140133+4048233,no_civ_data,1,1,0,0,968,968,0.0,0.0,nothing
+265,2MASS J08042265+1926386,no_civ_data,1,1,0,0,962,962,0.0,0.0,nothing
+266,2MASS J13042289+2055107,no_civ_data,1,1,0,0,950,950,0.0,0.0,nothing
+267,2MASS J17185029+3042017,no_civ_data,1,1,0,0,950,950,0.0,0.0,nothing
+268,PB 3493,no_civ_data,1,1,0,0,945,945,0.0,0.0,nothing
+269,2MASS J09224506+3032585,no_civ_data,1,1,0,0,933,933,0.0,0.0,nothing
+270,2MASS J12210891+4228388,no_civ_data,1,1,0,0,930,930,0.0,0.0,nothing
+272,2MASS J11190530+5925140,no_civ_data,1,1,0,0,1579,1579,0.0,0.0,nothing
+274,FBQS J2226-0901,no_civ_data,1,1,0,0,1550,1550,0.0,0.0,nothing
+284,2MASS J14314604+0301444,no_civ_data,0,1,False,0,0,758,0.0,0.0,ICA range +758 px; +1 spectra
+294,Q1130+6026,no_civ_data,1,1,0,0,1305,1305,0.0,0.0,nothing
+295,LB 10203,no_civ_data,2,2,0,0,1690,1690,0.0,0.0,nothing
+307,2MASS J13304515+2813216,no_civ_data,1,1,0,140,1455,1455,0.0,0.18,"C IV now covered (140 px, was 0); S/N now measurable"
+310,4C 10.30,no_civ_data,0,1,False,0,0,0,0.0,0.0,+1 spectra
+326,QSO J0910+1014,no_civ_data,1,1,0,140,1316,1316,0.0,0.19,"C IV now covered (140 px, was 0); S/N now measurable"
+331,QSO J1154+0134,no_civ_data,1,1,0,0,605,2399,0.0,0.0,ICA range +1794 px
+334,QSO J1619+3342,no_civ_data,1,1,0,140,0,1256,0.0,0.4,"C IV now covered (140 px, was 0); ICA range +1256 px; S/N now measurable"
+338,[VV98] J102847.0+391758,no_civ_data,0,1,False,0,0,1254,0.0,0.0,ICA range +1254 px; +1 spectra
+349,QSO J1550+4001,no_civ_data,1,1,0,0,646,2398,0.0,0.0,ICA range +1752 px
+355,PB 6739,no_civ_data,1,1,0,140,1173,1173,0.0,0.35,"C IV now covered (140 px, was 0); S/N now measurable"
+367,LBQS 1222+1640,no_civ_data,1,1,0,0,376,2170,0.0,0.0,ICA range +1794 px
+373,2MASS J10051419+5302398,no_civ_data,1,1,0,105,1032,1032,0.0,0.15,"C IV now covered (105 px, was 0); S/N now measurable"
+376,QSO J1028+4500,no_civ_data,1,1,0,0,279,2074,0.0,0.0,ICA range +1795 px
+382,[VV2006] J142927.3+523849,no_civ_data,0,1,False,140,0,2581,0.0,3.99,"C IV now covered (140 px, was 0); ICA range +2581 px; S/N now measurable; +1 spectra"
+421,SBSG 1123+594A,no_civ_data,3,3,0,5,470,844,0.0,9.46,ICA range +374 px; S/N now measurable
