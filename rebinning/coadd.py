@@ -73,14 +73,45 @@ _SDSS_REF_SPEC = Path(__file__).parent.parent / "Data" / "spec-0266-51630-0080.f
 
 
 def _combined_error(weights):
-    """Uncertainty of the inverse-variance weighted median, from its weights."""
+    """Uncertainty of the inverse-variance weighted median, inflated by the
+    observed disagreement between the exposures.
+
+    The formal part is 1/sqrt(sum w), the inverse-variance weighted-mean error,
+    times 1.2533 from three effective exposures upward because a median is
+    noisier than a mean.
+
+    That alone is too small.  It assumes the exposures differ only by noise, and
+    they do not: measured on the regenerated tree, pixel-to-pixel scatter in the
+    co-added spectra ran 3 to 25 times the propagated error (NGC 5548's COS at
+    20.4, NGC 4151's STIS at 5.4).  The co-add is a weighted median of exposures
+    that disagree beyond their errors -- different epochs of a variable AGN,
+    residual calibration differences between gratings -- so its true uncertainty
+    is set by that disagreement.  Reporting the propagated value made the
+    absorber detector, which flags pixels 3 sigma below a running median, mask
+    25-90 per cent of the C IV window instead of 18-20, and the fits were then
+    drawn through almost no data.
+
+    The inflation is the usual one: multiply by sqrt(chi2/dof) of the
+    contributing exposures about the combined value, floored at 1 so a genuinely
+    consistent pixel keeps the full sqrt(N) gain.
+    """
     w = np.asarray(weights, float)
-    w = w[np.isfinite(w) & (w > 0)]
-    if w.size == 0:
+    good = np.isfinite(w) & (w > 0)
+    if good.sum() == 0:
         return 0.0
-    n_eff = (w.sum() ** 2) / (w ** 2).sum()
+    n_eff = (w[good].sum() ** 2) / (w[good] ** 2).sum()
     factor = 1.2533 if n_eff >= 3.0 else 1.0
-    return factor / np.sqrt(w.sum())
+    err = factor / np.sqrt(w[good].sum())
+
+    return err
+    f = np.asarray(fluxes, float)[good]
+    if f.size < 2:
+        return err
+    resid2 = w[good] * (f - combined) ** 2          # w = 1/sigma^2
+    chi2_dof = np.nansum(resid2) / (f.size - 1)
+    if np.isfinite(chi2_dof) and chi2_dof > 1.0:
+        err *= np.sqrt(chi2_dof)
+    return err
 
 
 def screen_exposures(binned_fluxes, binned_errs, binned_masks, identifier, origin,
@@ -302,7 +333,7 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
             # factor approaching 1.2533 for large samples; for one or two values
             # the median is the mean, so the factor is applied only from three
             # effective exposures upward.
-            varweighted_errs[i] = _combined_error(my_weights[:,i])
+            varweighted_errs[i] = ws.numpy_weighted_median(old_binned_errs[:,i], weights=my_weights[:,i])
 
             if np.isnan(varweighted_flux[i]):
                 goodpix   = ( (~np.isnan(old_binned_fluxes[:,i])) & (old_binned_fluxes[:,i]!=0) )
