@@ -130,6 +130,91 @@ def civ_subcontinuum(res):
     return out
 
 
+#: The two continuum anchors are Rankine's own, as used by the sub-continuum veto
+#: (cont_region below): 1445-1465 A and 1700-1705 A.  Rankine defines no window at
+#: 2500 A, so 2490-2510 is ours, matched to the width of the 1450 anchor; that
+#: choice is the paper's to state.
+LUM_WINDOWS = ((1450.0, 1445.0, 1465.0),
+               (1700.0, 1700.0, 1705.0),
+               (2500.0, 2490.0, 2510.0))
+
+
+def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
+    """Monochromatic luminosities from the ICA reconstruction.
+
+    Taken from the reconstruction rather than the data: the reconstruction is
+    fitted only to unmasked pixels, so BAL troughs and absorption lines are
+    excluded from it and it interpolates across them -- which is what makes this
+    an unabsorbed continuum luminosity.
+
+    Each wavelength is flagged as measured or extrapolated according to whether
+    the object's own unmasked data reach it.  Extrapolated values are set by the
+    shape of the ICA components rather than by this object, so any systematic
+    error in that shape enters the luminosity and hence the luminosity dependence
+    the paper is about; they should be identifiable and droppable.
+
+    Flat LambdaCDM, H0 = 70 km/s/Mpc, Omega_m = 0.3.
+    """
+    out = {}
+    wi, fi = np.asarray(res["wave_ica"], float), np.asarray(res["flux_ica"], float)
+    wa, ma = np.asarray(res["wave_arb"], float), np.asarray(res["mask_arb"])
+    fa = np.asarray(res["flux_arb"], float)
+    # The fit runs on continuum-normalised flux, so the absolute scale comes from
+    # the "Continuum Normalisation" column the co-adder now records.  Without it
+    # there is no luminosity, only a shape.
+    cw = cc = None
+    if spec_path and os.path.exists(spec_path):
+        try:
+            from astropy.io import fits as _f
+            with _f.open(spec_path) as _h:
+                _t = _h[1].data
+                if "Continuum Normalisation" in getattr(_t, "names", []):
+                    cw = np.asarray(_t["Rest-frame Wavelength"], float)
+                    cc = np.asarray(_t["Continuum Normalisation"], float)
+        except Exception:
+            cw = cc = None
+    try:
+        from astropy.cosmology import FlatLambdaCDM
+        import astropy.units as u
+        dl_cm = FlatLambdaCDM(H0=70, Om0=0.3).luminosity_distance(z).to(u.cm).value
+    except Exception:
+        dl_cm = np.nan
+    for w0, lo, hi in windows:
+        k = "%d" % int(round(w0))
+        g = np.isfinite(wi) & np.isfinite(fi)
+        band = g & (wi >= lo) & (wi <= hi)
+        if not band.any():
+            out[k] = dict(f_lambda=np.nan, logL=np.nan, measured=False, covered=False,
+                          calibrated=False, window=[lo, hi])
+            continue
+        f0 = float(np.nanmedian(fi[band]))
+        near = (wa >= lo) & (wa <= hi) & (ma == 0) & np.isfinite(fa)
+        covered = bool(near.sum() > 3)
+        scale = np.nan
+        if cw is not None:
+            m = (cw >= lo) & (cw <= hi) & np.isfinite(cc)
+            if m.sum() > 3:
+                scale = float(np.nanmedian(cc[m]))
+        # No luminosity yet, deliberately.  coadd.rebin divides every exposure by
+        # its own continuum before combining, so the rebinned products -- and
+        # therefore the reconstruction fitted to them -- carry no absolute flux
+        # scale: NGC 3783's f_lambda(1450) is 3.0 in fit units where the archive
+        # says 1.6e-13 erg/s/cm2/A.  Multiplying the fit units by 4 pi D_L^2 gave
+        # log L = 56.9 for a Seyfert that should be near 44.  The scale has to be
+        # recovered -- by recording the normalisation at rebin time, or by
+        # re-measuring against the archive exposures -- before this is a
+        # luminosity.  Until then report the shape-only value and say so.
+        f_real = f0 * scale if np.isfinite(scale) else np.nan
+        lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0
+                 if (np.isfinite(dl_cm) and np.isfinite(f_real)) else np.nan)
+        out[k] = dict(f_lambda=f0, f_lambda_cgs=f_real,
+                      logL=(float(np.log10(lam_l)) if (np.isfinite(lam_l) and lam_l > 0)
+                            else np.nan),
+                      measured=covered, covered=covered,
+                      calibrated=bool(np.isfinite(scale)), window=[lo, hi])
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("name", help="spectrum stem, e.g. 'NGC 3516_COMBINED'")
@@ -302,6 +387,53 @@ def main():
     # Figures sit at the top of the object's folder and the JSON records go
     # underneath in records/. The user browses these folders by flipping through
     # images, so the images are what the folder should show.
+    # Mark the luminosity wavelengths on the full-range panel, so the value can be
+    # checked against absorption at the point it is taken from, and print both in
+    # a corner.  Green where the object's own data reach the wavelength, red where
+    # the reconstruction is being extrapolated there.
+    mono = monochromatic(res, res["z"], spec_path=os.path.join(path, args.name + ".fits"))
+    full_ax = None
+    for ax in fig.axes:
+        lo, hi = ax.get_xlim()
+        if (hi - lo) > 400 and "Flux" in (ax.get_ylabel() or ""):
+            if full_ax is None or (hi - lo) > (full_ax.get_xlim()[1] - full_ax.get_xlim()[0]):
+                full_ax = ax
+    if full_ax is not None:
+        lines = []
+        for w0, _lo, _hi in LUM_WINDOWS:
+            m = mono["%d" % int(w0)]
+            col = "#1a9850" if m["measured"] else "#d73027"
+            lo, hi = full_ax.get_xlim()
+            if lo <= w0 <= hi:
+                full_ax.axvline(w0, color=col, lw=0.9, ls=":", alpha=0.75, zorder=5)
+                # Mark the FLUX LEVEL that is actually used, not only where it is
+                # taken from: a horizontal bar across the window at the value the
+                # luminosity is computed from, so it can be compared against the
+                # data there.  If a BAL or any uncorrected absorption depresses
+                # the spectrum in the window, the bar sits above the data and the
+                # discrepancy is visible rather than buried in a number.
+                if np.isfinite(m["f_lambda"]):
+                    # A point, not a bar.  A bar drawn wide enough to see would be
+                    # nine times the width of Rankine's 1700-1705 window and would
+                    # assert a measurement over a range that was never used -- on
+                    # a figure whose purpose is checking absorption, that is the
+                    # worst place to be imprecise.  The window is in the corner text.
+                    full_ax.plot([w0], [m["f_lambda"]], marker="D", ms=6.5, color=col,
+                                 mec="white", mew=0.9, zorder=8)
+                full_ax.text(w0, full_ax.get_ylim()[1], " %d" % int(w0), color=col,
+                             fontsize=8, va="top", ha="left", zorder=6)
+            if np.isfinite(m["logL"]):
+                lines.append("log L%d = %.2f  [%.0f-%.0f A]  %s"
+                             % (int(w0), m["logL"], _lo, _hi,
+                                "measured" if m["measured"] else "extrapolated"))
+            elif np.isfinite(m["f_lambda"]):
+                lines.append("f%d = %.3g (fit units, no continuum recorded)" % (int(w0), m["f_lambda"]))
+            else:
+                lines.append("log L%d --  (outside the reconstruction)" % int(w0))
+        full_ax.text(0.995, 0.03, "\n".join(lines), transform=full_ax.transAxes,
+                     ha="right", va="bottom", fontsize=8,
+                     bbox=dict(fc="white", ec="0.7", alpha=0.85, pad=2.5))
+
     os.makedirs(os.path.join(d, "records"), exist_ok=True)
     png = os.path.join(d, tag + ".png")
     plt.savefig(png, dpi=100, bbox_inches="tight")
@@ -394,6 +526,7 @@ def main():
                      "comps_use": comps},
         "result": {"civ_blue": res["civ_blue"], "civ_ew": res["civ_ew"],
                    "f2500": res["f2500"], "z": res["z"]},
+        "monochromatic": mono,
         "plot": png,
         "windows": record_windows,
         "redshift_check_kms": zdiag,

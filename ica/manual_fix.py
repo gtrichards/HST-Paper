@@ -135,7 +135,28 @@ class ICAManualFixProcessor:
         one identifier per instrument (each fit independently).
         """
         files = sorted(glob.glob(os.path.join(glob.escape(self.rebin_path), "*.fits")))
-        return [os.path.splitext(os.path.basename(f))[0] for f in files]
+        stems = [os.path.splitext(os.path.basename(f))[0] for f in files]
+
+        # Alphabetical order makes an object hard to find when you are working
+        # from a numbered list: GTR walks the sample by index, so if the rebin
+        # directory carries an index_order.csv (stem,index) use it to order the
+        # list, keeping anything unlisted at the end in alphabetical order.
+        order_file = os.path.join(self.rebin_path, "index_order.csv")
+        if os.path.exists(order_file):
+            try:
+                import csv as _csv
+                rank = {}
+                with open(order_file) as _fh:
+                    for _r in _csv.DictReader(_fh):
+                        try:
+                            rank[_r["stem"]] = int(_r["index"])
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                if rank:
+                    stems.sort(key=lambda s: (rank.get(s, 10 ** 6), s))
+            except Exception:
+                pass
+        return stems
 
     def _ensure_output_dirs(self):
         """Create the plot output directory and its subfolders for the active mode."""
