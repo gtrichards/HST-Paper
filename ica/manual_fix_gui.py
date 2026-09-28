@@ -391,12 +391,25 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self.next_btn.clicked.connect(lambda: self._step(+1))
         self.obj_combo = QtWidgets.QComboBox()
         self.obj_combo.setEditable(True)
-        self.obj_combo.addItems(self.names)
+        # Label each entry with its index: the sample is walked by index number,
+        # and a bare stem gives no way to tell which object you are on.  The
+        # stem stays the identifier -- only the label carries the number.
+        self._index_of = _index_map(getattr(self.proc, "rebin_path", None))
+        self._label_of = {}
+        self._name_of_label = {}
+        for n in self.names:
+            i = self._index_of.get(n)
+            lab = ("%03d  %s" % (i, n)) if i is not None else n
+            self._label_of[n] = lab
+            self._name_of_label[lab] = n
+        self.obj_combo.addItems([self._label_of[n] for n in self.names])
         self.obj_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
         self.obj_combo.completer().setCompletionMode(
             QtWidgets.QCompleter.PopupCompletion)
         self.obj_combo.activated.connect(
-            lambda _i: self._load_object(self.obj_combo.currentText()))
+            lambda _i: self._load_object(
+                self._name_of_label.get(self.obj_combo.currentText(),
+                                        self.obj_combo.currentText())))
         row.addWidget(self.prev_btn)
         row.addWidget(self.obj_combo, stretch=1)
         row.addWidget(self.next_btn)
@@ -986,6 +999,39 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self.ax_full.set_ylabel("Flux (arb.)")
         self.ax_full.set_title("%s  —  ICA fit" % res["name"])
 
+        # The monochromatic luminosity points, marked where they are taken from
+        # and at the flux level used, so absorption affecting one is visible
+        # while fitting rather than discovered afterwards.  Green where this
+        # object's own unmasked data reach the window, red where the
+        # reconstruction is being extrapolated there.
+        try:
+            mono = _monochromatic(res, getattr(self.proc, "rebin_path", None))
+            lines = []
+            x0, x1 = self.ax_full.get_xlim()
+            for w0, lo, hi in LUM_WINDOWS:
+                m = mono.get(w0)
+                if not m:
+                    continue
+                col = "#1a9850" if m["measured"] else "#d73027"
+                if x0 <= w0 <= x1:
+                    self.ax_full.axvline(w0, color=col, lw=0.8, ls=":", alpha=0.7, zorder=5)
+                    self.ax_full.plot([w0], [m["f_lambda"]], marker="D", ms=6.0,
+                                      color=col, mec="white", mew=0.9, zorder=8)
+                if np.isfinite(m["logL"]):
+                    lines.append("log L%d = %.2f  %s"
+                                 % (int(w0), m["logL"],
+                                    "meas" if m["measured"] else "extrap"))
+                else:
+                    lines.append("log L%d --" % int(w0))
+            if lines:
+                self.ax_full.text(0.995, 0.04, "\n".join(lines),
+                                  transform=self.ax_full.transAxes,
+                                  ha="right", va="bottom", fontsize=7.5,
+                                  bbox=dict(fc="white", ec="0.7", alpha=0.85, pad=2.0),
+                                  zorder=9)
+        except Exception:
+            pass
+
         # CIV region
         self.ax_civ.plot(wave, flux, "-k", alpha=0.6)
         self.ax_civ.plot(wave_ica, flux_ica, "-r")
@@ -1249,6 +1295,92 @@ def _make_processor(rebin_dir):
     return GuiFixProcessor(
         rebin_path=rebin_dir, master_mode=True,
         output_path="ICA_Plots_Rebin_master")
+
+
+LUM_WINDOWS = ((1450.0, 1445.0, 1465.0),
+               (1700.0, 1700.0, 1705.0),
+               (2500.0, 2490.0, 2510.0))
+
+
+def _monochromatic(res, rebin_path):
+    """The three monochromatic luminosities, as iterate_fit.py records them.
+
+    Taken from the ICA reconstruction, which is fitted only to unmasked pixels
+    and so interpolates across absorption -- an unabsorbed continuum.  The
+    absolute scale comes from the "Continuum Normalisation" column the co-adder
+    writes; without it there is a shape but no luminosity.  Windows 1445-1465
+    and 1700-1705 are Rankine's continuum anchors; 2490-2510 is ours.
+    Flat LambdaCDM, H0 = 70, Omega_m = 0.3.
+    """
+    out = {}
+    try:
+        wi = np.asarray(res["wave_ica"], float); fi = np.asarray(res["flux_ica"], float)
+        wa = np.asarray(res["wave_arb"], float); fa = np.asarray(res["flux_arb"], float)
+        ma = np.asarray(res["mask_arb"])
+        z = float(res.get("z", np.nan))
+    except Exception:
+        return out
+    cw = cc = None
+    try:
+        from astropy.io import fits as _f
+        path = os.path.join(rebin_path or "", "%s.fits" % res.get("spec_name", ""))
+        if os.path.exists(path):
+            with _f.open(path) as h:
+                t = h[1].data
+                if "Continuum Normalisation" in getattr(t, "names", []):
+                    cw = np.asarray(t["Rest-frame Wavelength"], float)
+                    cc = np.asarray(t["Continuum Normalisation"], float)
+    except Exception:
+        cw = cc = None
+    dl_cm = np.nan
+    try:
+        from astropy.cosmology import FlatLambdaCDM
+        import astropy.units as u
+        if np.isfinite(z):
+            dl_cm = FlatLambdaCDM(H0=70, Om0=0.3).luminosity_distance(z).to(u.cm).value
+    except Exception:
+        pass
+    for w0, lo, hi in LUM_WINDOWS:
+        g = np.isfinite(wi) & np.isfinite(fi)
+        band = g & (wi >= lo) & (wi <= hi)
+        if not band.any():
+            continue
+        f0 = float(np.nanmedian(fi[band]))
+        near = (wa >= lo) & (wa <= hi) & (ma == 0) & np.isfinite(fa)
+        scale = np.nan
+        if cw is not None:
+            m = (cw >= lo) & (cw <= hi) & np.isfinite(cc)
+            if m.sum() > 3:
+                scale = float(np.nanmedian(cc[m]))
+        f_real = f0 * scale if np.isfinite(scale) else np.nan
+        lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0
+                 if (np.isfinite(dl_cm) and np.isfinite(f_real)) else np.nan)
+        out[w0] = dict(f_lambda=f0,
+                       logL=(float(np.log10(lam_l)) if (np.isfinite(lam_l) and lam_l > 0)
+                             else np.nan),
+                       measured=bool(near.sum() > 3), window=(lo, hi))
+    return out
+
+
+def _index_map(rebin_path):
+    """stem -> index, from index_order.csv in the rebin directory if present."""
+    out = {}
+    if not rebin_path:
+        return out
+    path = os.path.join(rebin_path, "index_order.csv")
+    if not os.path.exists(path):
+        return out
+    try:
+        import csv as _csv
+        with open(path) as fh:
+            for r in _csv.DictReader(fh):
+                try:
+                    out[r["stem"]] = int(r["index"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+    except Exception:
+        return {}
+    return out
 
 
 def main(argv=None):
