@@ -72,6 +72,42 @@ from rebinning import spec_morph
 _SDSS_REF_SPEC = Path(__file__).parent.parent / "Data" / "spec-0266-51630-0080.fits"
 
 
+def _weighted_median_pair(fluxes, errs, weights):
+    """Weighted median of the contributing exposures at one pixel.
+
+    Every exposure is stored across the full co-add lattice, so at any pixel the
+    exposures that do not reach it are NaN with zero weight.  Those entries must
+    be removed before the median rather than passed through with zero weight,
+    because weightedstats.numpy_weighted_median begins with
+
+        sorted(zip(data, weights))
+
+    and Python cannot sort tuples whose first element is NaN: every comparison
+    against NaN is False, so Timsort leaves the NaNs where they fall and, with
+    them, leaves the real values out of ascending order.  The cumulative-weight
+    walk that follows then returns an arbitrary contributing exposure instead of
+    the median.  The damage is to the ordering, so zero weights do not protect
+    against it, and it grows with the number of non-contributing rows: on
+    SWIFT J2325.6+2157 the C IV window came back with pixel-to-pixel scatter
+    2.81 times its quoted error from 8 real and 24 NaN rows, 1.80 with the same
+    8 real and 8 NaN rows, and 1.60 once the NaN rows were dropped here.
+
+    Flux and error are selected on the same exposures so that the reported
+    uncertainty belongs to the exposures that actually set the flux.
+    """
+    f = np.asarray(fluxes, float)
+    e = np.asarray(errs, float)
+    w = np.asarray(weights, float)
+    good = np.isfinite(f) & np.isfinite(e) & (e > 0) & np.isfinite(w) & (w > 0)
+    if not good.any():
+        return np.nan, 0.0
+    med_f = ws.numpy_weighted_median(f[good], weights=w[good])
+    med_e = ws.numpy_weighted_median(e[good], weights=w[good])
+    if med_f is None:
+        return np.nan, 0.0
+    return med_f, (0.0 if med_e is None else med_e)
+
+
 def _combined_error(weights):
     """Uncertainty of the inverse-variance weighted median, inflated by the
     observed disagreement between the exposures.
@@ -258,6 +294,13 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
     old_binned_fluxes = np.zeros((waves.shape[0], len(hst_wave_new)))*np.nan
     old_binned_errs   = np.zeros((waves.shape[0], len(hst_wave_new)))
     old_binned_masks  = np.zeros((waves.shape[0], len(hst_wave_new)))
+    # Every exposure is divided by its own continuum before combining, which
+    # throws away the absolute flux scale: the products carry f_lambda ~ 1-4 in
+    # arbitrary units where the archive says 1e-13 erg/s/cm2/A, so no
+    # monochromatic luminosity can be recovered from them.  Carry the continuum
+    # through the same co-addition and write it alongside, so real units are one
+    # multiplication away.
+    old_binned_cont   = np.zeros((waves.shape[0], len(hst_wave_new)))*np.nan
 
     f1450_list = np.array([])
     f1450_wts  = np.array([])
@@ -278,6 +321,7 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
 
         new_binned_fluxes /= continuum
         new_binned_errs /= continuum
+        _cont_keep = np.asarray(continuum, float)
 
         #Save arrays with wavelength "in place"
         argstart = max(0, np.argmin(np.abs(new_binned_waves[0]-hst_wave_new))-1) #avoid ValueError below
@@ -285,6 +329,7 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         old_binned_fluxes[i,argstart:argstart+len(new_binned_fluxes)] = new_binned_fluxes
         old_binned_errs[i,argstart:argstart+len(new_binned_errs)]     = new_binned_errs
         old_binned_masks[i,argstart:argstart+len(new_binned_masks)]   = new_binned_masks
+        old_binned_cont[i,argstart:argstart+len(_cont_keep)]          = _cont_keep
 
     """
     Step 3: Now that data are rebinned, co-add them
@@ -298,11 +343,13 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
             old_binned_fluxes = old_binned_fluxes[keep_exp]
             old_binned_errs   = old_binned_errs[keep_exp]
             old_binned_masks  = old_binned_masks[keep_exp]
+            old_binned_cont   = old_binned_cont[keep_exp]
 
         #Initialize - note we want weights for each exposure
         varweighted_flux = np.zeros(old_binned_waves.shape[1])*np.nan
         varweighted_errs = np.zeros(old_binned_waves.shape[1])
         varweighted_mask = np.zeros(old_binned_waves.shape[1])
+        varweighted_cont = np.zeros(old_binned_waves.shape[1])*np.nan
         total_variance = np.zeros(old_binned_waves.shape[1])
         my_weights     = np.ones(old_binned_waves.shape)
 
@@ -319,21 +366,26 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
 
         #the masking portion need not be co-added; just mask final pixel if that pixel from all exposures is masked
         for i in range(old_binned_waves.shape[1]):
-            varweighted_flux[i] = ws.numpy_weighted_median(old_binned_fluxes[:,i], weights=my_weights[:,i])
-            # The uncertainty ON THE COMBINATION, not the typical uncertainty of
-            # one exposure.  This used to be the weighted median of the input
-            # errors, which is a single-exposure error however many exposures
-            # went in: LEDA 29208's co-add of 11 overlapping exposures reported
-            # 90% of the single-exposure error where variance weighting predicts
-            # 30%.  Signal-to-noise was understated across the sample, and with
-            # it every sigma quoted from a window residual or a veto.
-            #
-            # sum(w) with w = 1/e^2 gives the inverse-variance-weighted-mean
-            # error as 1/sqrt(sum w).  A median is noisier than a mean, by a
-            # factor approaching 1.2533 for large samples; for one or two values
-            # the median is the mean, so the factor is applied only from three
-            # effective exposures upward.
-            varweighted_errs[i] = ws.numpy_weighted_median(old_binned_errs[:,i], weights=my_weights[:,i])
+            varweighted_flux[i], _med_err = _weighted_median_pair(
+                old_binned_fluxes[:,i], old_binned_errs[:,i], my_weights[:,i])
+            # The error is the weighted median of the contributing exposures'
+            # errors -- a single-exposure error however many exposures went in.
+            # An inverse-variance combination (1/sqrt(sum w), times 1.2533 for a
+            # median) was tried and reverted: the exposures differ by more than
+            # their errors, so the smaller number made maskNAL mask most of the
+            # C IV window.  See _combined_error, kept unused, and the notebook
+            # entry for 2026-09-23.  What matters here is only that flux and
+            # error come from the same set of exposures, which
+            # _weighted_median_pair guarantees.
+            varweighted_errs[i] = _med_err
+            # Same exposures, same weights, so the recorded continuum belongs to
+            # the flux it normalised.
+            _c = old_binned_cont[:, i]
+            _w = my_weights[:, i]
+            _g = np.isfinite(_c) & np.isfinite(_w) & (_w > 0)
+            if _g.any():
+                _mc = ws.numpy_weighted_median(_c[_g], weights=_w[_g])
+                varweighted_cont[i] = np.nan if _mc is None else _mc
 
             if np.isnan(varweighted_flux[i]):
                 goodpix   = ( (~np.isnan(old_binned_fluxes[:,i])) & (old_binned_fluxes[:,i]!=0) )
@@ -348,9 +400,12 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
                     varweighted_errs[i]  = 0
                     varweighted_mask[i] = 1
                 else:
-                    varweighted_flux[i]  = ws.numpy_weighted_median(new_flux,weights=new_weights)
+                    # Same NaN hazard as above: select before taking the median.
+                    varweighted_flux[i], med_err = _weighted_median_pair(
+                        new_flux, new_errs, new_weights)
+                    if np.isnan(varweighted_flux[i]):
+                        med_err = None
                     # AP: Defensive check - weighted_median can return None if weights are all zero/nan/inf
-                    med_err = ws.numpy_weighted_median(new_errs,weights=new_weights)
                     if med_err is None:
                         varweighted_errs[i] = 0
                         varweighted_mask[i] = 1
@@ -368,6 +423,7 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         varweighted_flux = old_binned_fluxes[0].copy()
         varweighted_errs = old_binned_errs[0].copy()
         varweighted_mask = old_binned_masks[0].copy()
+        varweighted_cont = old_binned_cont[0].copy()
 
     #data is messy blueward of ~1120Å, so cut it there
     lambdacut = 1120
@@ -438,11 +494,23 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         final_flux = varweighted_flux[argstart:]
         final_errs = varweighted_errs[argstart:] * varweighted_morph_factor[argstart:]
         final_mask = varweighted_mask[argstart:]
+        final_cont = varweighted_cont[argstart:]
     """
     Finally, save!
     """
-    t = Table([final_wave/(1+z), final_flux, final_errs, final_mask, z*np.ones(len(final_wave))],
-              names=('Rest-frame Wavelength','Coadded Flux (Arbitrary Units)','Coadded Flux Errors','Bad Pixel Mask','Redshift'))
+    if "final_cont" not in dir():
+        final_cont = np.full(len(final_wave), np.nan)
+    if len(final_cont) != len(final_wave):
+        _c = np.full(len(final_wave), np.nan)
+        _n = min(len(_c), len(final_cont))
+        _c[:_n] = final_cont[:_n]
+        final_cont = _c
+    t = Table([final_wave/(1+z), final_flux, final_errs, final_mask,
+               z*np.ones(len(final_wave)), final_cont],
+              names=('Rest-frame Wavelength','Coadded Flux (Arbitrary Units)',
+                     'Coadded Flux Errors','Bad Pixel Mask','Redshift',
+                     'Continuum Normalisation'))
+    # Multiply the flux column by this to recover erg/s/cm2/A.
 
     # AP: For HSLA data, Identifier already contains .fits extension, so strip it before appending _HSLA.fits
     if data_origin == "HSLA":

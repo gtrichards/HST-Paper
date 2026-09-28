@@ -42,6 +42,40 @@ from rebinning import spec_cuts_hsla as SpecCuts_HSLA
 _COS_EXPOSURE_CAP = {"Mrk 817": 100, "NGC 5548": 100}
 
 
+#: Per-file record of what the most recent flat read kept and dropped, and why.
+#: The rebinned product says nothing about the exposures behind it, so there was
+#: no way to show which archive files actually reached a fit -- needed both for
+#: the review figures and for the paper's "spectra available / spectra used"
+#: columns.  Purely additive: nothing here changes what the readers return.
+PROVENANCE = []
+
+
+def _prov_reset():
+    del PROVENANCE[:]
+
+
+def _prov(fn, kept, reason=""):
+    PROVENANCE.append(dict(file=os.path.basename(fn), path=fn,
+                           kept=bool(kept), reason=reason))
+
+
+def _wrong_instrument(fn, want):
+    """True if this file's INSTRUME does not match the directory it was filed in.
+
+    27 STIS files across nine objects were retrieved into COS directories, and
+    read_cos_flat globs *_x1d.fits without asking what wrote them, so STIS G430M
+    and G230L exposures were being read as COS and co-added with the FUV data.
+    G430M lies outside the ICA range and merely inflated the lattice; G230L
+    overlaps it at 1600-3200 A, so on Mrk 231 and Mrk 817 optical-arm STIS data
+    was mixing into the COS co-add.  Cheap to check, so check.
+    """
+    try:
+        got = str(fits.getheader(fn).get('INSTRUME', '')).strip().upper()
+    except Exception:
+        return False
+    return bool(got) and got != want.upper()
+
+
 def _cos_median_snr(fn):
     """Median per-pixel S/N of a COS x1d exposure, for ranking. Flattens all
     rows (segments/stripes) so it works for FUV (2 seg) and NUV (3 stripe) data."""
@@ -310,6 +344,14 @@ def read_cos(Identifier, path, z):
         err_wmask  = fluxerr.copy()
         sel        = ((wavelength >= 1215.0) & (wavelength <= 1216.0))
         masks[i,:][(err_wmask == 0.0)] = 1
+        # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
+        # dead or unilluminated pixel that the archive flags in DQ, and 43% of
+        # NGC 3783's COS pixels in the C IV window are of this kind, every one of them
+        # carrying a non-zero error.  Cut_Edge_Pix already defines a good pixel as
+        # flux != 0 and fluxerr != 0, but uses that only to trim the ends of the array,
+        # so interior dead pixels reached the co-add with full 1/err^2 weight and pulled
+        # the weighted median toward zero.  This applies the same definition everywhere.
+        masks[i,:][(flux_wmask == 0.0)] = 1
         waves[i,:]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask, \
                                                 wavelength, array_len, "wavelength", False, z, "%s - %s"%(Identifier,spec_names[i]), "COS")
         fluxes[i,:]    = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask, \
@@ -370,6 +412,14 @@ def read_stis(Identifier, path, z):
         err_wmask  = fluxerr.copy()
         sel        = ((wavelength >= 1215.0) & (wavelength <= 1216.0))
         masks[i,:len(err_wmask)][err_wmask==0.] = 1
+        # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
+        # dead or unilluminated pixel that the archive flags in DQ, and 43% of
+        # NGC 3783's COS pixels in the C IV window are of this kind, every one of them
+        # carrying a non-zero error.  Cut_Edge_Pix already defines a good pixel as
+        # flux != 0 and fluxerr != 0, but uses that only to trim the ends of the array,
+        # so interior dead pixels reached the co-add with full 1/err^2 weight and pulled
+        # the weighted median toward zero.  This applies the same definition everywhere.
+        masks[i,:len(err_wmask)][(flux_wmask == 0.0)] = 1
         waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask, \
                                                 wavelength, array_len, "wavelength", False, z, "%s - %s"%(Identifier,spec_names[i]), "STIS")
         fluxes[i,:len(err_wmask)]    = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask, \
@@ -464,6 +514,14 @@ def read_fos(Identifier, path, z):
         flux_wmask                = flux.copy()
         err_wmask                 = fluxerr.copy()
         masks[i,:len(err_wmask)][err_wmask==0.] = 1
+        # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
+        # dead or unilluminated pixel that the archive flags in DQ, and 43% of
+        # NGC 3783's COS pixels in the C IV window are of this kind, every one of them
+        # carrying a non-zero error.  Cut_Edge_Pix already defines a good pixel as
+        # flux != 0 and fluxerr != 0, but uses that only to trim the ends of the array,
+        # so interior dead pixels reached the co-add with full 1/err^2 weight and pulled
+        # the weighted median toward zero.  This applies the same definition everywhere.
+        masks[i,:len(err_wmask)][(flux_wmask == 0.0)] = 1
 
         waves[i,:len(flux)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask, \
                                                 wavelength, array_len, "wavelength", False, z, "%s - %s"%(Identifier,spec_names[i]),"FOS")
@@ -486,19 +544,42 @@ def read_cos_flat(name, path, z):
     # Only use per-exposure _x1d.fits products (matches Trevor's legacy convention).
     # _x1dsum.fits files are CalCOS per-visit coadds of the same exposures, so
     # including them would double-count the same photons in coadd.py.
+    _prov_reset()
     fn_list = sorted(glob.glob(os.path.join(glob.escape(path), '*_x1d.fits')))
+    for fn in sorted(glob.glob(os.path.join(glob.escape(path), '*_x1dsum.fits'))):
+        _prov(fn, False, "x1dsum: CalCOS per-visit coadd of exposures already read individually")
     if not fn_list:
         raise FileNotFoundError("No COS x1d files found in %s" % path)
 
     # Drop files where CalCOS extraction failed and produced an empty BinTable
     # (zero rows). These are still archived by MAST and would crash the readers
     # downstream. Failed visits are typically re-observed under a new ASN_ID.
-    fn_list = [fn for fn in fn_list if fits.open(fn)[1].data is not None
-               and len(fits.open(fn)[1].data) > 0]
+    _right = [fn for fn in fn_list if not _wrong_instrument(fn, 'COS')]
+    if len(_right) < len(fn_list):
+        for fn in fn_list:
+            if fn not in _right:
+                _prov(fn, False, "not a COS file (INSTRUME says otherwise)")
+        print("  %s COS: skipping %d file(s) filed here but written by another "
+              "instrument: %s" % (name, len(fn_list) - len(_right),
+                                  ", ".join(os.path.basename(f) for f in fn_list
+                                            if f not in _right)))
+    fn_list = _right
+    if not fn_list:
+        raise FileNotFoundError("No COS x1d files found in %s" % path)
+
+    _nonempty = [fn for fn in fn_list if fits.open(fn)[1].data is not None
+                 and len(fits.open(fn)[1].data) > 0]
+    for fn in fn_list:
+        if fn not in _nonempty:
+            _prov(fn, False, "empty extraction (zero-row BinTable)")
+    fn_list = _nonempty
     if not fn_list:
         raise FileNotFoundError("No non-empty COS x1d files found in %s" % path)
 
     kept = [fn for fn in fn_list if _carries_flux(fn)]
+    for fn in fn_list:
+        if fn not in kept:
+            _prov(fn, False, "no non-zero flux")
     if len(kept) < len(fn_list):
         print("  %s COS: skipping %d exposure(s) with no non-zero flux: %s"
               % (name, len(fn_list) - len(kept),
@@ -511,6 +592,8 @@ def read_cos_flat(name, path, z):
     if name in _COS_EXPOSURE_CAP and len(fn_list) > _COS_EXPOSURE_CAP[name]:
         n_keep = _COS_EXPOSURE_CAP[name]
         ranked = sorted(fn_list, key=_cos_median_snr, reverse=True)
+        for fn in ranked[n_keep:]:
+            _prov(fn, False, "capped: not among the %d highest-S/N exposures (TEMP)" % n_keep)
         fn_list = sorted(ranked[:n_keep])  # re-sort by name for deterministic order
         print("CAP COS %s: kept %d highest-S/N of %d exposures (TEMP -- see "
               "Migration_Log.md)" % (name, n_keep, len(ranked)), flush=True)
@@ -519,6 +602,7 @@ def read_cos_flat(name, path, z):
     for fn in fn_list:
         hdr = fits.open(fn)[0].header
         gratings.append(hdr.get('OPT_ELEM', hdr.get('FILTER', 'UNKNOWN')))
+        _prov(fn, True, "")
 
     array_sizes = []
     n_rows = 0
@@ -557,6 +641,14 @@ def read_cos_flat(name, path, z):
             # the max. Matches the FOS/STIS reader pattern; padding stays as zeros
             # and coadd.py filters with waves[waves!=0].
             masks[i,:len(err_wmask)][(err_wmask == 0.0)] = 1
+            # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
+            # dead or unilluminated pixel that the archive flags in DQ, and 43% of
+            # NGC 3783's COS pixels in the C IV window are of this kind, every one of them
+            # carrying a non-zero error.  Cut_Edge_Pix already defines a good pixel as
+            # flux != 0 and fluxerr != 0, but uses that only to trim the ends of the array,
+            # so interior dead pixels reached the co-add with full 1/err^2 weight and pulled
+            # the weighted median toward zero.  This applies the same definition everywhere.
+            masks[i,:len(err_wmask)][(flux_wmask == 0.0)] = 1
             waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
                                                     wavelength, array_len, "wavelength", False, z,
                                                     "%s - %s" % (name, spec_id), "COS")
@@ -579,6 +671,7 @@ def read_stis_flat(name, path, z):
     # MAMA modes (G140L/M, G230L/M, E140M, E230M, PRISM) → _x1d.fits;
     # CCD modes with CR-SPLIT (G430L/M, G750L/M, G230LB, G230MB) → _sx1.fits.
     # They are mutually exclusive per rootname, so include both.
+    _prov_reset()
     fn_list = sorted(
         glob.glob(os.path.join(glob.escape(path), '*_x1d.fits')) +
         glob.glob(os.path.join(glob.escape(path), '*_sx1.fits'))
@@ -587,13 +680,31 @@ def read_stis_flat(name, path, z):
         raise FileNotFoundError("No STIS x1d/sx1 files found in %s" % path)
 
     # Defensive: drop files where pipeline extraction produced an empty BinTable.
+    _right = [fn for fn in fn_list if not _wrong_instrument(fn, 'STIS')]
+    if len(_right) < len(fn_list):
+        for fn in fn_list:
+            if fn not in _right:
+                _prov(fn, False, "not a STIS file (INSTRUME says otherwise)")
+        print("  %s STIS: skipping %d file(s) filed here but written by another "
+              "instrument" % (name, len(fn_list) - len(_right)))
+    fn_list = _right
+    if not fn_list:
+        raise FileNotFoundError("No STIS x1d/sx1 files found in %s" % path)
+
     # Not currently observed in STIS data, but matches the COS reader hardening.
-    fn_list = [fn for fn in fn_list if fits.open(fn)[1].data is not None
-               and len(fits.open(fn)[1].data) > 0]
+    _nonempty = [fn for fn in fn_list if fits.open(fn)[1].data is not None
+                 and len(fits.open(fn)[1].data) > 0]
+    for fn in fn_list:
+        if fn not in _nonempty:
+            _prov(fn, False, "empty extraction (zero-row BinTable)")
+    fn_list = _nonempty
     if not fn_list:
         raise FileNotFoundError("No non-empty STIS x1d/sx1 files found in %s" % path)
 
     kept = [fn for fn in fn_list if _carries_flux(fn)]
+    for fn in fn_list:
+        if fn not in kept:
+            _prov(fn, False, "no non-zero flux")
     if len(kept) < len(fn_list):
         print("  %s STIS: skipping %d exposure(s) with no non-zero flux: %s"
               % (name, len(fn_list) - len(kept),
@@ -606,6 +717,7 @@ def read_stis_flat(name, path, z):
     for fn in fn_list:
         hdr = fits.open(fn)[0].header
         gratings.append(hdr.get('OPT_ELEM', hdr.get('FILTER', 'UNKNOWN')))
+        _prov(fn, True, "")
 
     array_sizes = []
     n_rows = 0
@@ -640,6 +752,14 @@ def read_stis_flat(name, path, z):
             flux_wmask = flux.copy()
             err_wmask  = fluxerr.copy()
             masks[i,:len(err_wmask)][err_wmask == 0.] = 1
+            # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
+            # dead or unilluminated pixel that the archive flags in DQ, and 43% of
+            # NGC 3783's COS pixels in the C IV window are of this kind, every one of them
+            # carrying a non-zero error.  Cut_Edge_Pix already defines a good pixel as
+            # flux != 0 and fluxerr != 0, but uses that only to trim the ends of the array,
+            # so interior dead pixels reached the co-add with full 1/err^2 weight and pulled
+            # the weighted median toward zero.  This applies the same definition everywhere.
+            masks[i,:len(err_wmask)][(flux_wmask == 0.0)] = 1
             waves[i,:len(err_wmask)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
                                                     wavelength, array_len, "wavelength", False, z,
                                                     "%s - %s" % (name, spec_id), "STIS")
@@ -661,11 +781,14 @@ def read_fos_flat(name, path, z):
     Read FOS c0f/c1f/c2f/cqf files from a flat directory (no NecessaryParams.csv).
     Discovers exposures by globbing *_c0f.fits; algorithm is identical to read_fos().
     """
+    _prov_reset()
     wave_files = sorted(glob.glob(os.path.join(glob.escape(path), '*_c0f.fits')))
     if not wave_files:
         raise FileNotFoundError("No FOS c0f files found in %s" % path)
 
     spec_names = [os.path.basename(f).replace('_c0f.fits', '') for f in wave_files]
+    for _fn in wave_files:
+        _prov(_fn, True, "")
 
     array_lens = np.array([], dtype=int)
     for sn in spec_names:
@@ -737,6 +860,14 @@ def read_fos_flat(name, path, z):
         flux_wmask = flux.copy()
         err_wmask  = fluxerr.copy()
         masks[i,:len(err_wmask)][err_wmask == 0.] = 1
+        # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
+        # dead or unilluminated pixel that the archive flags in DQ, and 43% of
+        # NGC 3783's COS pixels in the C IV window are of this kind, every one of them
+        # carrying a non-zero error.  Cut_Edge_Pix already defines a good pixel as
+        # flux != 0 and fluxerr != 0, but uses that only to trim the ends of the array,
+        # so interior dead pixels reached the co-add with full 1/err^2 weight and pulled
+        # the weighted median toward zero.  This applies the same definition everywhere.
+        masks[i,:len(err_wmask)][(flux_wmask == 0.0)] = 1
 
         waves[i,:len(flux)]     = Cut_Edge_Pix_TVM.Cut_Edge_Pix(DQ, wavelength, flux_wmask, err_wmask,
                                                 wavelength, array_len, "wavelength", False, z,
