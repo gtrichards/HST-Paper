@@ -90,8 +90,30 @@ def _cos_median_snr(fn):
 _MIN_PHYSICAL_WAVE = 500.0
 
 
-def _rows_of(data):
+#: STIS echelle modes write one row per spectral order.  An order is narrow --
+#: about 18 A in the rest frame near C IV at z~0.09 -- so it must never be
+#: treated as a separate exposure: see _rows_of.
+_ECHELLE = ("E140M", "E230M", "E140H", "E230H")
+
+
+def _rows_of(data, stitch=False):
     """Each row of an extracted spectrum, cleaned, as its own arrays.
+
+    With `stitch`, all rows are concatenated into a single spectrum instead.
+    That is required for STIS echelle modes and wrong for everything else.
+    coadd.rebin divides every row it is given by that row's own fitted
+    continuum before co-adding, and an echelle order is narrower than a broad
+    emission line: on Mrk 1383 (E140M, 44 orders) the order holding the C IV
+    core spans 1575-1593 A in the rest frame, has no line-free pixels at all,
+    and was normalised by its own median -- which is the line.  The line came
+    back flat.  Measured against the 1445-1465 A continuum, the 1530-1570 A
+    band read 2.08 in the students' master co-add and 0.95 here; stitching the
+    orders first restores it to 3.09 on a single exposure.  The pre-flat
+    reader, read_stis, special-cased E140M and concatenated its orders for
+    exactly this reason; the generalisation below to per-row output was made
+    to recover COS segments and NUV stripes, which are hundreds of Angstroms
+    wide and genuinely want separate treatment, and it silently took echelle
+    with it.
 
     COS writes one row per detector segment -- two for the FUV (FUVA, FUVB) and
     three for the NUV stripes -- and STIS echelle modes one row per order.  The
@@ -121,6 +143,13 @@ def _rows_of(data):
         w, f, e, q = w[ok], f[ok], e[ok], q[ok]
         order = np.argsort(w, kind='stable')
         out.append((w[order], f[order], e[order], q[order]))
+    if stitch and len(out) > 1:
+        w = np.concatenate([r[0] for r in out])
+        f = np.concatenate([r[1] for r in out])
+        e = np.concatenate([r[2] for r in out])
+        q = np.concatenate([r[3] for r in out])
+        order = np.argsort(w, kind='stable')
+        return [(w[order], f[order], e[order], q[order])]
     return out
 
 
@@ -719,11 +748,15 @@ def read_stis_flat(name, path, z):
         gratings.append(hdr.get('OPT_ELEM', hdr.get('FILTER', 'UNKNOWN')))
         _prov(fn, True, "")
 
+    # Echelle orders are stitched into one spectrum per exposure; every other
+    # STIS mode writes a single row anyway.  See _rows_of for why.
+    stitch_of = {fn: (str(g).upper() in _ECHELLE) for fn, g in zip(fn_list, gratings)}
+
     array_sizes = []
     n_rows = 0
     for i, fn in enumerate(fn_list):
         data = fits.open(fn)[1].data
-        for _w, _f, _e, _q in _rows_of(data):
+        for _w, _f, _e, _q in _rows_of(data, stitch=stitch_of[fn]):
             array_sizes.append(len(_w))
             n_rows += 1
     array_len = max(array_sizes)
@@ -745,7 +778,7 @@ def read_stis_flat(name, path, z):
     for fn in fn_list:
         base = os.path.basename(fn).replace('_x1d.fits', '').replace('_sx1.fits', '')
         data = fits.open(fn)[1].data
-        rows = _rows_of(data)
+        rows = _rows_of(data, stitch=stitch_of[fn])
         for t, (wavelength, flux, fluxerr, DQ) in enumerate(rows):
             i += 1
             spec_id = base if len(rows) == 1 else '%s.%d' % (base, t)

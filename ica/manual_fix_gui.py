@@ -1024,9 +1024,11 @@ class ManualFixWindow(QtWidgets.QMainWindow):
                 else:
                     lines.append("log L%d --" % int(w0))
             if lines:
-                self.ax_full.text(0.995, 0.04, "\n".join(lines),
+                # Upper right, clear of the legend: at the bottom the box covered
+                # Mg II 2800, one of the lines the fit is judged by.
+                self.ax_full.text(0.995, 0.86, "\n".join(lines),
                                   transform=self.ax_full.transAxes,
-                                  ha="right", va="bottom", fontsize=7.5,
+                                  ha="right", va="top", fontsize=7.5,
                                   bbox=dict(fc="white", ec="0.7", alpha=0.85, pad=2.0),
                                   zorder=9)
         except Exception:
@@ -1043,7 +1045,23 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         # plot -- on NGC 4395 the peak was not visible at all, so there was no
         # way to judge the fit. Data and model both count, so the model's peak
         # is never lost either.
-        w_civ = (wave >= 1500) & (wave <= 1600) & np.isfinite(flux)
+        # Masked pixels are drawn but must not set the scale. A single bad pixel
+        # inside the window -- Mrk 1383 carries one near 1575 A that reaches 17
+        # in a panel whose line peaks at 11 -- otherwise squashes the line into
+        # the bottom third and there is nothing left to judge the fit by. GTR:
+        # "the current interactive plotter is including a bad pixel that is
+        # messing up the scaling of the plot." Masked data stay visible in
+        # plot_HST's own colours; only the limits ignore them.
+        _ok = np.ones_like(flux, dtype=bool)
+        try:
+            _m = np.asarray(mask)
+            if _m.shape == flux.shape:
+                _ok = (_m == 0)
+        except Exception:
+            pass
+        w_civ = (wave >= 1500) & (wave <= 1600) & np.isfinite(flux) & _ok
+        if not np.any(w_civ):   # every pixel in the window masked: use them all
+            w_civ = (wave >= 1500) & (wave <= 1600) & np.isfinite(flux)
         i_civ = (wave_ica >= 1500) & (wave_ica <= 1600) & np.isfinite(flux_ica)
         if np.any(w_civ) or np.any(i_civ):
             top = max(float(np.nanmax(flux[w_civ])) if np.any(w_civ) else ylow,
