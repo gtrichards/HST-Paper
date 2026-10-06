@@ -135,9 +135,19 @@ def draw(index, name, z, out_path, label="", simple=False):
     for inst in insts:
         for _, w, _ in exposures(os.path.join(base, inst), z):
             spans.append((w.min(), w.max()))
+    # The axis is set by every exposure drawn, kept and dropped alike -- NOT by
+    # the ICA component range.  Clamping to ICA[0] = 1260 A silently dropped the
+    # excluded exposures off the left edge whenever they lay blueward of it: on
+    # Mrk 1383 (index 88) the panel legended four G140M exposures covering
+    # 1100-1196 A and drew none of them, and GTR, looking at the figure to find
+    # out why the fit had changed, could not see what had been excluded.  An
+    # exposure outside the kept range is exactly the case the figure exists to
+    # show.  The floor is physical rather than nominal: HST ultraviolet coverage
+    # begins near 900 A and read_spec_data drops anything below 500 A as an
+    # unphysical wavelength solution.
     if spans:
-        XLO = max(ICA[0], min(a for a, _ in spans) - 10)
-        XHI = min(ICA[1], max(b for _, b in spans) + 10)
+        XLO = max(900.0, min(a for a, _ in spans) - 10)
+        XHI = max(b for _, b in spans) + 10
     else:
         XLO, XHI = ICA
     fig, axes = plt.subplots(len(insts), 1, figsize=(15.5, 3.4 * len(insts)), squeeze=False)
@@ -179,7 +189,28 @@ def draw(index, name, z, out_path, label="", simple=False):
         # far off the axis.  Fall back to the data that IS shown, so a panel of
         # rejections is still readable.
         pool = used if used else (dropped + proposed + review)
-        vals = np.concatenate([f for _, _, f, _ in pool]) if pool else np.array([np.nan])
+        # Scale on a smoothed version of each exposure, not the raw pixels. The
+        # raw 99.5th percentile is set by noise spikes wherever the spectrum runs
+        # out of signal, which on a red-dominated object squashes everything the
+        # figure exists to show: GTR could not judge Mrk 1018 (index 56) because
+        # "the data_review file is dominated by noise at the red end". A running
+        # median leaves real continuum and lines untouched while the spikes
+        # average away, so the scale follows the signal rather than the noise.
+        # Scale on the C IV neighbourhood, not the whole plotted range. A running
+        # median does not help: where COS runs out of signal past about 1900 A the
+        # excursions are broad rather than spiky, reaching 70 times the continuum,
+        # and they set the 99.5th percentile however much they are smoothed. The
+        # decision this figure supports is about C IV and the continuum windows
+        # either side of it, so the scale is taken from 1400-1750 A -- covering
+        # 1445-1465, 1500-1600 and 1700-1705 -- whenever there are enough pixels
+        # there, and from everything otherwise.
+        SCALE_LO, SCALE_HI = 1400.0, 1750.0
+        near = [f[(w >= SCALE_LO) & (w <= SCALE_HI)] for _, w, f, _ in pool]
+        near = [a for a in near if a.size]
+        n_near = int(sum(a.size for a in near))
+        vals = (np.concatenate(near) if n_near >= 200
+                else (np.concatenate([f for _, _, f, _ in pool]) if pool
+                      else np.array([np.nan])))
         lo, hi = np.nanpercentile(vals, [1, 99.5]) if np.isfinite(vals).any() else (0, 1)
         pad = 0.15 * (hi - lo) if np.isfinite(hi - lo) and hi > lo else 1.0
         def thin(seq):

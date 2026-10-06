@@ -23,7 +23,7 @@ PY = sys.executable
 sys.path.insert(0, HERE)
 sys.path.insert(0, "/Users/gtr/Work/git/HST-Paper")
 from exposure_decisions import (read_exposures, per_file, assign_epochs, recommend,
-                                alignment, choose_visit)
+                                alignment, choose_visit, _overrides as _OV)
 from rebinning import coadd as CO
 
 MAST = os.path.join(HERE, "data_v23", "MAST_v23")
@@ -117,8 +117,41 @@ def main():
         if not cands:
             print("%03d %s: no candidate visit" % (i, nm)); continue
         b = cands[0]
-        keep = [r["file"] for r in per_inst[b["inst"]]
-                if r["epoch"] == b["epoch"] and str(r["action"]).startswith("keep")]
+        # An override may name several epochs, where a second exists only to fill
+        # a wavelength hole the first cannot cover (Mrk 841, index 48).
+        _want = _OV().get(i, {}).get("epochs") or (b["epoch"],)
+        _force = _OV().get(i, {}).get("keep_files", ())
+        kept = [r for r in per_inst[b["inst"]]
+                if r["epoch"] in _want
+                and (str(r["action"]).startswith("keep")
+                     or any(r["file"].startswith(x) for x in _force))]
+        if _force:
+            got = [r["file"] for r in kept
+                   if not str(r["action"]).startswith("keep")]
+            print("   override: reinstating %d exposure(s) set aside for review: %s"
+                  % (len(got), ", ".join(sorted(got)) or "none matched"), flush=True)
+        if len(_want) > 1:
+            print("   override: combining epochs %s"
+                  % " + ".join(str(x) for x in sorted(_want)), flush=True)
+        # A hand override may exclude gratings within the chosen visit: mixing
+        # resolutions that differ by an order of magnitude puts a flux step
+        # across the line rather than adding signal (Mrk 1044, G140L + G140M).
+        drop = _OV().get(i, {}).get("drop_gratings", ())
+        if drop:
+            before = len(kept)
+            kept = [r for r in kept if str(r["grating"]).upper() not in drop]
+            print("   override: dropping grating(s) %s -- %d of %d exposures excluded"
+                  % (" ".join(drop), before - len(kept), before), flush=True)
+        # ...and individual exposures, where no instrument/epoch/grating cut
+        # separates the good from the bad (Mrk 205, index 81).
+        dropf = _OV().get(i, {}).get("drop_files", ())
+        if dropf:
+            before = len(kept)
+            kept = [r for r in kept
+                    if not any(r["file"].startswith(x) for x in dropf)]
+            print("   override: dropping exposure(s) %s -- %d of %d excluded"
+                  % (" ".join(dropf), before - len(kept), before), flush=True)
+        keep = [r["file"] for r in kept]
         d = os.path.join(STAGE, "%03d_%s" % (i, b["inst"]))
         nfiles = stage(name, b["inst"], keep, d)
         print("\n%03d  row %s  %s  ->  %s visit %d: %d exposures (%d files), S/N ~%.0f, %s"
@@ -134,6 +167,20 @@ def main():
             stem = os.path.basename(p)[:-5]; break
         if not stem:
             print("   no rebinned output"); continue
+        # Where a donor instrument is named, splice it on HERE, immediately after
+        # the chosen visit is rebinned, and fit the spliced product instead.  The
+        # splice was a second manual step for one day and that is one day too
+        # long: re-running this script regenerated the host and left the spliced
+        # file beside it, stale, with nothing to say so.  One entry point means
+        # the two cannot drift apart.
+        if _OV().get(i, {}).get("donor_inst"):
+            try:
+                import splice_spectra
+                sp = splice_spectra.build(i)
+            except SystemExit as exc:
+                print("   splice failed: %s" % exc); sp = None
+            if sp:
+                stem = os.path.basename(sp)[:-5]
         env = dict(os.environ, HSTICA_REBIN=REBIN, HSTICA_ITERDIR=ITER)
         r = subprocess.run([PY, os.path.join(HERE, "iterate_fit.py"), stem,
                             "--label", "chosen_visit"],

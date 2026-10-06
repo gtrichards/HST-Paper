@@ -179,6 +179,17 @@ def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
         dl_cm = FlatLambdaCDM(H0=70, Om0=0.3).luminosity_distance(z).to(u.cm).value
     except Exception:
         dl_cm = np.nan
+    # Everything needed to compute a luminosity later, without refitting: the
+    # distance, and the continuum scale at the edges of the calibrated range.
+    if cw is not None and cc is not None:
+        g = np.isfinite(cw) & np.isfinite(cc) & (cc != 0)
+        if g.any():
+            out["_calibration"] = dict(
+                dl_cm=(float(dl_cm) if np.isfinite(dl_cm) else np.nan), z=float(z),
+                cont_wave_min=float(np.nanmin(cw[g])), cont_wave_max=float(np.nanmax(cw[g])),
+                cont_at_min=float(cc[g][np.argmin(cw[g])]),
+                cont_at_max=float(cc[g][np.argmax(cw[g])]),
+                cosmology="FlatLambdaCDM H0=70 Om0=0.3")
     for w0, lo, hi in windows:
         k = "%d" % int(round(w0))
         g = np.isfinite(wi) & np.isfinite(fi)
@@ -191,10 +202,20 @@ def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
         near = (wa >= lo) & (wa <= hi) & (ma == 0) & np.isfinite(fa)
         covered = bool(near.sum() > 3)
         scale = np.nan
+        near_w = near_c = np.nan
         if cw is not None:
             m = (cw >= lo) & (cw <= hi) & np.isfinite(cc)
             if m.sum() > 3:
                 scale = float(np.nanmedian(cc[m]))
+            # The nearest calibrated point, whether or not the window itself is
+            # covered.  NGC 4593's continuum stops at 1694 A and the 1700-1705
+            # window misses it by six Angstroms -- a luminosity that could be
+            # recovered by a local extrapolation, if GTR later decides the fit
+            # out there is sound enough to use.
+            g = np.isfinite(cw) & np.isfinite(cc) & (cc != 0)
+            if g.any():
+                j = int(np.argmin(np.abs(cw[g] - w0)))
+                near_w = float(cw[g][j]); near_c = float(cc[g][j])
         # No luminosity yet, deliberately.  coadd.rebin divides every exposure by
         # its own continuum before combining, so the rebinned products -- and
         # therefore the reconstruction fitted to them -- carry no absolute flux
@@ -204,6 +225,12 @@ def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
         # recovered -- by recording the normalisation at rebin time, or by
         # re-measuring against the archive exposures -- before this is a
         # luminosity.  Until then report the shape-only value and say so.
+        # Where the data do not reach the window there is no continuum to scale
+        # by, so no luminosity -- but the shape value and the machinery to turn
+        # it into one should survive, because GTR may decide an extrapolated
+        # L1700 or L2500 is good enough for an object like NGC 4593 whose fit
+        # looks sound out there.  Record the reddest and bluest calibrated
+        # anchors so the scale can be extrapolated later without refitting.
         f_real = f0 * scale if np.isfinite(scale) else np.nan
         lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0
                  if (np.isfinite(dl_cm) and np.isfinite(f_real)) else np.nan)
@@ -211,7 +238,10 @@ def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
                       logL=(float(np.log10(lam_l)) if (np.isfinite(lam_l) and lam_l > 0)
                             else np.nan),
                       measured=covered, covered=covered,
-                      calibrated=bool(np.isfinite(scale)), window=[lo, hi])
+                      calibrated=bool(np.isfinite(scale)),
+                      continuum_scale=(float(scale) if np.isfinite(scale) else np.nan),
+                      nearest_cont_wave=near_w, nearest_cont=near_c,
+                      window=[lo, hi])
     return out
 
 
@@ -401,7 +431,9 @@ def main():
     if full_ax is not None:
         lines = []
         for w0, _lo, _hi in LUM_WINDOWS:
-            m = mono["%d" % int(w0)]
+            m = mono.get("%d" % int(w0))
+            if not m:
+                continue
             col = "#1a9850" if m["measured"] else "#d73027"
             lo, hi = full_ax.get_xlim()
             if lo <= w0 <= hi:
@@ -430,8 +462,11 @@ def main():
                 lines.append("f%d = %.3g (fit units, no continuum recorded)" % (int(w0), m["f_lambda"]))
             else:
                 lines.append("log L%d --  (outside the reconstruction)" % int(w0))
-        full_ax.text(0.995, 0.03, "\n".join(lines), transform=full_ax.transAxes,
-                     ha="right", va="bottom", fontsize=8,
+        # Upper right, below the "Input Bad Pixels" legend: at the bottom of the
+        # panel the box sat over Mg II 2800, which is one of the lines the fit is
+        # judged by.
+        full_ax.text(0.995, 0.86, "\n".join(lines), transform=full_ax.transAxes,
+                     ha="right", va="top", fontsize=8,
                      bbox=dict(fc="white", ec="0.7", alpha=0.85, pad=2.5))
 
     os.makedirs(os.path.join(d, "records"), exist_ok=True)

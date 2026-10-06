@@ -63,6 +63,13 @@ ALIGN_RMS = 0.25        # shape disagreement with the object's best data, after 
                         # every level and S/N check and still "not align well with the
                         # best single FOS or COS spectrum".
 LEVEL_FACTOR = 3.0      # this far from its own epoch's level: an outlier, not variability
+#: Skip the within-visit level comparison when the reference median flux is
+#: not positive.  `level` is a whole-exposure median, so for an object whose
+#: continuum is absorbed to zero over most of a grating's range it goes
+#: negative and the ratio carries no information -- Mrk 231's COS exposures
+#: sat at -9e-19 and were reported at -492x and -732x their visit's level.
+#: Set False only to reproduce the pre-fix behaviour for impact assessment.
+LEVEL_GUARD = True
 EPOCH_SPAN = 1.5        # epochs differing by more than this need a choice
 GAP_DAYS = 30.0
 SNR_TARGET = 10.0       # the degrade-and-refit experiment: three of five spectra held
@@ -296,14 +303,33 @@ def recommend(recs):
         live = [g for g in group if g["action"] is None and np.isfinite(g["level"])]
         med = float(np.median([g["level"] for g in live])) if live else np.nan
         tol = LEVEL_TOL_MANY if len(live) >= MANY_EXPOSURES else LEVEL_TOL
+        # `level` is the median flux over the whole exposure, so for an object
+        # whose continuum is absorbed to zero over most of a grating's range the
+        # reference median comes out NEGATIVE and the ratio is meaningless: on
+        # Mrk 231 (index 54) the COS G140L exposures sit at about -9e-19 and the
+        # test reported levels of -492x and -732x, keeping an arbitrary 5 of 22
+        # exposures that were in truth indistinguishable.  A ratio of two numbers
+        # straddling zero carries no information about agreement, so where the
+        # reference is not positive the test is skipped rather than acted on.
+        # The S/N and dead-exposure tests still apply.
+        # LEVEL_GUARD exists so the change can be run both ways when assessing
+        # what it alters for objects already processed; it is not a tuning knob.
+        ratio_usable = np.isfinite(med) and (med > 0 or not LEVEL_GUARD)
         for g in group:
             g["epoch_level"] = med
-            ratio = (g["level"] / med) if (np.isfinite(med) and med != 0
-                                           and np.isfinite(g["level"])) else np.nan
+            if LEVEL_GUARD:
+                ratio = (g["level"] / med) if (ratio_usable and np.isfinite(g["level"])
+                                               and g["level"] > 0) else np.nan
+            else:
+                ratio = (g["level"] / med) if (np.isfinite(med) and med != 0
+                                               and np.isfinite(g["level"])) else np.nan
             g["level_ratio"] = ratio
             if g["action"] is not None:
                 continue
-            if np.isfinite(ratio) and not ((1 - tol) <= ratio <= 1 / (1 - tol)):
+            if not ratio_usable:
+                g["action"] = "keep"
+                g["level_test"] = "skipped: visit median flux %.3g is not positive" % med
+            elif np.isfinite(ratio) and not ((1 - tol) <= ratio <= 1 / (1 - tol)):
                 g["action"] = "review: level %.2fx the rest of this visit (tol %.0f%%)" % (
                     ratio, 100 * tol)
             else:
@@ -389,6 +415,21 @@ def _overrides():
     explainable to a referee.  One row per object: index, instrument, epoch, the
     reason, and when.  An override always wins, and the reason travels with the
     measurement into the provenance record.
+
+    `donor_inst` / `donor_epoch` splice a second instrument's visit on below
+    where the chosen one starts, for the object whose chosen visit is the only
+    one carrying the red anchors while a different instrument is the only one
+    carrying the blue end.  See the note on those fields below; the rule that
+    makes it checkable is that the donor supplies only wavelengths the chosen
+    visit does not cover.
+
+    `drop_gratings` is a space-separated list of gratings to exclude from the
+    chosen visit.  It exists because a visit can be the right visit and still
+    carry the wrong data: Mrk 1044's STIS visit pairs two G140L exposures with
+    eight narrow G140M strips, and co-adding resolutions that differ by a factor
+    of ten puts a flux step across C IV rather than adding signal.  Dropping the
+    strips is a choice about which data to trust, so it is recorded here with
+    the rest of them rather than made by editing a co-add by hand.
     """
     out = {}
     if not os.path.exists(OVERRIDES):
@@ -397,9 +438,73 @@ def _overrides():
         for r in csv.DictReader(open(OVERRIDES)):
             if not str(r.get("index", "")).strip():
                 continue
+            # `epoch` may name more than one, separated by spaces or commas, for
+            # the case where a second epoch exists only to fill a hole the first
+            # cannot cover.  Mrk 841's chosen COS visit has no exposure at all
+            # across 1534-1542 A rest -- the detector segment gap, which its four
+            # FP-POS offsets fail to close -- and the other epoch covers it.  The
+            # co-adder continuum-normalises each exposure before combining, so
+            # the second epoch contributes shape and not flux level, and its
+            # inverse-variance weight is negligible wherever the first has data.
+            _ep = str(r.get("epoch", "")).replace(",", " ").split()
             out[int(r["index"])] = dict(inst=str(r.get("inst", "")).strip(),
-                                        epoch=int(r["epoch"]) if str(r.get("epoch", "")).strip() else None,
+                                        epoch=int(_ep[0]) if _ep else None,
+                                        epochs=tuple(int(x) for x in _ep),
                                         reason=str(r.get("reason", "")).strip(),
+                                        drop_gratings=tuple(
+                                            str(r.get("drop_gratings", "")).upper().split()),
+                                        # `drop_files` names individual exposures to
+                                        # exclude, by rootname, where neither the
+                                        # instrument, the epoch nor the grating
+                                        # separates the good from the bad.  Mrk 205's
+                                        # two H27 exposures differ in flux level by a
+                                        # factor of 430 -- 4.99e-12 against 1.16e-14,
+                                        # where its other gratings sit at 1.6-2.0e-14 --
+                                        # and the screening lost both because the level
+                                        # test compared each against the median of that
+                                        # two-element pair, which the bad one poisoned.
+                                        drop_files=tuple(
+                                            str(r.get("drop_files", "")).replace(",", " ").split()),
+                                        # `keep_files` forces named exposures back in
+                                        # after the screening has set them aside for
+                                        # review.  The level test is a comparison with
+                                        # the median of an exposure's own epoch-and-
+                                        # grating group, so where that group has two
+                                        # members and one is bad, BOTH are flagged and
+                                        # the good one has to be reinstated by name.
+                                        keep_files=tuple(
+                                            str(r.get("keep_files", "")).replace(",", " ").split()),
+                                        # `donor_inst` and `donor_epoch` name a SECOND
+                                        # instrument's visit to splice on below where
+                                        # the chosen one starts.  Not a co-addition: the
+                                        # donor contributes only at wavelengths the
+                                        # chosen visit does not cover, so no pixel is
+                                        # ever averaged between instruments.  LEDA 50824
+                                        # (index 90) is one STIS G230L exposure running
+                                        # 1451-2899 A, so it carries C III] and Mg II and
+                                        # no Si IV at all; COS epoch 3 supplies 1120-1447
+                                        # and nothing above it.  Co-adding them instead
+                                        # would mix R~700 with R~16000 across C IV, the
+                                        # defect of index 17 and index 28, and measurably
+                                        # did: 31 per cent off the EW.  The donor's
+                                        # exposures are chosen by the same screening the
+                                        # host's are, so the audit trail is the same;
+                                        # `donor_files` overrides that by rootname only
+                                        # where the screening is wrong about the donor,
+                                        # exactly as keep_files does for the host.
+                                        donor_inst=str(r.get("donor_inst", "")).strip(),
+                                        donor_epochs=tuple(
+                                            int(x) for x in
+                                            str(r.get("donor_epoch", "")).replace(",", " ").split()),
+                                        donor_files=tuple(
+                                            str(r.get("donor_files", "")).replace(",", " ").split()),
+                                        # The join is DERIVED -- the chosen visit's
+                                        # bluest usable pixel -- so there is nothing to
+                                        # get wrong.  `join` overrides it only where the
+                                        # chosen visit's own blue edge is junk and the
+                                        # donor should run further red.
+                                        join=(float(r["join"])
+                                              if str(r.get("join", "")).strip() else None),
                                         when=str(r.get("when", "")).strip())
     except Exception:
         return {}
@@ -478,8 +583,9 @@ def choose_visit(per_inst, rows_by_file, index=None):
     cands.sort(key=rank)
     ov = _overrides().get(index) if index is not None else None
     if ov and ov.get("inst"):
+        want = ov.get("epochs") or ()
         hit = [c for c in cands
-               if c["inst"] == ov["inst"] and (ov["epoch"] is None or c["epoch"] == ov["epoch"])]
+               if c["inst"] == ov["inst"] and (not want or c["epoch"] in want)]
         if hit:
             pick = hit[0]
             pick["overridden"] = True

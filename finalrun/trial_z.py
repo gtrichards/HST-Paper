@@ -91,16 +91,32 @@ def main():
         for lab, lo, hi in (("CIII]", 1860, 1960), ("MgII", 2740, 2860), ("CIV", 1500, 1600)):
             v, n = xcorr_shift(w, data, model, lo, hi)
             xc[lab] = None if not np.isfinite(v) else float(v)
+        # The band ratios across the C III] blend, separately.  The cross-
+        # correlation compares the whole 1860-1960 window and is centroid-like,
+        # so it cannot tell a misregistered blend from a mis-shaped one.  A blend
+        # at the right redshift matches all three components; one that is
+        # misregistered shows the blue components under-fit while the C III] core
+        # is over-fit, with the model compensating by broadening the red side.
+        br = {}
+        for lab, lo, hi in (("AlIII", 1852.0, 1863.0),
+                            ("SiIII]", 1887.0, 1898.0),
+                            ("CIII]c", 1903.0, 1915.0)):
+            sel = (w >= lo) & (w <= hi) & np.isfinite(data) & np.isfinite(model) & (model != 0)
+            br[lab] = float(np.nanmedian(data[sel] / model[sel])) if sel.sum() > 3 else None
         sub = civ_subcontinuum(res)
         row = dict(dv=dv, z_trial=round(z, 6),
                    ciii_xcorr=xc["CIII]"], mgii_xcorr=xc["MgII"], civ_xcorr=xc["CIV"],
                    civ_blue=res["civ_blue"], civ_ew=res["civ_ew"],
+                   alIII_ratio=br["AlIII"], siIII_ratio=br["SiIII]"],
+                   cIII_core_ratio=br["CIII]c"],
                    veto="pass" if sub["ok"] else "REJECT(%d)" % sub["n_px"])
         rows.append(row)
         fmt = lambda v: "--" if v is None else "%+.0f" % v
-        print("%+8.0f %-10.6f %9s %9s %9s %9.1f %8.2f %6s"
+        rfmt = lambda v: "--" if v is None else "%.2f" % v
+        print("%+8.0f %-10.6f %9s %9s %9s %9.1f %8.2f %6s   %5s %5s %5s"
               % (dv, z, fmt(xc["CIII]"]), fmt(xc["MgII"]), fmt(xc["CIV"]),
-                 res["civ_blue"], res["civ_ew"], row["veto"]), flush=True)
+                 res["civ_blue"], res["civ_ew"], row["veto"],
+                 rfmt(br["AlIII"]), rfmt(br["SiIII]"]), rfmt(br["CIII]c"])), flush=True)
         os.remove(os.path.join(WORKDIR, stem + ".fits"))
 
     os.makedirs(os.path.dirname(outcsv), exist_ok=True)
@@ -108,7 +124,9 @@ def main():
         wtr = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         wtr.writeheader()
         wtr.writerows(rows)
-    print("\n(xcorr: +ve = model sits blueward of data, i.e. z too low)\n-> %s" % outcsv)
+    print("\n(xcorr: +ve = model sits blueward of data, i.e. z too low)")
+    print("(band ratios are data/model over Al III 1852-1863, Si III] 1887-1898,"
+          " C III] core 1903-1915; a registered blend matches all three)\n-> %s" % outcsv)
     return 0
 
 
