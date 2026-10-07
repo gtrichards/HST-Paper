@@ -174,8 +174,9 @@ def build(index, keep_work=False, quiet=False):
     else:
         print("   join overridden: %.2f A (the chosen visit starts at %.2f)"
               % (join, derived))
-    print("   chosen visit %s begins at %.2f A; the donor supplies below that only"
-          % (host_inst, derived))
+    _hg = host[C_WAVE][host["good"]]
+    print("   chosen visit %s covers %.2f-%.2f A; the donor supplies only what it does not"
+          % (host_inst, _hg.min(), _hg.max()))
 
     ref = np.log(host[C_WAVE][0])
     kh = np.rint((np.log(host[C_WAVE]) - ref) / STEP).astype(int)
@@ -190,24 +191,60 @@ def build(index, keep_work=False, quiet=False):
     shared = set(dh) & set(dd)
     r = np.array([dh[k] / dd[k] for k in shared if dd[k] != 0])
     r = r[np.isfinite(r) & (r > 0)]
-    if r.size < 20:
-        sys.exit("only %d usable overlap pixels -- too few to cross-normalise" % r.size)
-    scale = float(np.median(r))
-    print("   overlap %d px; donor scaled by %.4f" % (r.size, scale))
+    if r.size >= 20:
+        scale = float(np.median(r))
+        print("   overlap %d px; donor scaled by %.4f" % (r.size, scale))
+    elif not shared:
+        # Genuinely disjoint, which is a different situation from a thin or
+        # corrupt overlap.  Ton S 210 (index 97) is the case: COS ends at
+        # 1622 A and the STIS E230M donor begins at 1778, a 156 A gap, so
+        # there is nothing to measure a scale on.  Both products are
+        # continuum-normalised by construction -- coadd.rebin divides every
+        # exposure by its own fitted continuum before combining -- so their
+        # normalised fluxes are already on a common scale and 1.0 is the
+        # honest default.  It is an ASSUMPTION rather than a measurement, and
+        # it is announced as one; the recorded continuum still carries each
+        # side's own absolute calibration, so the luminosities are unaffected.
+        scale = 1.0
+        _hw = host[C_WAVE][host["good"]]
+        _dwa = donor[C_WAVE][donor["good"]]
+        _gap = max(_dwa.min() - _hw.max(), _hw.min() - _dwa.max(), 0.0)
+        print("   NO OVERLAP: the two do not share a single pixel, %.1f A apart. "
+              "Both are continuum-normalised, so the donor is taken at scale 1.0 "
+              "-- ASSUMED, not measured." % _gap)
+    else:
+        # Overlapping but barely, or overlapping on junk: that is a symptom, not
+        # a case to paper over with a default.
+        sys.exit("only %d usable overlap pixels of %d shared -- too few to "
+                 "cross-normalise, and the two are not disjoint"
+                 % (r.size, len(shared)))
 
-    take = donor["good"] & (donor[C_WAVE] < join)
+    # GTR's rule, stated as the code: the donor supplies exactly those pixels the
+    # chosen visit does not have.  Expressed on the shared lattice rather than as
+    # a wavelength cut, because the donor is not always blueward -- Ton S 210
+    # (index 97) splices STIS E230M at 1778-2527 A onto a COS visit that stops at
+    # 1622, entirely redward, where LEDA 50824 (index 90) splices COS below a
+    # STIS visit that starts at 1451.  A donor pixel landing on a host pixel
+    # would mean two instruments averaged at one wavelength, which is the
+    # resolution mixing this whole arrangement exists to avoid.
+    have = set(kh[host["good"]].tolist())
+    take = donor["good"] & np.array([int(k) not in have for k in kd])
+    if join is not None and ov.get("join") is not None:
+        # An explicit join restricts the donor further: use it only where the
+        # chosen visit's own edge is junk and the donor should stop short of it.
+        take &= (donor[C_WAVE] < join)
     if not take.any():
-        sys.exit("the donor has no usable pixels blueward of the chosen visit")
-    # GTR's rule, checked rather than trusted: the donor supplies only where the
-    # chosen visit has nothing.  A donor pixel landing on a host pixel would mean
-    # two instruments averaged at one wavelength, which is the resolution mixing
-    # this whole arrangement exists to avoid, and it would do so silently.
-    clash = set(kd[take].tolist()) & set(kh[host["good"]].tolist())
+        sys.exit("the donor covers nothing the chosen visit does not already have")
+    clash = set(kd[take].tolist()) & have
     if clash:
         sys.exit("donor and chosen visit both cover %d pixel(s) -- "
                  "the donor must supply only what the chosen visit does not" % len(clash))
-    print("   donor contributes %d px over %.1f-%.1f A, none shared with the chosen visit"
-          % (int(take.sum()), donor[C_WAVE][take].min(), donor[C_WAVE][take].max()))
+    _dw = donor[C_WAVE][take]
+    _side = ("blueward" if _dw.max() < host[C_WAVE][host["good"]].min()
+             else "redward" if _dw.min() > host[C_WAVE][host["good"]].max()
+             else "around")
+    print("   donor contributes %d px over %.1f-%.1f A (%s the chosen visit), "
+          "none shared with it" % (int(take.sum()), _dw.min(), _dw.max(), _side))
 
     k_all = np.concatenate([kd[take], kh[host["good"]]])
     f_all = np.concatenate([donor[C_FLUX][take] * scale, host[C_FLUX][host["good"]]])
@@ -248,8 +285,15 @@ def build(index, keep_work=False, quiet=False):
                             ("CIII]", 1860, 1960), ("L2500", 2490, 2510),
                             ("MgII", 2740, 2860)):
             sel = (wave >= lo) & (wave <= hi) & g
-            src_lab = ("donor" if hi <= join else
-                       ("chosen visit" if lo >= join else "both sides of the join"))
+            # Say which spectrum actually supplied the band, by looking at the
+            # lattice rather than at a wavelength cut -- the donor may sit either
+            # side of the chosen visit, or fill a hole inside its range.
+            _ks = set(np.rint((np.log(wave[sel]) - ref) / STEP).astype(int).tolist())
+            _nh = len(_ks & set(kh[host["good"]].tolist()))
+            _nd = len(_ks & set(kd[take].tolist()))
+            src_lab = ("chosen visit" if _nd == 0 else
+                       "DONOR" if _nh == 0 else
+                       "%d from the chosen visit, %d from the donor" % (_nh, _nd))
             print("      %-7s %4d usable px   (%s)" % (lab, int(sel.sum()), src_lab))
         # A hole can open at the join when the donor's own coverage stops short
         # of where the chosen visit begins: on index 90 COS's G160M segment gap

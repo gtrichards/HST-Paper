@@ -829,15 +829,52 @@ def read_fos_flat(name, path, z):
         array_lens = np.append(array_lens, wave.shape[-1])
     array_len = max(array_lens)
 
-    waves     = np.zeros((len(spec_names), array_len))
-    fluxes    = np.zeros((len(spec_names), array_len))
-    flux_errs = np.zeros((len(spec_names), array_len))
-    masks     = np.zeros((len(spec_names), array_len))
-
     def accum_flag(index, flux_arr):
         return _is_cumulative_accum(flux_arr, index)
 
-    for i, sn in enumerate(spec_names):
+    def _grid_groups(wave):
+        """Indices of the groups, split by which wavelength solution they use.
+
+        An FOS exposure's groups are normally repeated readouts on ONE grid, and
+        the reader averages them by pixel index.  A SPECTROPOLARIMETRY exposure
+        is different: its groups alternate between the two polarisation
+        channels, whose wavelength solutions differ -- on 3C 273's H19 exposures
+        by 6.11 A, about 16 pixels and 833 km/s -- so averaging them by index
+        smears every line across 6 A and drags its centroid several hundred
+        km/s.  That is how 3C 273's C III] came to sit 1285 km/s blueward of
+        systemic in the co-add (index 111), and Mrk 486's only C IV-covering
+        spectrum is built entirely from such files (index 51).
+
+        Splitting by grid and emitting one row per channel costs nothing
+        elsewhere -- an exposure whose groups share a grid yields a single
+        group, exactly as before -- and lets the rebin step align the channels
+        by wavelength, which is where alignment belongs.  Interpolating one
+        channel onto the other's grid would work too and is deliberately not
+        done: the co-addition is built on "no interpolation", and COS detector
+        segments already take this same separate-rows treatment.
+        """
+        nz = wave > 0.
+        groups, reps = [], []
+        for g in range(wave.shape[0]):
+            ok = nz[g]
+            placed = False
+            for j, r in enumerate(reps):
+                both = ok & nz[r]
+                if both.any() and np.allclose(wave[g][both], wave[r][both],
+                                              rtol=0, atol=1e-3):
+                    groups[j].append(g)
+                    placed = True
+                    break
+            if not placed:
+                reps.append(g)
+                groups.append([g])
+        return groups
+
+    #: One entry per row that will be handed to the co-adder: (name, wavelength,
+    #: flux, fluxerr, DQ).  Usually one per file; more when a file's groups use
+    #: more than one wavelength solution (see _grid_groups).
+    entries = []
+    for sn in spec_names:
         wave        = fits.open(os.path.join(path, '%s_c0f.fits' % sn))[0].data
         obs_flux    = fits.open(os.path.join(path, '%s_c1f.fits' % sn))[0].data
         obs_fluxerr = fits.open(os.path.join(path, '%s_c2f.fits' % sn))[0].data
@@ -847,6 +884,30 @@ def read_fos_flat(name, path, z):
         else:
             obs_DQ = np.zeros_like(obs_flux)
 
+        ind = -1
+
+        if len(np.shape(wave)) > 1:
+            _gg = _grid_groups(np.asarray(wave, float))
+            if len(_gg) > 1:
+                print("FOS %s: %d groups on %d wavelength solutions "
+                      "(spectropolarimetry); kept as %d separate spectra rather "
+                      "than averaged by pixel index"
+                      % (sn, wave.shape[0], len(_gg), len(_gg)), flush=True)
+                for k, gidx in enumerate(_gg):
+                    sub_w = np.asarray(wave, float)[gidx]
+                    sub_f = np.asarray(obs_flux, float)[gidx]
+                    sub_e = np.asarray(obs_fluxerr, float)[gidx]
+                    sub_q = np.asarray(obs_DQ, float)[gidx]
+                    entries.append(("%s.%d" % (sn, k), sub_w, sub_f, sub_e, sub_q))
+                continue
+        entries.append((sn, wave, obs_flux, obs_fluxerr, obs_DQ))
+
+    waves     = np.zeros((len(entries), array_len))
+    fluxes    = np.zeros((len(entries), array_len))
+    flux_errs = np.zeros((len(entries), array_len))
+    masks     = np.zeros((len(entries), array_len))
+
+    for i, (sn, wave, obs_flux, obs_fluxerr, obs_DQ) in enumerate(entries):
         ind = -1
 
         if len(wave.shape) > 1:

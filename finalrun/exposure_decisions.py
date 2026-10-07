@@ -446,10 +446,21 @@ def _overrides():
             # co-adder continuum-normalises each exposure before combining, so
             # the second epoch contributes shape and not flux level, and its
             # inverse-variance weight is negligible wherever the first has data.
-            _ep = str(r.get("epoch", "")).replace(",", " ").split()
+            # int(float(x)) rather than int(x): a pandas round-trip of this file
+            # turns a column holding both blanks and numbers into floats, so
+            # "3" is rewritten "3.0" and a bare int() raises.  The except below
+            # then swallowed it and returned an EMPTY override table -- every
+            # hand choice in this file silently stopped applying, with nothing
+            # printed.  Found on 2026-10-06 when a splice reported "no donor
+            # named" for a row that plainly named one.
+            def _ints(v):
+                return tuple(int(float(x)) for x in
+                             str(v or "").replace(",", " ").split()
+                             if x not in ("nan", "None"))
+            _ep = _ints(r.get("epoch", ""))
             out[int(r["index"])] = dict(inst=str(r.get("inst", "")).strip(),
-                                        epoch=int(_ep[0]) if _ep else None,
-                                        epochs=tuple(int(x) for x in _ep),
+                                        epoch=_ep[0] if _ep else None,
+                                        epochs=_ep,
                                         reason=str(r.get("reason", "")).strip(),
                                         drop_gratings=tuple(
                                             str(r.get("drop_gratings", "")).upper().split()),
@@ -493,9 +504,7 @@ def _overrides():
                                         # where the screening is wrong about the donor,
                                         # exactly as keep_files does for the host.
                                         donor_inst=str(r.get("donor_inst", "")).strip(),
-                                        donor_epochs=tuple(
-                                            int(x) for x in
-                                            str(r.get("donor_epoch", "")).replace(",", " ").split()),
+                                        donor_epochs=_ints(r.get("donor_epoch", "")),
                                         donor_files=tuple(
                                             str(r.get("donor_files", "")).replace(",", " ").split()),
                                         # The join is DERIVED -- the chosen visit's
@@ -506,7 +515,13 @@ def _overrides():
                                         join=(float(r["join"])
                                               if str(r.get("join", "")).strip() else None),
                                         when=str(r.get("when", "")).strip())
-    except Exception:
+    except Exception as exc:
+        # Never fail silently here.  Returning {} means every hand choice in
+        # spectrum_overrides.csv stops applying -- the wrong visit, the wrong
+        # gratings, no splice -- and the pass carries on producing plausible
+        # numbers for the wrong spectra.
+        print("SPECTRUM OVERRIDES NOT LOADED: %s: %s -- every hand choice in %s "
+              "is being IGNORED" % (type(exc).__name__, exc, OVERRIDES), flush=True)
         return {}
     return out
 
