@@ -9,9 +9,12 @@ read individually -- and a reviewer looking at a fit has no way to see any of it
 
 Every archive exposure is drawn in the rest frame: those the pipeline used in
 colour, those it dropped in grey, with the reason listed.  The vertical scale is
-set by the exposures that were used, so a discarded exposure that sits far off
-the plot simply leaves it, which is the right emphasis -- if it was not used,
-its level does not matter.
+set by the exposures that were used, so that the data the fit actually saw is
+readable; a dropped exposure at a very different level would then be a flat line
+on the floor or off the panel entirely, so its level is written into its legend
+entry instead.  That matters because the screening has been seen to drop the
+right exposure and keep the wrong one (index 119), and this figure is where that
+is caught.
 
     python figure_included_excluded.py --index 11 19
     python figure_included_excluded.py --multi-only
@@ -34,7 +37,8 @@ sys.path.insert(0, "/Users/gtr/Work/git/HST-Paper")
 from rebinning import read_spec_data as R
 from exposure_decisions import (read_exposures as _dec_read, per_file as _dec_per_file,
                                 assign_epochs as _dec_epochs, recommend as _dec_recommend,
-                                alignment as _dec_align, choose_visit as _dec_choose)
+                                alignment as _dec_align, choose_visit as _dec_choose,
+                                _overrides as _dec_OV)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MAST = os.path.join(HERE, "data_v23", "MAST_v23")
@@ -121,13 +125,33 @@ def draw(index, name, z, out_path, label="", simple=False):
             for r in recs:
                 r["align_rms"] = al.get(r["file"], np.nan)
             per_inst[inst] = _dec_recommend(recs)[0]
-        cands = _dec_choose(per_inst, rows_all)
+        cands = _dec_choose(per_inst, rows_all, index=index)
         if cands:
             b = cands[0]
-            chosen = (b["inst"], b["epoch"],
-                      {r["file"] for r in per_inst[b["inst"]]
-                       if r["epoch"] == b["epoch"] and str(r["action"]).startswith("keep")},
-                      b)
+            # Apply the hand overrides, exactly as fit_chosen_visit.py does.
+            # Without this the panel showed what the PIPELINE would have chosen
+            # rather than what was actually fitted, which inverts the picture on
+            # every object carrying an override -- on PG 0953+414 (index 119) it
+            # drew the corrupt exposure as kept and the good one it replaced as
+            # dropped.  This figure is where a reviewer checks which photons
+            # reached the fit, so it has to show the fit that exists.
+            _ov = _dec_OV().get(index, {})
+            _want = _ov.get("epochs") or (b["epoch"],)
+            _force = _ov.get("keep_files", ())
+            kept = [r for r in per_inst[b["inst"]]
+                    if r["epoch"] in _want
+                    and (str(r["action"]).startswith("keep")
+                         or any(r["file"].startswith(x) for x in _force))]
+            _drop_g = _ov.get("drop_gratings", ())
+            if _drop_g:
+                kept = [r for r in kept
+                        if str(r["grating"]).upper() not in _drop_g]
+            _drop_f = _ov.get("drop_files", ())
+            if _drop_f:
+                kept = [r for r in kept
+                        if not any(r["file"].startswith(x) for x in _drop_f)]
+            chosen = (b["inst"], b["epoch"], {r["file"] for r in kept}, b,
+                      tuple(_force), tuple(_drop_f), tuple(_drop_g))
     except Exception:
         chosen = None
 
@@ -172,13 +196,30 @@ def draw(index, name, z, out_path, label="", simple=False):
         for fn, w, f in exposures(d, z):
             p = prov.get(fn)
             act = action.get(fn, "keep")
+            # A hand override in spectrum_overrides.csv supersedes the
+            # screening's own verdict in BOTH directions, and the panel has to
+            # say so rather than repeat the screening: on index 119 the override
+            # drops an exposure the screening kept and reinstates one it called
+            # "no signal", and labelling either by the screening's reason would
+            # describe a decision that was overturned.
+            _forced = chosen[4] if chosen is not None and len(chosen) > 4 else ()
+            _dropped_by_hand = chosen[5] if chosen is not None and len(chosen) > 5 else ()
+            _dropped_grating = chosen[6] if chosen is not None and len(chosen) > 6 else ()
+            is_forced = any(fn.startswith(x) for x in _forced)
             if chosen is not None and not (inst == chosen[0] and fn in chosen[2]):
-                why = ("not the chosen visit" if p is None or p["kept"]
-                       else p["reason"])
+                if any(fn.startswith(x) for x in _dropped_by_hand):
+                    why = "dropped by hand (spectrum_overrides)"
+                elif (_dropped_grating
+                      and str(prov.get(fn, {}).get("grating", "")).upper()
+                      in _dropped_grating):
+                    why = "grating dropped by hand (spectrum_overrides)"
+                else:
+                    why = ("not the chosen visit" if p is None or p["kept"]
+                           else p["reason"])
                 dropped.append((fn, w, f, dict(kept=False, reason=why)))
             elif p is not None and not p["kept"]:
                 dropped.append((fn, w, f, p))
-            elif act.startswith("drop"):
+            elif act.startswith("drop") and not is_forced:
                 proposed.append((fn, w, f, dict(kept=True, reason=act)))
             elif act.startswith("review"):
                 review.append((fn, w, f, dict(kept=True, reason=act)))
@@ -227,13 +268,37 @@ def draw(index, name, z, out_path, label="", simple=False):
         # legend entry; the kept ones stay aggregated, since there can be
         # hundreds of them and they are not what is being decided.
         seen_lbl = set()
-        def _lab(fn, reason):
+        def _lab(fn, reason, f=None):
             root = fn.split("_")[0]
             key = (root, reason)
             if key in seen_lbl:
                 return None
             seen_lbl.add(key)
-            return "%s  %s" % (root, reason)
+            txt = "%s  %s" % (root, reason)
+            # The vertical scale is set by the exposures that were USED, so a
+            # dropped exposure at a very different level renders as a flat line
+            # on the floor or leaves the panel entirely -- and that is exactly
+            # the case the figure exists to show.  On PG 0953+414 (index 119)
+            # the screening kept a corrupt exposure 267x brighter than the good
+            # one it dropped; scaled on the kept exposure, the good one is a
+            # line along the bottom and the panel cannot answer GTR's question,
+            # "why were the bad FOS spectra kept over COS?".  Widening the axis
+            # to hold both would squash the kept data flat instead, so the level
+            # is written into the legend: no curve is drawn off the axis without
+            # the reader being told where it actually sits.  Same rule as the
+            # x-axis fix above -- never legend a curve the axis cannot show.
+            if f is not None and np.isfinite(f).any():
+                med = float(np.nanmedian(f))
+                span = (hi + pad) - (lo - pad)
+                # Outside the axis, or inside it but flattened onto the floor --
+                # both are invisible to the reader, and the second is the common
+                # case when one exposure is orders of magnitude brighter.
+                if np.isfinite(med) and np.isfinite(span) and span > 0:
+                    if not (lo - pad <= med <= hi + pad):
+                        txt += "  [level %.2e, OFF SCALE]" % med
+                    elif abs(med - (lo - pad)) < 0.02 * span:
+                        txt += "  [level %.2e, flat at this scale]" % med
+            return txt
         # One colour per class, dash pattern to tell individuals apart.  Giving
         # each excluded exposure its own colour from the default cycle made them
         # look like ordinary data: GTR read green and red curves lying at zero as
@@ -264,7 +329,7 @@ def draw(index, name, z, out_path, label="", simple=False):
                 kw, lab_ok = _style(n, nfiles)
                 lbl = None
                 if lab_ok:
-                    lbl = _lab(fn, p["reason"])
+                    lbl = _lab(fn, p["reason"], f)
                 elif first:
                     lbl = "%d %s" % (nfiles, tag)
                     first = False
@@ -400,11 +465,19 @@ def main():
             if s and a.copy_to_fits:
                 # GTR compares this against the fit figures, so it belongs in the
                 # same folder as them rather than in a directory of its own kind.
-                for fold in glob.glob(os.path.join(HERE, "pipeline_output",
-                                                   "fit_iterations_v23", "%03d_*" % i)):
-                    if os.path.isdir(fold):
-                        shutil.copy2(out, os.path.join(
-                            fold, "DATA_archive_exposures.png"))
+                # Copy into EVERY tree that holds a folder for this object, not
+                # just fit_iterations_v23: that was the working tree when this
+                # was written, but the definitive pass fits under
+                # chosen_visit/fits, so the panel was landing beside the
+                # superseded fits and never beside the ones being judged.
+                for tree in ("chosen_visit/fits", "fit_iterations_v23",
+                             "fit_iterations"):
+                    for fold in glob.glob(os.path.join(HERE, "pipeline_output",
+                                                       *tree.split("/"),
+                                                       "%03d_*" % i)):
+                        if os.path.isdir(fold):
+                            shutil.copy2(out, os.path.join(
+                                fold, "DATA_archive_exposures.png"))
             if s:
                 rows += s
                 print("%-52s %s" % (os.path.basename(out),
