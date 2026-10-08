@@ -48,12 +48,25 @@ import csv
 import glob
 import json
 import os
+import re
 import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTDIR = os.path.join(HERE, "pipeline_output")
 from rebin_path import ITERDIR   # env HSTICA_ITERDIR overrides
+
+#: Where to look for an adopted fit, in order -- the same resolution
+#: build_paper_table.py uses, ported here because this table was still reading
+#: ITERDIR/<decisions folder> and so found the PRE-PASS fit for 92 of the 93
+#: objects worked under the single-visit policy.  The ledger's folder name
+#: predates that policy and no longer matches the fit folder (092's row is
+#: 092_..._COMBINED while its fit is in 092_..._COS), but the three-digit index
+#: prefix is stable across both, so the fit is found by index and the ledger's
+#: folder name is left alone as the historical key it is.
+FIT_TREES = [os.path.join(OUTDIR, "chosen_visit", "fits"),
+             os.path.join(OUTDIR, "fit_iterations_v23"),
+             ITERDIR]
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
 FINAL = os.path.join(OUTDIR, "final")
 DECISIONS = os.path.join(FINAL, "decisions.csv")
@@ -77,6 +90,31 @@ _INITIAL = [
      "1545 usable px all below 1800 A, no anchor coverage; all four variants "
      "fail the sub-continuum veto (77-123 px); blueshift swings 14 quanta"),
 ]
+
+
+def _fit_folders_by_index():
+    """Adopted fits by object index: (tree, folder), most recent tree first.
+
+    Unlike build_paper_table's version this also accepts a folder whose only
+    record is REJECT_ALL_*, because an excluded object still needs its
+    least-bad figure copied into final/plots.
+    """
+    out = {}
+    for tree in FIT_TREES:
+        if not os.path.isdir(tree):
+            continue
+        for d in sorted(os.listdir(tree)):
+            m = re.match(r"^(\d{3})_", d)
+            if not m or not os.path.isdir(os.path.join(tree, d)):
+                continue
+            i = int(m.group(1))
+            if i in out:
+                continue          # an earlier tree in the list already has it
+            rec = os.path.join(tree, d, "records")
+            if (glob.glob(os.path.join(rec, "BEST_*.json"))
+                    or glob.glob(os.path.join(rec, "REJECT_ALL_*.json"))):
+                out[i] = (tree, d)
+    return out
 
 
 def safe_name(s):
@@ -107,11 +145,17 @@ def main():
             if st:
                 by_folder[folder_for(st)] = r
 
+    fits_by_index = _fit_folders_by_index()
     rows = []
     for dec in decisions:
         folder = dec["folder"]
         q = by_folder.get(folder, {})
-        rec_dir = os.path.join(ITERDIR, folder, "records")
+        # Prefer this pass's fit, found by the index prefix; fall back to the
+        # ledger's own folder name under ITERDIR for anything not yet worked.
+        m = re.match(r"^(\d{3})_", folder)
+        found = fits_by_index.get(int(m.group(1))) if m else None
+        fit_tree, fit_folder = found if found else (ITERDIR, folder)
+        rec_dir = os.path.join(fit_tree, fit_folder, "records")
         best = glob.glob(os.path.join(rec_dir, "BEST_*.json"))
         rej = glob.glob(os.path.join(rec_dir, "REJECT_ALL_*.json"))
         chosen = best[0] if best else (rej[0] if rej else None)
@@ -127,7 +171,7 @@ def main():
         name_pub = q.get("name_pub") or folder
         common_name = q.get("name_mast_key") or folder
         if chosen:
-            src = os.path.join(ITERDIR, folder,
+            src = os.path.join(fit_tree, fit_folder,
                                os.path.basename(chosen)[:-len(".json")] + ".png")
             if os.path.exists(src):
                 # Prefixed with the queue index so the folder sorts into
