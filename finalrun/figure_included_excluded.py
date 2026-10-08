@@ -221,7 +221,7 @@ def draw(index, name, z, out_path, label="", simple=False):
                 dropped.append((fn, w, f, p))
             elif act.startswith("drop") and not is_forced:
                 proposed.append((fn, w, f, dict(kept=True, reason=act)))
-            elif act.startswith("review"):
+            elif act.startswith("review") and not is_forced:
                 review.append((fn, w, f, dict(kept=True, reason=act)))
             else:
                 used.append((fn, w, f, p))

@@ -197,6 +197,16 @@ def main():
             print("   figure: %s" % recs[-1].replace("/records/", "/").replace(".json", ".png"))
         else:
             print("   fit produced no record: %s" % (r.stderr.strip().splitlines()[-1:] or ""))
+    # The interactive fitter orders its object list from index_order.csv in the
+    # rebin directory.  Nothing wrote that file, so an override that changed an
+    # object's instrument left the old stem mapped and the new one unlisted:
+    # H1821+643 appeared at the end of the fitter with no index number at all.
+    # Refreshing it here means it cannot drift from what is actually on disk.
+    try:
+        import write_index_order
+        write_index_order.write(quiet=True)
+    except Exception as exc:
+        print("   could not refresh index_order.csv: %s" % exc, flush=True)
     return 0
 
 

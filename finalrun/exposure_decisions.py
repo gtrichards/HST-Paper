@@ -539,8 +539,24 @@ def choose_visit(per_inst, rows_by_file, index=None):
     Returns a list of candidate dicts, best first, each carrying why.
     """
     cands = []
+    # The override's own keep_files / drop_files have to be honoured HERE, while
+    # candidates are being built, not only after a visit has been chosen.  The
+    # docstring of _overrides says an override always wins, and it did not: on
+    # H1821+643 (index 127) the only two FOS exposures covering C IV are both
+    # H19 and the screening set BOTH aside for review -- the index-81
+    # two-member-group poisoning -- so the FOS epoch had no kept exposure with
+    # any C IV pixels, was dropped by the `if not civ: continue` below, and the
+    # instrument override had no candidate left to match.  An override naming an
+    # instrument could therefore be silently ignored, with the ranking's own
+    # choice fitted instead and nothing printed.
+    _ovk = _overrides().get(index) if index is not None else None
+    _force = tuple(_ovk.get("keep_files", ()) if _ovk else ())
+    _dropf = tuple(_ovk.get("drop_files", ()) if _ovk else ())
     for inst, recs in per_inst.items():
-        keep = [r for r in recs if str(r["action"]).startswith("keep")]
+        keep = [r for r in recs
+                if (str(r["action"]).startswith("keep")
+                    or any(r["file"].startswith(x) for x in _force))
+                and not any(r["file"].startswith(x) for x in _dropf)]
         by_ep = {}
         for r in keep:
             by_ep.setdefault(r["epoch"], []).append(r)
