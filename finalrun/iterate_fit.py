@@ -27,6 +27,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 import warnings
 from datetime import datetime, timezone
@@ -356,7 +357,17 @@ def main():
         tag = os.path.basename(args.replot)[:-len(".json")]
         n = prev.get("iteration", 0)
     else:
-        n = 1 + len([f for f in os.listdir(rec) if f.endswith(".json")]) if os.path.isdir(rec) else 1
+        # Number from the HIGHEST existing iteration, not from the count: a
+        # folder with a gap in it -- which happens whenever duplicate variants
+        # are pruned -- otherwise reuses a number that is already taken, and two
+        # files called iter05_* is a real hazard when GTR selects a fit by name.
+        _n = 0
+        if os.path.isdir(rec):
+            for f in os.listdir(rec):
+                m = re.match(r"^(?:BEST_|REJECT_ALL_)?iter(\d+)", f)
+                if m and f.endswith(".json"):
+                    _n = max(_n, int(m.group(1)))
+        n = _n + 1
         tag = "iter%02d%s" % (n, ("_" + args.label) if args.label else "")
 
     proc.create_diagnostic_plot(

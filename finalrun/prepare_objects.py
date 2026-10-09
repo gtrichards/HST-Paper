@@ -8,10 +8,13 @@ moment it comes up rather than being half-prepared while GTR waits.
 
 Per object it writes, into the chosen-visit fit folder:
 
-    iter*_proposed[_{low,mod,high}] mask_proposer.py's automatic proposals
-    iter*_probe_{low,mod,high}      the unmasked component scan
-    iter*_gtr_hand                  GTR's saved GUI override replayed, if any
-    iter*_gtrmask_{low,mod,high}    that override across the component sets
+    iter*_nomask_{low,mod,high}     no masks, the component scan
+    iter*_automask[_{low,mod,high}] mask_proposer.py's masks, where it found any
+    iter*_gtrmask[_{low,mod,high}]  GTR's saved GUI override, where one exists
+
+Exact duplicates are not written twice: a variant whose override and result both
+match an earlier one carries no information and only makes the list harder to
+read.
 
 and appends a row to pipeline_output/final/prepared.csv with the numbers, plus
 a line to prepared_flags.csv for anything the assembly checks dislike:
@@ -189,16 +192,31 @@ for n, i in enumerate(todo, 1):
     # blueshift from -148 to -632.  The proposer finds it unaided.  GTR had to
     # point it out: "why would you not have masked the spike at 2738A without me
     # having to tell you?"
+    # Labels say what the MASKS are, not how the variant was produced: "probe"
+    # and "proposed" were too alike to tell apart in a list, and GTR had to ask
+    # which was which.  nomask / automask / gtrmask, each with its component
+    # scan.
     subprocess.run([PY, os.path.join(HERE, "mask_proposer.py"), "--names", stem],
                    capture_output=True, text=True,
                    env=dict(os.environ, HSTICA_REBIN=REBIN))
-    run(stem, "proposed", ["--from-proposals"])
+    # Only fit the automatic masks if the proposer actually found something --
+    # on most objects it finds nothing and the variants came out byte-identical
+    # to the unmasked ones, which is clutter rather than information.
+    n_prop = 0
+    try:
+        _pj = json.load(open(os.path.join(HERE, "pipeline_output",
+                                          "mask_proposals.json"))).get(stem, {})
+        n_prop = len(_pj.get("mask_ranges") or _pj.get("ranges") or [])
+    except Exception:
+        pass
+    if n_prop:
+        run(stem, "automask", ["--from-proposals"])
+        for c in ("low", "mod", "high"):
+            run(stem, "automask_%s" % c, ["--from-proposals", "--comps", c])
     for c in ("low", "mod", "high"):
-        run(stem, "proposed_%s" % c, ["--from-proposals", "--comps", c])
-    for c in ("low", "mod", "high"):
-        run(stem, "probe_%s" % c, ["--comps", c])
+        run(stem, "nomask_%s" % c, ["--comps", c])
     if stem in store:
-        run(stem, "gtr_hand", ["--from-store", stem])
+        run(stem, "gtrmask", ["--from-store", stem])
         for c in ("low", "mod", "high"):
             run(stem, "gtrmask_%s" % c, ["--from-store", stem, "--comps", c])
 
