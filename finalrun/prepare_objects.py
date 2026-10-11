@@ -249,7 +249,33 @@ for n, i in enumerate(todo, 1):
           % (n, len(todo), i, str(q.get("name_pub"))[:28], desc,
              len(blues), spread, ",".join(sorted(set(fl))) or "-"), flush=True)
 
-pd.DataFrame(rows).to_csv(os.path.join(FINAL, "prepared.csv"), index=False)
-pd.DataFrame(flagrows).to_csv(os.path.join(FINAL, "prepared_flags.csv"), index=False)
+#: MERGE rather than overwrite.  These tables accumulate across runs -- the
+#: docstring above says "appends" -- but the write was an unconditional
+#: to_csv, so running the script on a range that produced nothing (index 216,
+#: whose chosen visit had no rebin product yet) emptied the file for every
+#: object already prepared.  Rows are keyed on (index, iteration) for
+#: prepared.csv and (index, flag) for the flags, with the new run winning so a
+#: re-preparation refreshes its own numbers.
+def _merge(new_rows, path, keys):
+    new_df = pd.DataFrame(new_rows)
+    if os.path.exists(path) and os.path.getsize(path) > 1:
+        try:
+            old_df = pd.read_csv(path)
+        except Exception:
+            old_df = None
+        if old_df is not None and len(old_df):
+            if new_df.empty:
+                return old_df
+            keep = [c for c in keys if c in old_df.columns and c in new_df.columns]
+            if keep:
+                merged = pd.concat([old_df, new_df], ignore_index=True)
+                merged = merged.drop_duplicates(subset=keep, keep="last")
+                return merged.sort_values(keys[0], kind="stable")
+    return new_df
+
+_merge(rows, os.path.join(FINAL, "prepared.csv"), ["index", "iteration"]) \
+    .to_csv(os.path.join(FINAL, "prepared.csv"), index=False)
+_merge(flagrows, os.path.join(FINAL, "prepared_flags.csv"), ["index", "flag"]) \
+    .to_csv(os.path.join(FINAL, "prepared_flags.csv"), index=False)
 print("\n%d variant rows -> final/prepared.csv" % len(rows))
 print("%d flags -> final/prepared_flags.csv" % len(flagrows))
