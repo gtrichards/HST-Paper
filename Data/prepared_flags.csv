@@ -15,3 +15,6 @@ index,name_pub,flag,note
 239,2MASS J09215939+4509126,no_anchor,
 241,LBQS 1338-0038,red_edge_collapse,G140L reads -7.86 at 1700-1705 A
 241,LBQS 1338-0038,no_anchor,
+254,HS 0840+2630,no_records,"COS ep1, 2 exp, G140L"
+254,HS 0840+2630,red_edge_collapse,G140L reads -44.63 at 1700-1705 A
+254,HS 0840+2630,no_anchor,
