@@ -302,6 +302,46 @@ class ICAManualFixProcessor:
             wave_orig = np.asarray(wave_orig, dtype=float) * (1.0 + z) / (1.0 + z_new)
             z = z_new
 
+        #: KNOWN DEFECT -- DELIBERATELY LEFT IN PLACE.  Do not "fix" these two
+        #: lines without reading this note and re-running the sample.
+        #:
+        #: flux_orig is a view into the FITS data and the "/=" below is in
+        #: place, so by the time the second line runs np.nanmedian(flux_orig)
+        #: is 1.0, not the spectrum's median.  The errors are therefore divided
+        #: by 1 and left un-normalised while the flux is normalised: every error
+        #: bar handed to the fit is too large by that object's own flux median
+        #: (2.59x on 4C 13.41, so S/N reads 6.0 where the data give 15.6).  The
+        #: median across the 428 rebinned spectra is 3.18 and the worst is 17.2;
+        #: 420 of 428 have a median above 1.1.
+        #:
+        #: The ICA weights are unaffected -- a uniform scale on the errors
+        #: cancels in the weighted least squares and in the redchi comparison
+        #: that chooses low/mod/high.  What it changes is every test that
+        #: compares a flux difference to an error, above all maskNAL's
+        #: "flux_median_61p - flux > 3*errs": that 3 sigma is really ~9.5 sigma
+        #: at the sample median, so automatic narrow-absorption detection is
+        #: effectively off.  4C 13.41's 6.8-sigma C IV absorber tested as 2.4
+        #: sigma and went unflagged, 0 of 85 px in 1530-1560 A.
+        #:
+        #: Correcting it alone is a NET LOSS, which is why it stands.  Re-running
+        #: all 190 adopted fits with the normalisation corrected: blueshift
+        #: moves >2 quanta on 41 objects and flips sign on 6; EW drifts down
+        #: ~2%; 44 objects lose more than 80 of ~280 C IV pixels.  The cause is
+        #: maskNAL's +/-3 px padding: with correct errors many isolated 1-2 px
+        #: noise dips clear 3 sigma and each is widened to 7 px, so e.g. Mrk 110
+        #: takes 50 separate 1-4 px detections at S/N 21 and loses 189 of 246
+        #: C IV pixels.  Classifying the newly flagged pixels by structure, only
+        #: 8 of 190 objects have coherent absorbers (<=6 runs, longest >=6 px)
+        #: and those do not move at all -- deep troughs already cleared the
+        #: inflated threshold -- while 73 are scattered noise and lose a median
+        #: 94 C IV pixels.  The padding is Rankine's prescription and is not
+        #: ours to change, so the fix buys nothing where it is right and costs a
+        #: great deal where it is not.
+        #:
+        #: Operational consequence: narrow absorption is masked BY HAND in this
+        #: project, and only the strongest, coherent troughs are masked at all.
+        #: A patch implementing the correction is kept out of tree; reapplying it
+        #: requires re-deriving every recorded measurement.
         flux_orig /= np.nanmedian(flux_orig)
         errs_orig = spec[1].data["Coadded Flux Errors"] / np.nanmedian(flux_orig)
         
