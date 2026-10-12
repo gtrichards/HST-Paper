@@ -252,6 +252,39 @@ def draw(index, name, z, out_path, label="", simple=False):
         vals = (np.concatenate(near) if n_near >= 200
                 else (np.concatenate([f for _, _, f, _ in pool]) if pool
                       else np.array([np.nan])))
+        #: Reject detector collapse before taking the percentile.  Where COS
+        #: G140L runs past its red cutoff the flux calibration divides by a
+        #: throughput near zero and the extracted values reach 1e-3 against a
+        #: real continuum of 1e-15 -- eleven orders of magnitude out, with the
+        #: error array going the same way.  On 2MASS J08434975+2619106 (index
+        #: 254) that collapse begins at 1680 A rest, inside the 1400-1750 A
+        #: scaling window, and contaminates the top 8% of pixels: the 99.5th
+        #: percentile came out at 4.2e-04 and squashed the entire spectrum --
+        #: including a clean C IV line peaking at 9e-15 -- onto the zero line.
+        #: The panel read as "no coverage of C IV" when the line is plainly
+        #: there in both exposures.
+        #:
+        #: Iterated median/MAD clipping separates the two populations because
+        #: they are so far apart: after the first pass the MAD is set by real
+        #: pixels alone, so the collapse falls outside any sane multiple of it.
+        #: k = 30 is deliberately loose -- it leaves healthy objects bit for
+        #: bit unchanged (246, 249 and 253 keep 100% of their pixels and the
+        #: identical limits) while cutting 254's upper limit by a factor 1.4e10.
+        #: A tighter k starts trimming genuine emission-line peaks: at k = 8,
+        #: 246 loses 30% off the top.
+        _v = vals[np.isfinite(vals)] if np.isfinite(vals).any() else vals
+        if _v.size:
+            _keep = np.ones(_v.size, bool)
+            for _ in range(8):
+                _med = np.median(_v[_keep])
+                _mad = np.median(np.abs(_v[_keep] - _med))
+                if not _mad:
+                    break
+                _new = np.abs(_v - _med) <= 30.0 * _mad
+                if _new.sum() < 50 or (_new == _keep).all():
+                    break
+                _keep = _new
+            vals = _v[_keep]
         lo, hi = np.nanpercentile(vals, [1, 99.5]) if np.isfinite(vals).any() else (0, 1)
         pad = 0.15 * (hi - lo) if np.isfinite(hi - lo) and hi > lo else 1.0
         def thin(seq):
