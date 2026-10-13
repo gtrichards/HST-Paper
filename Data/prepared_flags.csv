@@ -22,3 +22,9 @@ index,name_pub,flag,note
 255,2MASS J11575874-0022208,no_anchor,
 260,ATO J200.4373+03.5154,red_edge_collapse,G140L reads -0.00 at 1700-1705 A
 260,ATO J200.4373+03.5154,no_anchor,
+261,[HB89] 1444+407,no_anchor,
+275,2MASS J08525922+0313207,red_edge_collapse,G140L reads -0.00 at 1700-1705 A
+275,2MASS J08525922+0313207,no_anchor,
+277,2MASS J13142650+0201157,no_anchor,
+279,PB  1309,no_anchor,
+281,LBQS 1340-0038,no_anchor,
