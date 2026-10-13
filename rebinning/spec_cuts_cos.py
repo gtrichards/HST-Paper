@@ -37,4 +37,18 @@ BlueEdges = {
 RedEdges = {
     "2MASS J08434975+2619106 - lb1402rhq.0": 1602.0,
     "2MASS J08434975+2619106 - lb1402rnq.0": 1602.0,
+    #: ATO J200.4373+03.5154 (index 260, z=0.2686) is the same failure with a
+    #: different face.  Here the C IV window itself is clean -- S/N 3.4-5.2 and
+    #: no negative pixels through 1560 A -- but cont_filtered's interpolation
+    #: anchors past 1685 A, where this spectrum reaches -7.7e+09, so the
+    #: normalised flux steps down by a factor of SIX at exactly 1460 A, the
+    #: exclusion boundary.  The reconstruction then sat entirely below its own
+    #: continuum, the EW clamped to exactly 0.00 and the veto rejected at
+    #: -139 per cent.  Trimming at 1590 A rest (2017 A observed) clears the
+    #: veto, keeps 251 C IV pixels and corrects log L1450 by 1.5 dex, from
+    #: 43.944 to 45.418.  The cut is placed before the 1600-1620 A bin, where
+    #: 49 per cent of pixels are already negative; 1605 would buy 22 more
+    #: pixels at the cost of reaching into it, for the same blueshift to one
+    #: quantum.
+    "ATO J200.4373+03.5154 - lb1418isq.0": 1590.0,
 }

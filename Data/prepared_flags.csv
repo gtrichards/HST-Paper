@@ -18,3 +18,7 @@ index,name_pub,flag,note
 254,HS 0840+2630,no_records,"COS ep1, 2 exp, G140L"
 254,HS 0840+2630,red_edge_collapse,G140L reads -44.63 at 1700-1705 A
 254,HS 0840+2630,no_anchor,
+255,2MASS J11575874-0022208,red_edge_collapse,G140L reads -70.82 at 1700-1705 A
+255,2MASS J11575874-0022208,no_anchor,
+260,ATO J200.4373+03.5154,red_edge_collapse,G140L reads -0.00 at 1700-1705 A
+260,ATO J200.4373+03.5154,no_anchor,
