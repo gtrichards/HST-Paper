@@ -53,6 +53,102 @@ def parse_range(s):
 
 
 
+
+#: SDSS overlay for the diagnostic figure -- a consistency check only, never an
+#: input to the fit.  Splicing SDSS into the co-add was tested and left off: it
+#: changes the C IV measurement (index 286 moved eleven quanta on the low basis)
+#: while adding only ~300 fittable pixels, because the ICA components stop at
+#: 2999.9 A and the SDSS segment starts near 2800 A at these redshifts.
+#:
+#: What the overlay tests instead is the RECONSTRUCTION'S EXTRAPOLATION.  For
+#: these objects the HST data and the SDSS spectrum do not overlap at all --
+#: on index 286 the HST ends at 2325 A rest and SDSS begins at 2796 A -- but the
+#: reconstruction runs to 2999.9 A, so it is predicting flux in a region where
+#: SDSS has measured it.  That is the same extrapolation L2500 and the red
+#: continuum anchor rest on when the HST data stop short, so the agreement is
+#: worth seeing on every figure rather than inferred.
+SDSS_LITE = os.path.join(HERE, "data_v23", "SDSS_spec", "lite")
+SDSS_TABLE = os.path.join(HERE, "pipeline_output", "final", "sdss_spectra.csv")
+
+
+def _sdss_file_for_stem(stem):
+    """The SDSS spectrum belonging to this rebin stem, or None."""
+    try:
+        import pandas as _pd
+        cv = _pd.read_csv(os.path.join(HERE, "pipeline_output", "final",
+                                       "chosen_visit_summary.csv"))
+        hit = cv[cv["stem"].astype(str) == str(stem)]
+        if not len(hit):
+            return None
+        idx = int(hit.iloc[0]["index"])
+        sd = _pd.read_csv(SDSS_TABLE)
+        row = sd[sd["index"].astype("Int64") == idx]
+        if not len(row):
+            return None
+        fn = str(row.iloc[0].get("fn_sdss") or "").strip()
+        path = os.path.join(SDSS_LITE, fn)
+        return path if fn and os.path.exists(path) else None
+    except Exception:
+        return None
+
+
+def overlay_sdss(ax, stem, z, wave_ica, flux_ica):
+    """Draw the SDSS spectrum rescaled onto the reconstruction. Returns a label."""
+    path = _sdss_file_for_stem(stem)
+    if path is None:
+        return None
+    try:
+        from astropy.io import fits as _f
+        with _f.open(path) as h:
+            d = h[1].data
+            lam = 10.0 ** np.asarray(d["loglam"], float)
+            fl = np.asarray(d["flux"], float)
+            iv = np.asarray(d["ivar"], float)
+    except Exception:
+        return None
+    rest = lam / (1.0 + float(z))
+    ok = np.isfinite(fl) & (iv > 0)
+    if ok.sum() < 50:
+        return None
+    rest, fl = rest[ok], fl[ok]
+    wi = np.asarray(wave_ica, float)
+    fi = np.asarray(flux_ica, float)
+    #: Scale on the overlap with the RECONSTRUCTION, not with the HST data --
+    #: at these redshifts there is usually no HST/SDSS overlap at all.
+    lo = max(rest.min(), np.nanmin(wi))
+    hi = min(rest.max(), np.nanmax(wi))
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi - lo < 20.0:
+        return None
+    ms = (rest >= lo) & (rest <= hi)
+    mi = (wi >= lo) & (wi <= hi) & np.isfinite(fi)
+    if ms.sum() < 20 or mi.sum() < 20:
+        return None
+    #: One multiplicative factor, from the medians.  Shape is then free to agree
+    #: or not, which is the point; the factor itself is reported so a gross
+    #: calibration mismatch is visible as well as a shape mismatch.
+    num = np.nanmedian(np.interp(rest[ms], wi[mi], fi[mi]))
+    den = np.nanmedian(fl[ms])
+    if not np.isfinite(num) or not np.isfinite(den) or den == 0:
+        return None
+    k = num / den
+    #: Smooth for legibility only; the residual below uses the smoothed curve
+    #: too, so it measures shape agreement rather than SDSS pixel noise.
+    n = max(3, int(round(len(rest) / 900.0)) * 2 + 1)
+    sm = np.convolve(fl * k, np.ones(n) / n, mode="same") if n > 1 else fl * k
+    ax.plot(rest, sm, color="#2166ac", lw=0.8, alpha=0.8, zorder=3)
+    #: The panel is scaled to the HST data, which on these objects stops well
+    #: short of where SDSS begins -- so without this the overlay is drawn off
+    #: the right-hand edge and the check is invisible.  Extend only as far as
+    #: the compared region, not to the end of the SDSS spectrum, which runs to
+    #: 7000 A and would squash the UV into nothing.
+    x0, x1 = ax.get_xlim()
+    if hi > x1:
+        ax.set_xlim(x0, hi + 0.02 * (hi - x0))
+    resid = (np.interp(rest[ms], wi[mi], fi[mi]) - sm[ms]) / np.abs(num)
+    return ("SDSS x %.3g over %.0f-%.0f A: rms %.0f%%"
+            % (k, lo, hi, 100.0 * np.nanstd(resid)))
+
+
 def civ_continuum(wave_r, flux_r,
                   cont_region=((1445.0, 1465.0), (1700.0, 1705.0)),
                   ew_region=(1500.0, 1600.0)):
@@ -476,6 +572,9 @@ def main():
         # Upper right, below the "Input Bad Pixels" legend: at the bottom of the
         # panel the box sat over Mg II 2800, which is one of the lines the fit is
         # judged by.
+        _sd = overlay_sdss(full_ax, args.name, res["z"], res["wave_ica"], res["flux_ica"])
+        if _sd:
+            lines.append(_sd)
         full_ax.text(0.995, 0.86, "\n".join(lines), transform=full_ax.transAxes,
                      ha="right", va="top", fontsize=8,
                      bbox=dict(fc="white", ec="0.7", alpha=0.85, pad=2.5))

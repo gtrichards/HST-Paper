@@ -473,6 +473,19 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
             final_flux, final_morph_factor = spec_morph.morph2(final_wave, final_flux, final_errs, z, Identifier)
             final_errs *= final_morph_factor
             final_mask = np.concatenate((varweighted_mask[argstart:argcut], sdss_ANDMask))
+            #: Carry the continuum here as well, not only in the HST-only branch
+            #: below.  Without this, final_cont was never assigned on the SDSS
+            #: path and the save fell through to the all-NaN fallback, so every
+            #: spliced object lost its Continuum Normalisation column -- and with
+            #: it the absolute scale that monochromatic() needs for L1450, L1700
+            #: and L2500.  The HST segment has been divided TWICE, once per
+            #: exposure inside the co-add (recorded in varweighted_cont) and
+            #: again by varweighted_continuum just above, so the product of the
+            #: two is what restores it; the SDSS segment carries its own
+            #: sdss_continuum.
+            final_cont = np.concatenate((
+                varweighted_cont[argstart:argcut] * varweighted_continuum[argstart:argcut],
+                sdss_continuum))
         else:
             #there's a gap between HST and SDSS waves
             gap_wave    = 10.**np.arange(np.log10(max(hst_wave_new))+final_res, np.log10(min(sdss_wave)), final_res)
@@ -485,6 +498,11 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
 
             _, final_morph_factor = spec_morph.morph2(final_wave, final_flux, final_errs, z, Identifier)
             final_mask = np.concatenate((varweighted_mask[argstart:], gap_ones, sdss_ANDMask))
+            #: Same as the overlap case above; the gap itself has no continuum,
+            #: matching the NaN flux already written there.
+            final_cont = np.concatenate((
+                varweighted_cont[argstart:] * varweighted_continuum[argstart:],
+                gap_nans, sdss_continuum))
     else:
         """
         Step 5b: Morph variance-weighted-median-continuum-normalized HST spectrum.

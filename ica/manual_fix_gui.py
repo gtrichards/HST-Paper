@@ -1034,6 +1034,36 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+        # SDSS consistency check, drawn as an INSET so the main panel keeps the
+        # detail it has always shown.  The reconstruction is extrapolating past
+        # the end of the HST data here, and SDSS has real flux there; the inset
+        # is the only place the two can be compared, since putting SDSS on the
+        # main axis would stretch it to 7000 A and squash the UV to nothing.
+        try:
+            self._sdss_inset = None
+            _sd = _sdss_overlay(res, getattr(self.proc, "rebin_path", None))
+            if _sd is not None:
+                _rest, _sm, _k, _lo, _hi, _rms = _sd
+                ins = self.ax_full.inset_axes([0.635, 0.085, 0.345, 0.37])
+                _wi = np.asarray(wave_ica, float); _fi = np.asarray(flux_ica, float)
+                _mi = (_wi >= _lo) & (_wi <= _hi)
+                _ms = (_rest >= _lo) & (_rest <= _hi)
+                ins.plot(_rest[_ms], _sm[_ms], color="#2166ac", lw=0.9,
+                         label="SDSS x %.3g" % _k)
+                ins.plot(_wi[_mi], _fi[_mi], "-r", lw=1.3, label="ICA (extrap.)")
+                ins.set_xlim(_lo, _hi)
+                ins.tick_params(labelsize=6, length=2, pad=1)
+                ins.set_title("SDSS check  %.0f-%.0f A   rms %.0f%%"
+                              % (_lo, _hi, 100.0 * _rms), fontsize=6.5, pad=2)
+                ins.patch.set_alpha(0.92)
+                for sp in ins.spines.values():
+                    sp.set_linewidth(0.6); sp.set_color("0.5")
+                ins.legend(fontsize=5.5, loc="best", framealpha=0.75,
+                           handlelength=1.2, borderpad=0.3)
+                self._sdss_inset = ins
+        except Exception:
+            pass
+
         # CIV region
         self.ax_civ.plot(wave, flux, "-k", alpha=0.6)
         self.ax_civ.plot(wave_ica, flux_ica, "-r")
@@ -1318,6 +1348,79 @@ def _make_processor(rebin_dir):
 LUM_WINDOWS = ((1450.0, 1445.0, 1465.0),
                (1700.0, 1700.0, 1705.0),
                (2500.0, 2490.0, 2510.0))
+
+
+
+def _sdss_overlay(res, rebin_path):
+    """SDSS spectrum for this object, rescaled onto the reconstruction.
+
+    Returns (rest, flux_scaled, k, lo, hi, rms_frac) or None.
+
+    This is a consistency check, never an input to the fit.  Splicing SDSS into
+    the co-add was tested and left off: it moves the C IV measurement (index 286
+    shifted eleven quanta on the low basis) while adding only ~300 fittable
+    pixels, because the ICA components stop at 2999.9 A and the SDSS segment
+    starts near 2800 A at these redshifts.
+
+    What this shows instead is whether the RECONSTRUCTION'S EXTRAPOLATION is
+    right.  Where the HST data stop short -- index 286 ends at 2325 A rest while
+    SDSS begins at 2657 -- the reconstruction is still predicting flux out to
+    2999.9 A, and SDSS has measured it there.  That is the same extrapolation
+    L2500 and the red continuum anchor rely on, so it is worth seeing while
+    fitting rather than taking on trust.
+    """
+    try:
+        import pandas as _pd
+        from astropy.io import fits as _f
+        root = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(rebin_path or ""))))
+        stem = str(res.get("spec_name") or res.get("name") or "")
+        cv = _pd.read_csv(os.path.join(root, "pipeline_output", "final",
+                                       "chosen_visit_summary.csv"))
+        hit = cv[cv["stem"].astype(str) == stem]
+        if not len(hit):
+            return None
+        idx = int(hit.iloc[0]["index"])
+        sd = _pd.read_csv(os.path.join(root, "pipeline_output", "final",
+                                       "sdss_spectra.csv"))
+        row = sd[sd["index"].astype("Int64") == idx]
+        if not len(row):
+            return None
+        fn = str(row.iloc[0].get("fn_sdss") or "").strip()
+        path = os.path.join(root, "data_v23", "SDSS_spec", "lite", fn)
+        if not fn or not os.path.exists(path):
+            return None
+        with _f.open(path) as h:
+            d = h[1].data
+            lam = 10.0 ** np.asarray(d["loglam"], float)
+            fl = np.asarray(d["flux"], float)
+            iv = np.asarray(d["ivar"], float)
+        ok = np.isfinite(fl) & (iv > 0)
+        if ok.sum() < 50:
+            return None
+        rest = lam[ok] / (1.0 + float(res["z"]))
+        fl = fl[ok]
+        wi = np.asarray(res["wave_ica"], float)
+        fi = np.asarray(res["flux_ica"], float)
+        lo = max(rest.min(), np.nanmin(wi))
+        hi = min(rest.max(), np.nanmax(wi))
+        if not np.isfinite(lo) or not np.isfinite(hi) or hi - lo < 20.0:
+            return None
+        ms = (rest >= lo) & (rest <= hi)
+        mi = (wi >= lo) & (wi <= hi) & np.isfinite(fi)
+        if ms.sum() < 20 or mi.sum() < 20:
+            return None
+        num = np.nanmedian(np.interp(rest[ms], wi[mi], fi[mi]))
+        den = np.nanmedian(fl[ms])
+        if not np.isfinite(num) or not np.isfinite(den) or den == 0:
+            return None
+        k = num / den
+        n = max(3, int(round(len(rest) / 900.0)) * 2 + 1)
+        sm = np.convolve(fl * k, np.ones(n) / n, mode="same") if n > 1 else fl * k
+        resid = (np.interp(rest[ms], wi[mi], fi[mi]) - sm[ms]) / abs(num)
+        return rest, sm, k, lo, hi, float(np.nanstd(resid))
+    except Exception:
+        return None
 
 
 def _monochromatic(res, rebin_path):

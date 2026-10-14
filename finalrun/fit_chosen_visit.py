@@ -30,6 +30,44 @@ MAST = os.path.join(HERE, "data_v23", "MAST_v23")
 STAGE = os.path.join(HERE, "pipeline_output", "chosen_visit", "stage")
 REBIN = os.path.join(HERE, "pipeline_output", "chosen_visit", "rebin")
 ITER = os.path.join(HERE, "pipeline_output", "chosen_visit", "fits")
+SDSS_DIR = os.path.join(HERE, "data_v23", "SDSS_spec", "lite")
+SDSS_TABLE = os.path.join(HERE, "pipeline_output", "final", "sdss_spectra.csv")
+
+_SDSS_CACHE = {}
+
+
+def sdss_for(index):
+    """The SDSS spectrum to splice onto this object's HST data, or None.
+
+    coadd.rebin takes fn_sdss as its fourth argument and has always been able
+    to splice SDSS onto the HST co-add, but this driver passed None
+    unconditionally, so the branch never ran. sdss_spectra.csv records which
+    objects have a spectrum and how far blueward it reaches; only those whose
+    coverage overlaps the ICA range are worth splicing, which is what
+    sdss_flag = 2 means and begins at index 286 (z ~ 0.359, where SDSS first
+    reaches Mg II).
+
+    Returns (fn_sdss, sdss_spec_dir) or (None, None).
+    """
+    if not _SDSS_CACHE:
+        try:
+            t = pd.read_csv(SDSS_TABLE)
+        except Exception:
+            _SDSS_CACHE["_"] = None
+            return None, None
+        for _, r in t.iterrows():
+            try:
+                k = int(r["index"])
+            except Exception:
+                continue
+            if not bool(r.get("covers_mgii", False)):
+                continue
+            fn = str(r.get("fn_sdss") or "").strip()
+            if not fn or not os.path.exists(os.path.join(SDSS_DIR, fn)):
+                continue
+            _SDSS_CACHE[k] = fn
+    fn = _SDSS_CACHE.get(int(index))
+    return (fn, SDSS_DIR) if fn else (None, None)
 
 
 def select(index, name, z):
@@ -158,7 +196,11 @@ def main():
               % (i, dec.loc[i, "row_num"] if i in dec.index else "?", nm, b["inst"],
                  b["epoch"], len(keep), nfiles, b["snr_combined"], b["why"]), flush=True)
         try:
-            CO.rebin(name, z, b["inst"], None, data_path=d, output_dir=REBIN, flat=True)
+            _fn_sdss, _sdss_dir = sdss_for(i)
+            if _fn_sdss:
+                print("   splicing SDSS spectrum %s" % _fn_sdss, flush=True)
+            CO.rebin(name, z, b["inst"], _fn_sdss, data_path=d, output_dir=REBIN,
+                     sdss_spec_dir=_sdss_dir, flat=True)
         except Exception as exc:
             print("   rebin failed: %s" % exc, flush=True); continue
         stem = None
