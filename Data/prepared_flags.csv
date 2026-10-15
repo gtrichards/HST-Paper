@@ -30,3 +30,17 @@ index,name_pub,flag,note
 281,LBQS 1340-0038,no_anchor,
 293,LBQS 1214+1804,no_anchor,
 296,LBQS 1138+0204,no_anchor,
+297,LBQS 1144-0115,no_anchor,
+298,QSO J1536+0441,no_anchor,
+299,LBQS 0100+0205,no_anchor,
+300,2MASS J11191611+1101069,no_anchor,
+301,[HB89] 1628+380,no_anchor,
+303,2MASS J07505172+2454095,level_outlier,one exposure 323x the visit median
+304,[HB89] 1543+489,no_anchor,
+305,LBQS 0017+0209,no_anchor,
+306,LBQS 1230+0947,no_anchor,
+308,[HB89] 1049+616,no_anchor,
+313,QSO J1435+3604,skipped_no_civ_coverage,not fittable from this status
+314,2MASS J14041058+0937451,no_anchor,
+315,87GB 121807.5+173455,skipped_no_civ_coverage,not fittable from this status
+316,QSO J0755+2542,no_anchor,
