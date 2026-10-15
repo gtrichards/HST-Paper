@@ -1044,7 +1044,13 @@ class ManualFixWindow(QtWidgets.QMainWindow):
             _sd = _sdss_overlay(res, getattr(self.proc, "rebin_path", None))
             if _sd is not None:
                 _rest, _sm, _k, _lo, _hi, _rms = _sd
-                ins = self.ax_full.inset_axes([0.635, 0.085, 0.345, 0.37])
+                #: Vertically centred, at GTR's request on index 290.  Low in
+                #: the panel it sat on the HST spectrum itself; high in the
+                #: panel it would collide with the luminosity legend pinned at
+                #: y = 0.86.  The middle band is clear of both on every object
+                #: seen so far, because the spectrum falls away toward the red
+                #: end of the panel where the inset sits.
+                ins = self.ax_full.inset_axes([0.635, 0.315, 0.345, 0.37])
                 _wi = np.asarray(wave_ica, float); _fi = np.asarray(flux_ica, float)
                 _mi = (_wi >= _lo) & (_wi <= _hi)
                 _ms = (_rest >= _lo) & (_rest <= _hi)
