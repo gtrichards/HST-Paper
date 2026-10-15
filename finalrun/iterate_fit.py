@@ -224,6 +224,24 @@ def civ_subcontinuum(res):
             out["civ_span"] = None
             out["ok"] = False
             out["no_civ_data"] = True
+        # Pixels in the window are not the same as pixels AT the line, and the
+        # check above cannot tell the difference.  Index 298 (QSO J1536+0441)
+        # has 83 usable pixels inside 1500-1600 A, every one of them in a single
+        # stretch at 1500.1-1528.7 A on the blue shoulder, and NONE within 15 A
+        # of 1549.48: nothing from 1528.7 A to 1600 A survives.  It satisfied the
+        # guard, passed the sub-continuum veto -- which can only fail where the
+        # line has observed pixels to fail against -- and reported blueshifts of
+        # -286.1 to -909.1 km/s across its component variants, nine quanta of
+        # spread from a line shape set by the ICA components and anchored on
+        # continuum 20-50 A blueward of it.  That is the Mrk 352 pattern this
+        # guard was written for, reaching the same wrong end by a different
+        # route.  Six objects are in this state; the five already judged are all
+        # at manmask 0, so requiring coverage at the line costs no adopted fit.
+        core = (np.abs(w_o - 1549.48) <= 15.0) & (m_o == 0) & np.isfinite(f_o)
+        out["n_civ_core_px"] = int(core.sum())
+        if usable.any() and not core.any():
+            out["ok"] = False
+            out["no_civ_at_line"] = True
     return out
 
 

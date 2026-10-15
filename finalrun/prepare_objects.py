@@ -29,7 +29,7 @@ a line to prepared_flags.csv for anything the assembly checks dislike:
 
     python prepare_objects.py 125 199
 """
-import csv, glob, json, os, subprocess, sys
+import csv, glob, json, os, re, subprocess, sys
 import numpy as np
 import pandas as pd
 
@@ -41,6 +41,10 @@ from exposure_decisions import (read_exposures, per_file, assign_epochs,
                                 recommend, alignment, _overrides as OV)
 import fit_chosen_visit as F
 
+#: The systemic-redshift table, consulted by run() when deciding whether an
+#: existing record is still current.
+REDSHIFT_CSV = "/Users/gtr/Work/git/HST-Paper/ica/redshift_overrides.csv"
+
 MAST = os.path.join(HERE, "data_v23", "MAST_v23")
 FITS = os.path.join(HERE, "pipeline_output", "chosen_visit", "fits")
 REBIN = os.path.join(HERE, "pipeline_output", "chosen_visit", "rebin")
@@ -48,7 +52,15 @@ FINAL = os.path.join(HERE, "pipeline_output", "final")
 STORE = "/Users/gtr/Work/git/HST-Paper/ica/manual_fix_overrides.json"
 ECH = {"E140M", "E230M", "E140H", "E230H"}
 
-lo_i, hi_i = int(sys.argv[1]), int(sys.argv[2])
+#: work_status == "civ_partial" objects are fittable but partially covered, so
+#: they are held back from the default run and prepared deliberately with
+#: --include-partial.  Without it they reached GTR carrying only the two
+#: chosen_visit rows that fit_chosen_visit.py writes -- no component scan, no
+#: mask variants -- which is how index 300 sat in prepared.csv at a blueshift of
+#: -3973.2 km/s with 107 vetoed pixels and nothing to compare it against.
+_argv = [a for a in sys.argv[1:] if a != "--include-partial"]
+INCLUDE_PARTIAL = "--include-partial" in sys.argv
+lo_i, hi_i = int(_argv[0]), int(_argv[1])
 queue = {int(r["order"]): r for r in csv.DictReader(
     open(os.path.join(HERE, "pipeline_output", "work_queue.csv")))}
 dec = pd.read_csv(os.path.join(FINAL, "pass_decisions.csv")).set_index("index")
@@ -144,17 +156,81 @@ def checks(index, name, z):
 
 
 def run(stem, label, extra):
+    """Fit one variant, unless an up-to-date record for that label exists.
+
+    iterate_fit.py takes the next free iterNN number, so a second preparation
+    of the same object wrote a second copy of every variant rather than
+    refreshing them: re-preparing index 299 inside a 298-300 range turned its 9
+    records into 16, iter10-16 being byte-equal twins of iter03-09.  The same
+    thing had to be cleaned up by hand after re-rebinning 254, 260 and 286.
+    Skip a label that is already on disk -- unless the spectrum is NEWER than
+    the record, which is exactly the re-rebin case and must re-fit.
+    """
+    try:
+        from object_paths import folder_for
+        rec_dir = os.path.join(FITS, folder_for(stem), "records")
+        have = sorted(glob.glob(os.path.join(rec_dir, "iter*_%s.json" % label)))
+        # Match the label exactly: "gtrmask" must not be satisfied by
+        # "gtrmask_low", whose file name also ends in a label that contains it.
+        have = [h for h in have
+                if re.match(r"^iter\d+_%s$" % re.escape(label),
+                            os.path.basename(h)[:-5])]
+        if have:
+            #: A record is stale if EITHER the spectrum or the redshift override
+            #: table is newer than it.  Keying on the spectrum alone was not
+            #: enough: a systemic-redshift override changes the rest-frame grid
+            #: at fit time without touching the FITS, so index 312's variants
+            #: would have been skipped as up to date while still carrying the
+            #: old frame.  Both inputs decide the fit, so both invalidate it.
+            newer_than = [os.path.join(REBIN, stem + ".fits"), REDSHIFT_CSV]
+            rec_t = os.path.getmtime(have[-1])
+            if not any(os.path.exists(q) and os.path.getmtime(q) > rec_t
+                       for q in newer_than):
+                return "skipped"
+    except Exception:
+        pass
     env = dict(os.environ, HSTICA_REBIN=REBIN, HSTICA_ITERDIR=FITS)
     subprocess.run([PY, os.path.join(HERE, "iterate_fit.py"), stem,
                     "--label", label] + extra,
                    capture_output=True, text=True, env=env)
+    return "fitted"
 
 
 rows, flagrows = [], []
 todo = [i for i in range(lo_i, hi_i + 1)
         if i in queue and i not in dec.index
-        and queue[i].get("work_status") == "fit"]
-print("preparing %d objects: %s..%s" % (len(todo), todo[0], todo[-1]), flush=True)
+        and (queue[i].get("work_status") == "fit"
+             or (INCLUDE_PARTIAL
+                 and queue[i].get("work_status") == "civ_partial"))]
+
+#: Everything in the range this script will NOT prepare, and why.  The filter
+#: above takes only work_status == "fit", and used to drop the rest in silence:
+#: no printed line, no flag row, nothing to say an object had been passed over.
+#: Indices 298 and 300 were skipped that way inside a 297-306 batch whose log
+#: read "preparing 8 objects", and only a hand count of the output found them.
+#: Both are work_status "civ_partial" and both are fittable -- 83 and 114 usable
+#: pixels in 1500-1600 A -- so this is exactly the case that must not vanish.
+#: 24 objects carry that status; 16 had already been picked up by individual
+#: review, which is to say the silence was survived rather than safe.
+#: no_civ_coverage (53) and iue_only (19) are not fittable and are expected
+#: here, but they are still named, because "expected" is a judgement for GTR to
+#: make from a list rather than one this script should make by omission.
+_skipped = [(i, queue[i].get("work_status"))
+            for i in range(lo_i, hi_i + 1)
+            if i in queue and i not in dec.index and i not in todo]
+if not todo:
+    print("preparing 0 objects in %s..%s" % (lo_i, hi_i), flush=True)
+else:
+    print("preparing %d objects: %s..%s" % (len(todo), todo[0], todo[-1]), flush=True)
+if _skipped:
+    print("  NOT prepared, %d object(s) in this range:" % len(_skipped), flush=True)
+    for i, st in _skipped:
+        note = ("fittable -- re-run with --include-partial" if st == "civ_partial"
+                else "not fittable from this status")
+        print("    %03d  %-28s work_status=%-16s %s"
+              % (i, (queue[i].get("name_pub") or "")[:28], st, note), flush=True)
+        flagrows.append(dict(index=i, name_pub=queue[i].get("name_pub"),
+                             flag="skipped_%s" % st, note=note))
 
 for n, i in enumerate(todo, 1):
     q = queue[i]

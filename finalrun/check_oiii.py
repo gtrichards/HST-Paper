@@ -14,7 +14,7 @@ the core at -5 +/- 12 km/s and the apparent offset was the outflow wing pulling
 the centroid.  [O III] routinely has a blueshifted wing, so the core is what
 measures the systemic frame and the wing is a separate physical quantity.
 
-THE CORE MUST ACTUALLY BE A CORE.  A fitted "core" wider than about 150 km/s
+THE CORE MUST ACTUALLY BE A CORE.  A fitted "core" wider than CORE_SIGMA_MAX
 is not a narrow-line region measurement and should not be used as a frame.
 That threshold is reported, not enforced -- the caller decides.
 
@@ -39,6 +39,23 @@ SDSS_LITE = os.path.join(HERE, "data_v23", "SDSS_spec", "lite")
 SDSS_TABLE = os.path.join(HERE, "pipeline_output", "final", "sdss_spectra.csv")
 C = 299792.458
 OIII_A, OIII_B = 5008.240, 4960.295          # vacuum
+
+#: Widest fitted core still accepted as a narrow-line-region measurement, km/s.
+#: RAISED FROM 150 TO 200 ON 2026-10-15, by GTR ("I think that 200 km/s is fine"),
+#: after the 150 km/s value was measured against the pass rather than assumed.
+#: Of 87 objects with an [O III] measurement over indices 244-330, 35 certified,
+#: 31 failed for substantive reasons (a degenerate decomposition, a spurious
+#: narrow spike, or an ill-determined centroid) and 21 failed ONLY on this
+#: width test.  Those 21 were not errors the guard caught: their centroids are
+#: determined to a median of +/-11 km/s, they sit a median of 14 km/s from the
+#: catalogue redshift, and EVERY ONE of them agrees with the catalogue to within
+#: two 69 km/s quanta.  18 of the 21 have sigma between 150 and 200, which is
+#: still plausible narrow-line-region width.  Raising the threshold therefore
+#: changes no adopted redshift in this range -- it stops the report calling 21
+#: confirmed frames uncertified.  A core wider than this is still refused, and
+#: the other three guards (degenerate_two, spurious_core, core_dv_err) are
+#: untouched, so the failure modes that matter still fail.
+CORE_SIGMA_MAX = 200.0
 RATIO = 2.98                                  # 5007/4959
 
 
@@ -133,13 +150,25 @@ def measure(index, verbose=True):
         _b = (abs(p2[4]), p2[3], p2[5], e2[5])
         (sc, ac, dc, ec), (sw, aw, dw, ew) = ((_a, _b) if _a[0] <= _b[0] else (_b, _a))
         _fc, _fw = ac * sc, aw * sw
-        _frac = _fc / (_fc + _fw) if (_fc + _fw) else np.nan
-        out["core_flux_frac"] = float(_frac)
-        if np.isfinite(_frac) and _frac < 0.15:
-            out["spurious_core"] = True
-            (sc, ac, dc, ec), (sw, aw, dw, ew) = ((sw, aw, dw, ew), (sc, ac, dc, ec))
-        else:
+        #: A flux FRACTION only means anything while both components are
+        #: emission.  Where the two-Gaussian fit is degenerate one amplitude
+        #: goes negative and the ratio stops being a fraction at all: index 304
+        #: ([HB89] 1543+489, peak S/N 9.2) reported "a spike carrying -19450.5%
+        #: of the flux".  The guards rejected it anyway, for its 543 km/s core
+        #: and its +/-4883 km/s dv, but the number printed was meaningless.
+        #: Call the decomposition failed instead, and say so.
+        out["degenerate_two"] = bool(ac <= 0 or aw <= 0)
+        if out["degenerate_two"]:
+            out["core_flux_frac"] = float("nan")
             out["spurious_core"] = False
+        else:
+            _frac = _fc / (_fc + _fw) if (_fc + _fw) else np.nan
+            out["core_flux_frac"] = float(_frac)
+            if np.isfinite(_frac) and _frac < 0.15:
+                out["spurious_core"] = True
+                (sc, ac, dc, ec), (sw, aw, dw, ew) = ((sw, aw, dw, ew), (sc, ac, dc, ec))
+            else:
+                out["spurious_core"] = False
         out.update(core_dv=float(dc), core_dv_err=float(ec),
                    core_sigma=float(sc / OIII_A * C), core_amp=float(ac),
                    wing_dv=float(dw), wing_dv_err=float(ew),
@@ -190,8 +219,18 @@ def plot(index, out_dir=None):
     p1, _ = curve_fit(_doublet, x, y, p0=[y.max(), 3.0, 0.0], sigma=sg, maxfev=60000)
     p2, _ = curve_fit(two, x, y, p0=[y.max(), 1.5, 0.0, y.max() * 0.3, 8.0, -300.0],
                       sigma=sg, maxfev=200000)
-    (sc, ac, dc), (sw, aw, dw) = sorted([(abs(p2[1]), p2[0], p2[2]),
-                                         (abs(p2[4]), p2[3], p2[5])])
+    #: Take the core/wing assignment from measure(), do NOT re-derive it here.
+    #: This function used to sort the two components by width independently,
+    #: so when measure() learned to demote a spurious narrow spike the figure
+    #: kept the old labelling and drew the blue "core" curve on the wrong
+    #: component -- correct numbers in the report, wrong line in the plot.
+    #: GTR caught it on index 296, having already caught the underlying bug on
+    #: index 245. One source of truth.
+    _pairs = [(abs(p2[1]), p2[0], p2[2]), (abs(p2[4]), p2[3], p2[5])]
+    _target = r["core_sigma"] * OIII_A / C
+    _ci = int(np.argmin([abs(pp[0] - _target) for pp in _pairs]))
+    (sc, ac, dc) = _pairs[_ci]
+    (sw, aw, dw) = _pairs[1 - _ci]
     fig, ax = plt.subplots(2, 1, figsize=(11, 7.2),
                            gridspec_kw=dict(height_ratios=[2.4, 1]))
     xs = np.linspace(x.min(), x.max(), 2000)
@@ -276,13 +315,18 @@ def report(r):
         #:     reported "core" velocity was then -400 km/s instead of -51.
         #:     A core weaker than its own wing is a failed decomposition.
         bad = []
-        if r["core_sigma"] > 150:
-            bad.append("core sigma %.0f > 150 km/s, not a narrow-line core" % r["core_sigma"])
+        if r["core_sigma"] > CORE_SIGMA_MAX:
+            bad.append("core sigma %.0f > %.0f km/s, not a narrow-line core"
+                       % (r["core_sigma"], CORE_SIGMA_MAX))
         if r["core_dv_err"] > 50:
             bad.append("core dv uncertain to +/-%.0f km/s" % r["core_dv_err"])
         #: With the core now chosen by flux, the failure to catch is the core
         #: coming out BROADER than its own wing -- the two components have not
         #: separated into a narrow line plus an outflow, so neither is a frame.
+        if r.get("degenerate_two"):
+            bad.append("the two-Gaussian decomposition is degenerate -- one "
+                       "component came out in absorption, so there is no "
+                       "core/wing split to report")
         if r.get("spurious_core"):
             bad.append("the narrow component was a spike carrying %.1f%% of the flux; "
                        "values below are the dominant component instead"

@@ -36,8 +36,22 @@ SDSS_TABLE = os.path.join(HERE, "pipeline_output", "final", "sdss_spectra.csv")
 _SDSS_CACHE = {}
 
 
+#: Whether to splice SDSS onto the chosen-visit co-add.  OFF, by GTR's decision
+#: of 2026-10-14 after the splice was tested on index 286: it moved C IV by 11
+#: quanta and bought only ~300 fittable pixels, the ICA components ending at
+#: 2999.9 A.  The cost is larger than that test showed.  Splicing extends the
+#: co-add to ~6600 A rest, which changes the continuum fit over the whole range
+#: and therefore which pixels maskNAL rejects INSIDE C IV: on index 296 the
+#: usable C IV pixel count fell from 274 to 148 and the blueshift moved from
+#: +887.0 to +955.9 km/s, with the C IV data themselves untouched.  Enable per
+#: run with --splice-sdss only for a deliberate test, never for an adopted fit.
+SPLICE_SDSS = False
+
+
 def sdss_for(index):
     """The SDSS spectrum to splice onto this object's HST data, or None.
+
+    Returns (None, None) unless SPLICE_SDSS is set; see that flag.
 
     coadd.rebin takes fn_sdss as its fourth argument and has always been able
     to splice SDSS onto the HST co-add, but this driver passed None
@@ -49,6 +63,8 @@ def sdss_for(index):
 
     Returns (fn_sdss, sdss_spec_dir) or (None, None).
     """
+    if not SPLICE_SDSS:
+        return None, None
     if not _SDSS_CACHE:
         try:
             t = pd.read_csv(SDSS_TABLE)
@@ -113,7 +129,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--index", type=int, nargs="+", required=True)
+    ap.add_argument("--splice-sdss", action="store_true",
+                    help="splice SDSS onto the chosen-visit co-add (off by default; "
+                         "changes the continuum fit and the C IV masking -- test only)")
     a = ap.parse_args()
+    global SPLICE_SDSS
+    SPLICE_SDSS = bool(a.splice_sdss)
+    if SPLICE_SDSS:
+        print("   SDSS SPLICE ENABLED -- not for an adopted fit", flush=True)
     queue = {int(r["order"]): r for r in csv.DictReader(
         open(os.path.join(HERE, "pipeline_output", "work_queue.csv")))}
     dec = pd.read_csv(os.path.join(HERE, "pipeline_output", "final",
