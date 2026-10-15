@@ -149,6 +149,21 @@ class _FitTask(QtCore.QRunnable):
 # ---------------------------------------------------------------------------
 # Override persistence
 # ---------------------------------------------------------------------------
+def _looks_like_no_data(tb):
+    """Whether a traceback is the signature of an object with nothing to fit.
+
+    scipy reports an empty residual vector as "func output vector length M=0",
+    which is what every zero-C IV-pixel object raises.  Distinguishing it from a
+    real bug keeps the blanked panel informative: 29 of the 430 entries the
+    fitter lists have no usable C IV pixel, 24 of them already recorded at
+    manmask 0 with reject_reason no_civ_data.
+    """
+    t = str(tb or "")
+    return ("output vector length M=0" in t
+            or "zero-size array" in t
+            or "No usable" in t)
+
+
 def load_overrides(path):
     if os.path.exists(path):
         with open(path) as f:
@@ -763,6 +778,31 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self._set_busy(False)
         self._set_status("✗  Fit FAILED (see console).", _STATUS_ERR)
         print(tb, file=sys.stderr)
+        # A failed fit used to leave the PREVIOUS object's curves on screen while
+        # the selector and the title named the new one, so the panels showed one
+        # object's data under another object's name with only a status line to
+        # say so.  GTR hit this on index 294 (Q1130+6026_COS), whose COS spectrum
+        # reaches 1249 A rest and has no C IV pixel at all: the fit raises
+        # "func input vector length N=1 must not exceed func output vector
+        # length M=0" and the panel kept showing index 293.  Nothing stale may
+        # survive a failure -- clear the panels and say which object failed.
+        self._blank_panels(tb)
+
+    def _blank_panels(self, reason=""):
+        """Clear every panel and say why, so no stale curve can be misread."""
+        self._wave_plot = None
+        self._saved_lims = None
+        for ax in self._panels:
+            ax.clear()
+        why = "no usable C IV data" if _looks_like_no_data(reason) else "fit failed"
+        self.ax_civ.text(0.5, 0.5,
+                         "%s\n%s\n\nnothing drawn -- no data from this object "
+                         "is shown" % (self.current or "(no object)", why),
+                         transform=self.ax_civ.transAxes, ha="center", va="center",
+                         fontsize=11, color="#b00020")
+        for ax in self._panels:
+            ax.set_xticks([]); ax.set_yticks([])
+        self.canvas.draw_idle()
 
     def _set_controls_enabled(self, on):
         for w in (self.refit_btn, self.prev_btn, self.next_btn,
