@@ -56,6 +56,30 @@ OIII_A, OIII_B = 5008.240, 4960.295          # vacuum
 #: the other three guards (degenerate_two, spurious_core, core_dv_err) are
 #: untouched, so the failure modes that matter still fail.
 CORE_SIGMA_MAX = 200.0
+
+#: A core/wing split means nothing when the two components have similar widths
+#: AND the narrower one is not the dominant one.  GTR caught this on index 344:
+#: the fit returned sigma 147.0 and sigma 213.6 km/s -- a ratio of 1.45 -- with
+#: the BROADER component carrying 77 per cent of the flux and 2.25 times the
+#: amplitude, so the report labelled the weaker, narrower half the "core" and
+#: the dominant half the "wing", and the figure looked flipped.  Nothing was
+#: flipped: the narrower-is-core rule did exactly what it says.  The rule just
+#: does not apply when the fit has split one line into two comparable halves
+#: instead of separating a narrow core from a broad wing.  Distinct from the
+#: index-296 defect, where plot() re-derived the assignment and genuinely
+#: disagreed with measure().
+#:
+#: BOTH conditions are required, and the thresholds were calibrated against the
+#: pass rather than assumed.  Width alone is not enough: index 289, whose core
+#: was used to override a redshift (RM782), has a ratio of 1.43 -- but its core
+#: carries 90 per cent of the flux, so "core" is exactly the right word for it.
+#: A width-only guard at 1.8 would have stripped certification from 17 objects
+#: including that one.  With the dominance condition added, ratio < 1.5 and core
+#: flux < 50 per cent flags 5 objects over indices 244-352, NONE of which
+#: certify on the other guards.  So this changes no verdict: it explains why a
+#: decomposition that was already refused is not worth reading as core-plus-wing.
+CORE_WING_RATIO_MIN = 1.5
+CORE_WING_FRAC_MAX = 0.50
 RATIO = 2.98                                  # 5007/4959
 
 
@@ -157,10 +181,27 @@ def measure(index, verbose=True):
         #: of the flux".  The guards rejected it anyway, for its 543 km/s core
         #: and its +/-4883 km/s dv, but the number printed was meaningless.
         #: Call the decomposition failed instead, and say so.
+        #: Widths too close for the split to mean anything -- see
+        #: CORE_WING_RATIO_MIN.  Recorded alongside the values rather than
+        #: instead of them, so a reader can still see what the fit returned.
+        #: Computed from the ORIGINAL narrower/broader assignment, before the
+        #: spurious_core swap below may exchange them -- the question is whether
+        #: the fit separated a narrow core from a broad wing at all, which is a
+        #: property of the two fitted components and not of their labels.
+        out["core_wing_ratio"] = float(abs(sw) / abs(sc)) if sc else float("nan")
+        _ratio_frac = (_fc / (_fc + _fw)) if (_fc + _fw) else np.nan
+        out["widths_too_close"] = bool(
+            np.isfinite(out["core_wing_ratio"])
+            and out["core_wing_ratio"] < CORE_WING_RATIO_MIN
+            and np.isfinite(_ratio_frac) and _ratio_frac < CORE_WING_FRAC_MAX)
         out["degenerate_two"] = bool(ac <= 0 or aw <= 0)
         if out["degenerate_two"]:
             out["core_flux_frac"] = float("nan")
             out["spurious_core"] = False
+            #: A degenerate fit has no meaningful widths either, but saying so
+            #: twice helps nobody -- degeneracy is the more fundamental fault
+            #: and is reported on its own.
+            out["widths_too_close"] = False
         else:
             _frac = _fc / (_fc + _fw) if (_fc + _fw) else np.nan
             out["core_flux_frac"] = float(_frac)
@@ -323,6 +364,12 @@ def report(r):
         #: With the core now chosen by flux, the failure to catch is the core
         #: coming out BROADER than its own wing -- the two components have not
         #: separated into a narrow line plus an outflow, so neither is a frame.
+        if r.get("widths_too_close"):
+            bad.append("the two components have widths of %.0f and %.0f km/s, a ratio of "
+                       "%.2f, and the narrower one carries only %.0f%% of the flux, so this is "
+                       "not a core plus a wing and the labels below carry no information"
+                       % (r["core_sigma"], r["wing_sigma"], r["core_wing_ratio"],
+                          100.0 * r.get("core_flux_frac", float("nan"))))
         if r.get("degenerate_two"):
             bad.append("the two-Gaussian decomposition is degenerate -- one "
                        "component came out in absorption, so there is no "
