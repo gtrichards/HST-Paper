@@ -28,7 +28,23 @@ Three diagnostics, because they fail independently:
                    redward of C IV puts its anchor at 0.48 of the continuum, and
                    005 reads 0.88 against 0.75.  Prefer the power-law test
                    (--powerlaw), which is what the index-317 note used.
-  cn(1450)/cn(1700)   the Continuum Normalisation column at the two anchors.
+  cn negative      the fraction of the fitted range where the Continuum
+                   Normalisation column is NEGATIVE.  A continuum fit cannot be
+                   negative, so any of this is a failed fit somewhere; it is
+                   reported as a warning because it does not by itself condemn
+                   an anchor on the positive side of the crossing.  Six COS
+                   objects (175, 182, 199, 216, 223, 235) are negative over
+                   35-43 per cent of their range, every one crossing zero at
+                   1869-1958 A OBSERVED -- the G140L red-edge throughput
+                   collapse -- and in every one log L1450 is anchored on the
+                   positive side and sound.
+  cn(1450)/cn(1700)   the Continuum Normalisation column at the two anchors,
+                   COMPUTED ONLY WHERE monochromatic() REPORTS BOTH AS MEASURED.
+                   Taking it unconditionally was a mistake: on the six objects
+                   above it divides by a nearest_cont at 1700 A that the pipeline
+                   had already refused (measured=False, logL nan), which
+                   manufactured ratios of -9.19 to -0.39 and read as a defect in
+                   a quantity those rows do not carry.
                    A lambda^-1.5 continuum gives 1.27, and the adopted sample
                    runs 0.95-1.28 (16-84%, median 1.13).  This is the diagnostic
                    that decides the luminosity, because it is what multiplies
@@ -72,6 +88,7 @@ GAP_SIG_MIN = 5.0
 GAP_RATIO_MIN = 0.40
 CN_RATIO_MIN, CN_RATIO_MAX = 0.80, 2.0 #: cn ratio outside this distorts the luminosity
 DEX_MIN = -0.10                        #: below this the ordering is backwards
+CN_NEG_WARN = 0.02                     #: a warning, not a verdict; see the docstring
 
 
 def measure(spec, mono):
@@ -81,6 +98,9 @@ def measure(spec, mono):
     err = d["Coadded Flux Errors"]
     msk = d["Bad Pixel Mask"]
     cn = d["Continuum Normalisation"]
+    fit = np.isfinite(cn)
+    out_neg = float((cn[fit] < 0).mean()) if fit.any() else float("nan")
+    neg_w = w[fit & (cn < 0)]
     # De-normalise: the gap is a statement about the observed spectrum, and the
     # arbitrary-unit flux has already been divided by the very continuum whose
     # soundness is the question.
@@ -104,10 +124,15 @@ def measure(spec, mono):
     vals = [x["flux"] for x in nb if x]
     out["nb_flux"] = float(np.mean(vals)) if vals else float("nan")
     out["gap_ratio"] = out["gap_flux"] / out["nb_flux"] if vals else float("nan")
+    out["cn_neg_frac"] = out_neg
+    out["cn_neg_from"] = float(neg_w.min()) if neg_w.size else float("nan")
     c14 = (mono.get("1450") or {}).get("nearest_cont")
     c17 = (mono.get("1700") or {}).get("nearest_cont")
     out["cn1450"], out["cn1700"] = c14, c17
-    out["cn_ratio"] = (c14 / c17) if (c14 and c17) else float("nan")
+    # Only where the pipeline stands behind both anchors -- see the docstring.
+    both = ((mono.get("1450") or {}).get("measured")
+            and (mono.get("1700") or {}).get("measured"))
+    out["cn_ratio"] = (c14 / c17) if (both and c14 and c17) else float("nan")
     L14 = (mono.get("1450") or {}).get("logL")
     L17 = (mono.get("1700") or {}).get("logL")
     out["logL1450"], out["logL1700"] = L14, L17
@@ -133,6 +158,9 @@ def faults(r):
         out.append("cn ratio %.2f vs %.2f expected" % (r["cn_ratio"], EXPECTED_CN))
     if np.isfinite(r["dex"]) and r["dex"] < DEX_MIN:
         out.append("backwards by %.3f dex" % (-r["dex"]))
+    if np.isfinite(r["cn_neg_frac"]) and r["cn_neg_frac"] > CN_NEG_WARN:
+        out.append("cn negative over %.0f%% of the range, from %.0f A"
+                   % (100 * r["cn_neg_frac"], r["cn_neg_from"]))
     return out
 
 
@@ -164,9 +192,9 @@ def main():
         rows.append(r)
 
     print("expected: cn ratio %.2f, dex %+.3f   thresholds: gap median >= %.1f sigma, "
-          "gap/nbr >= %.2f, cn %.2f-%.2f, dex >= %+.2f"
+          "gap/nbr >= %.2f, cn %.2f-%.2f, dex >= %+.2f, cn negative <= %.0f%%"
           % (EXPECTED_CN, EXPECTED_DEX, GAP_SIG_MIN, GAP_RATIO_MIN,
-             CN_RATIO_MIN, CN_RATIO_MAX, DEX_MIN))
+             CN_RATIO_MIN, CN_RATIO_MAX, DEX_MIN, 100 * CN_NEG_WARN))
     print("%-4s %-40s %7s %7s %7s %8s %8s %7s  %s"
           % ("idx", "folder", "gap sig", "gap/nbr", "cn rat", "logL1450", "logL1700",
              "dex", "fault"))
@@ -187,6 +215,7 @@ def main():
     out = os.path.join(HERE, "pipeline_output", "final", "l1450_anchor_check.csv")
     keys = ["index", "folder", "stem", "record", "gap_n", "gap_flux", "gap_snr", "gap_sig",
             "nb_flux", "gap_ratio", "cn1450", "cn1700", "cn_ratio",
+            "cn_neg_frac", "cn_neg_from",
             "logL1450", "logL1700", "dex", "faults"]
     with open(out, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=keys, extrasaction="ignore")
