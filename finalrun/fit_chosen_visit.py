@@ -250,7 +250,16 @@ def main():
         r = subprocess.run([PY, os.path.join(HERE, "iterate_fit.py"), stem,
                             "--label", "chosen_visit"],
                            capture_output=True, text=True, env=env)
-        recs = sorted(glob.glob(os.path.join(ITER, "*", "records", "*chosen_visit*.json")),
+        # Glob THIS object's folder, not the whole tree.  Globbing ITER/* and
+        # taking the newest record means that when an object's fit produces no
+        # record at all, recs[-1] is the PREVIOUS object's -- so the log reports
+        # one object's blueshift, EW and figure path under another object's
+        # index.  Index 374 (QSO J0943+0531, a visit at S/N 0.0 that produced
+        # nothing) was reported with index 372's numbers and 372's figure, and
+        # a variant prepared from that log would have carried 372's measurement
+        # against 374's row.  The index prefix is the stable key.
+        recs = sorted(glob.glob(os.path.join(ITER, "%03d_*" % i, "records",
+                                             "*chosen_visit*.json")),
                       key=os.path.getmtime)
         if recs:
             j = json.load(open(recs[-1]))

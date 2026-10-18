@@ -595,7 +595,13 @@ def choose_visit(per_inst, rows_by_file, index=None):
                               wmin=wmin, wmax=wmax, snr_single=s1, snr_combined=snr,
                               civ_cov=civ_cov, ciii_cov=ciii_cov, filled=filled,
                               has_ciii=bool(ciii_cov >= CIII_COVER),
-                              meets_snr=bool(snr >= SNR_TARGET)))
+                              meets_snr=bool(snr >= SNR_TARGET),
+                              #: Median flux in the C IV region across this
+                              #: visit's exposures -- the test for a dead visit;
+                              #: see the filter below cands.sort().
+                              civ_level_med=float(
+                                  np.nanmedian([r["civ_level"] for r in g]))
+                              if len(g) else float("nan")))
     # anchored and deep enough first, then anchored, then deep enough, then the rest;
     # within each tier the fewest exposures that do the job, then the best S/N.
     def rank(c):
@@ -612,6 +618,36 @@ def choose_visit(per_inst, rows_by_file, index=None):
         # a visit at S/N 26 over three others at S/N 33-40.
         return (tier, -round(c["filled"], 2), -c["snr_combined"])
     cands.sort(key=rank)
+
+    # A visit with NO FLUX AT C IV cannot yield a C IV measurement, and the
+    # ranking above cannot see that: its tiers read C III] coverage and S/N, and
+    # its tiebreak reads `filled` -- the fraction of 1260-3000 A covered -- which
+    # rewards a wide, empty visit over a narrow, populated one.  Index 374
+    # (QSO J0943+0531) is the case: epoch 2 is two G140L exposures whose median
+    # flux is identically 0.0, at C IV as well as overall, covering 66 per cent
+    # of the C IV window, and it was ranked ABOVE epoch 3, which has the full
+    # window at S/N 0.4.  The fit on epoch 2 produced no record at all.
+    #
+    # The test is the C IV level, NOT the S/N or the overall level, and the
+    # difference decides whether this is safe.  Nineteen adopted fits have a
+    # candidate whose combined S/N is non-positive, and in thirteen of them that
+    # candidate is the one chosen -- but every one of those has a healthy
+    # positive flux level AT C IV (1.4e-15 to 3.2e-15).  Their S/N is non-positive
+    # because the Coadded Flux Errors column is NEGATIVE over part of the
+    # spectrum, a defect in 134 of the master tree's spectra that has nothing to
+    # do with whether the flux is there.  Dropping those visits would discard
+    # good data because the error column is corrupt.  Only index 374 has the
+    # flux itself absent at C IV.
+    #
+    # And the filter never empties the list: four objects (179, 220, 227, 235)
+    # have a slightly negative C IV level and only ONE candidate each, so
+    # filtering unconditionally would strip them of any visit and retract their
+    # adopted fits.  Falling back to the unfiltered ranking keeps them exactly as
+    # they are.  Blast radius on the 262 adopted fits: zero.
+    _alive = [c for c in cands if c.get("civ_level_med", 1.0) > 0]
+    if _alive and len(_alive) < len(cands):
+        cands = _alive
+
     ov = _overrides().get(index) if index is not None else None
     if ov and ov.get("inst"):
         want = ov.get("epochs") or ()
