@@ -78,9 +78,25 @@ def _sdss_file_for_stem(stem):
         cv = _pd.read_csv(os.path.join(HERE, "pipeline_output", "final",
                                        "chosen_visit_summary.csv"))
         hit = cv[cv["stem"].astype(str) == str(stem)]
-        if not len(hit):
-            return None
-        idx = int(hit.iloc[0]["index"])
+        if len(hit):
+            idx = int(hit.iloc[0]["index"])
+        else:
+            # chosen_visit_summary.csv is written by a batch run, so an object
+            # added afterwards -- by a spectrum_overrides row, say -- is absent
+            # from it and the SDSS overlay silently vanished.  Indices 365 and
+            # 382 both reached GTR without their Mg II panel for this reason,
+            # while check_oiii found the same spectra because it keys on the
+            # index directly.  The work queue maps stems to indices for every
+            # object, so fall back to it rather than give up.
+            idx = None
+            with open(os.path.join(HERE, "pipeline_output",
+                                   "work_queue.csv"), newline="") as _f:
+                for _r in csv.DictReader(_f):
+                    if str(stem) in str(_r.get("stems", "")).split(";"):
+                        idx = int(_r["order"])
+                        break
+            if idx is None:
+                return None
         sd = _pd.read_csv(SDSS_TABLE)
         row = sd[sd["index"].astype("Int64") == idx]
         if not len(row):

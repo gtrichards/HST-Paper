@@ -58,8 +58,16 @@ ECH = {"E140M", "E230M", "E140H", "E230H"}
 #: chosen_visit rows that fit_chosen_visit.py writes -- no component scan, no
 #: mask variants -- which is how index 300 sat in prepared.csv at a blueshift of
 #: -3973.2 km/s with 107 vetoed pixels and nothing to compare it against.
-_argv = [a for a in sys.argv[1:] if a != "--include-partial"]
+_argv = [a for a in sys.argv[1:] if a not in ("--include-partial", "--force")]
 INCLUDE_PARTIAL = "--include-partial" in sys.argv
+#: Prepare an object even though pass_decisions.csv already carries a verdict on
+#: it.  That file holds decisions from EARLIER passes, some of them made in bulk
+#: without individual review, and a few have since been overtaken by fixes to
+#: the data.  Index 382 is the case: its row reads "0 unmasked pixels with a
+#: positive error within 25 A of 1549.48", and the current tree has 140 of 140
+#: usable there and 275 of 280 across the window.  Without this flag such an
+#: object cannot be re-prepared at all.
+FORCE = "--force" in sys.argv
 lo_i, hi_i = int(_argv[0]), int(_argv[1])
 queue = {int(r["order"]): r for r in csv.DictReader(
     open(os.path.join(HERE, "pipeline_output", "work_queue.csv")))}
@@ -198,7 +206,7 @@ def run(stem, label, extra):
 
 rows, flagrows = [], []
 todo = [i for i in range(lo_i, hi_i + 1)
-        if i in queue and i not in dec.index
+        if i in queue and (FORCE or i not in dec.index)
         and (queue[i].get("work_status") == "fit"
              or (INCLUDE_PARTIAL
                  and queue[i].get("work_status") == "civ_partial"))]
@@ -215,9 +223,19 @@ todo = [i for i in range(lo_i, hi_i + 1)
 #: no_civ_coverage (53) and iue_only (19) are not fittable and are expected
 #: here, but they are still named, because "expected" is a judgement for GTR to
 #: make from a list rather than one this script should make by omission.
+#: An object already carrying a pass_decisions verdict was skipped in SILENCE --
+#: absent from the "preparing N objects" list and from the skip list below, so a
+#: run covering it printed nothing at all about it.  That is the same defect the
+#: skip reporting was added to cure for civ_partial objects, and it hid index
+#: 382 inside a 381-400 batch whose log read "preparing 18 objects".  Name them.
 _skipped = [(i, queue[i].get("work_status"))
             for i in range(lo_i, hi_i + 1)
             if i in queue and i not in dec.index and i not in todo]
+_already = [(i, "already in pass_decisions (manmask %s) -- re-run with --force to prepare anyway"
+             % dec.loc[i].get("manmask"))
+            for i in range(lo_i, hi_i + 1)
+            if i in queue and i in dec.index and i not in todo]
+_skipped += _already
 if not todo:
     print("preparing 0 objects in %s..%s" % (lo_i, hi_i), flush=True)
 else:
