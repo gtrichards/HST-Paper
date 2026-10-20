@@ -41,6 +41,17 @@ CIV = (1500.0, 1600.0)
 
 # Thresholds, deliberately loose and all in one place so they can be tuned.
 SNR_KEEP = 3.0          # GTR: "keep things with S/N >= 3 that are within 20% of the rest"
+#: An exposure is only set aside when it differs from its visit BOTH by more
+#: than the tolerance below AND by more than LEVEL_SIG times the uncertainty on
+#: its own level.  The percentage alone asks whether two numbers differ; it does
+#: not ask whether the difference is measured, and on a faint object it is not.
+#: GTR caught this at index 366 (RM301): three STIS exposures from one night, the
+#: third 18.2 per cent below the visit median and set aside by the flat 20 per
+#: cent rule -- but at a per-pixel S/N of 0.34 that offset is only 2.4 sigma, and
+#: GTR's reading of the figure was that it "agrees with the others".  Requiring
+#: significance as well leaves the test unchanged wherever the levels are well
+#: measured, which is the overwhelming majority, and stops it firing on noise.
+LEVEL_SIG = 3.0
 LEVEL_TOL = 0.20        # the 20%: agreement with the other exposures of the same grating
 LEVEL_TOL_MANY = 0.10   # ...tightened where there are exposures to spare.  GTR: "maybe
 MANY_EXPOSURES = 12     # within 10% is appropriate for objects with large numbers of
@@ -169,6 +180,12 @@ def per_file(rows):
                         wmin=float(wv.min()) if wv.size else np.nan,
                         wmax=float(wv.max()) if wv.size else np.nan,
                         level=float(np.median(f[np.isfinite(f)])) if np.isfinite(f).any() else np.nan,
+                        #: Uncertainty on that median, 1.2533 * sigma / sqrt(n) for
+                        #: a median of n points.  The level test needs it: a flat
+                        #: percentage tolerance asks whether two numbers differ,
+                        #: not whether the difference is measured.  See LEVEL_SIG.
+                        level_err=(float(1.2533 * np.median(e[g]) / np.sqrt(g.sum()))
+                                   if g.sum() > 3 else np.nan),
                         civ_level=float(np.median(f[civ])) if civ.sum() > 20 else np.nan,
                         civ_px=int(civ.sum()), snr=snr))
     return sorted(out, key=lambda r: (r["mjd"] if np.isfinite(r["mjd"]) else 0, r["file"]))
@@ -330,8 +347,21 @@ def recommend(recs):
                 g["action"] = "keep"
                 g["level_test"] = "skipped: visit median flux %.3g is not positive" % med
             elif np.isfinite(ratio) and not ((1 - tol) <= ratio <= 1 / (1 - tol)):
-                g["action"] = "review: level %.2fx the rest of this visit (tol %.0f%%)" % (
-                    ratio, 100 * tol)
+                # Significance as well as size -- see LEVEL_SIG.  The departure is
+                # measured against this exposure's own level uncertainty; where
+                # that is unknown the test falls back to the tolerance alone, so
+                # nothing is quietly let through.
+                _err = g.get("level_err", np.nan)
+                _nsig = (abs(g["level"] - med) / _err
+                         if np.isfinite(_err) and _err > 0 else np.inf)
+                if _nsig >= LEVEL_SIG:
+                    g["action"] = ("review: level %.2fx the rest of this visit "
+                                   "(tol %.0f%%, %.1f sigma)" % (ratio, 100 * tol, _nsig))
+                else:
+                    g["action"] = "keep"
+                    g["level_test"] = ("%.2fx the visit, outside the %.0f%% tolerance but only "
+                                       "%.1f sigma on a level of %.3g +- %.3g -- not significant, kept"
+                                       % (ratio, 100 * tol, _nsig, g["level"], _err))
             else:
                 g["action"] = "keep"
 

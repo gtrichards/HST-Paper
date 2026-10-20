@@ -190,8 +190,10 @@ def draw(index, name, z, out_path, label="", simple=False):
         try:
             recs = _dec_recommend(_dec_epochs(_dec_per_file(_dec_read(d, inst, z))))[0]
             action = {r["file"]: r["action"] for r in recs}
+            epoch_of = {r["file"]: r.get("epoch") for r in recs}
         except Exception:
             action = {}
+            epoch_of = {}
         used, dropped, proposed, review = [], [], [], []
         for fn, w, f in exposures(d, z):
             p = prov.get(fn)
@@ -214,8 +216,24 @@ def draw(index, name, z, out_path, label="", simple=False):
                       in _dropped_grating):
                     why = "grating dropped by hand (spectrum_overrides)"
                 else:
-                    why = ("not the chosen visit" if p is None or p["kept"]
-                           else p["reason"])
+                    # "not the chosen visit" is only true when the exposure
+                    # belongs to a DIFFERENT epoch.  An exposure of the chosen
+                    # epoch that the screening set aside was labelled that way
+                    # too, which told the reader the wrong thing: GTR asked at
+                    # index 366 why one spectrum was dropped when it plainly
+                    # agreed with the others, and the answer was the level test,
+                    # not the visit -- all three were the same night.  Say which.
+                    _ep = epoch_of.get(fn)
+                    _same_epoch = (chosen is not None and inst == chosen[0]
+                                   and _ep is not None and len(chosen) > 1
+                                   and _ep == chosen[1])
+                    if p is not None and not p["kept"]:
+                        why = p["reason"]
+                    elif _same_epoch:
+                        _act = str(action.get(fn) or "").strip()
+                        why = _act or "set aside from the chosen visit"
+                    else:
+                        why = "not the chosen visit"
                 dropped.append((fn, w, f, dict(kept=False, reason=why)))
             elif p is not None and not p["kept"]:
                 dropped.append((fn, w, f, p))
