@@ -281,6 +281,26 @@ def main():
         write_index_order.write(quiet=True)
     except Exception as exc:
         print("   could not refresh index_order.csv: %s" % exc, flush=True)
+
+    # chosen_visit_summary.csv maps spectrum stems to object indices, and three
+    # readers resolve through it: the SDSS overlay on the diagnostic figures
+    # (iterate_fit._sdss_file_for_stem), the Mg II inset in the interactive
+    # fitter (manual_fix_gui._sdss_overlay) and check_oiii's redshift-override
+    # lookup.  Each returns None SILENTLY for a stem it cannot find.  Nothing
+    # wrote that file -- it was produced once, on 2026-09-27 -- so every object
+    # that entered the tree afterwards lost its overlay and its inset with no
+    # error and nothing in the log.  Fifteen had, four of them already recorded.
+    # GTR found it on index 382: "There is no MgII inset for the interactive
+    # fitter.  What's the problem here?  Why wasn't this block prepared exactly
+    # like the last one?"  It had been; the file was simply stale.  This is the
+    # step that creates new stems, so this is where the file is kept current.
+    try:
+        import reconcile_chosen_visit_summary as _rec
+        _added = _rec.reconcile(write=True, quiet=True)
+        if _added:
+            print("   chosen_visit_summary.csv: added %d stem(s)" % _added, flush=True)
+    except Exception as exc:
+        print("   could not refresh chosen_visit_summary.csv: %s" % exc, flush=True)
     return 0
 
 
