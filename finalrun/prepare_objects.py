@@ -314,6 +314,28 @@ for n, i in enumerate(todo, 1):
         for c in ("low", "mod", "high"):
             run(stem, "gtrmask_%s" % c, ["--from-store", stem, "--comps", c])
 
+    # The [O III] systemic-redshift figure.  check_oiii.py --plot writes
+    # OIII_redshift.png into the object's folder and GTR reads it for every
+    # object, but this script never called it: the figure appeared only where it
+    # had been run by hand afterwards, so the 401-409 block reached GTR without
+    # one -- "There's no OIII for the next set again."  The same shape of defect
+    # as the missing Mg II inset at index 382, and the same fix: make the
+    # diagnostic part of preparing an object rather than a separate step someone
+    # has to remember.  Flagged when no figure appears, so an object without one
+    # is visible in prepared_flags.csv instead of silently lacking it.
+    _oiii = subprocess.run([PY, os.path.join(HERE, "check_oiii.py"), "--plot", str(i)],
+                           capture_output=True, text=True,
+                           env=dict(os.environ, HSTICA_REBIN=REBIN))
+    if not os.path.exists(os.path.join(fold, "OIII_redshift.png")):
+        # Skip check_oiii.py's own "figure -> not drawn" line: the useful note is
+        # the reason above it, e.g. "no usable SDSS spectrum".
+        _out = [ln.strip() for ln in (_oiii.stdout or "").splitlines()
+                if ln.strip() and not ln.strip().startswith("figure ->")]
+        fl.append("no_oiii_figure")
+        while len(notes) < len(fl) - 1:
+            notes.append("")
+        notes.append((_out[-1] if _out else "check_oiii.py wrote no figure")[:160])
+
     best = None
     for p in sorted(glob.glob(os.path.join(fold, "records", "*.json"))):
         j = json.load(open(p)); r = j["result"]; sc = j["civ_subcontinuum"]
