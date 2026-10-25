@@ -351,17 +351,29 @@ def unavailable_reason(index):
         return "no SDSS spectrum retrieved (fn_sdss empty; status %s)" % row.get("status")
     if not os.path.exists(os.path.join(SDSS_LITE, fn)):
         return "SDSS file missing from disk: %s" % fn
-    #: The redshift test, done from the table rather than by reopening the file:
-    #: rest_max is the reddest rest wavelength the spectrum reaches.
+    #: The redshift test, measured FROM THE FILE.  sdss_spectra.csv carries
+    #: rest_min/rest_max columns, but they disagree with the files by more than
+    #: 50 A for 37 of the 51 objects from index 424 on, under-reporting BOSS
+    #: coverage by about 650 A -- BOSS reaches ~10400 A observed where the legacy
+    #: spectrograph stops near 9200.  Trusting the column made me tell GTR that
+    #: [O III] was gone for all 51 remaining objects when in fact 16 still have
+    #: it.  Open the file instead; it is already open below for the fit.
+    rest_max = rest_min = float("nan")
     try:
-        rest_max = float(row.get("rest_max"))
-        rest_min = float(row.get("rest_min"))
-    except (TypeError, ValueError):
-        rest_max = rest_min = float("nan")
+        with fits.open(os.path.join(SDSS_LITE, fn)) as _h:
+            _d = _h[1].data
+            _lam = 10.0 ** np.asarray(_d["loglam"], float)
+            _iv = np.asarray(_d["ivar"], float)
+        _r = _lam[_iv > 0] / (1.0 + float(row.get("z_queue", 0.0)))
+        if _r.size:
+            rest_min, rest_max = float(_r.min()), float(_r.max())
+    except Exception:
+        pass
     if np.isfinite(rest_max) and rest_max < 5010.0:
         return ("[O III] 5007 is outside the SDSS spectrum at z = %.4f: coverage "
-                "ends at %.1f A rest (%.0f A observed). Not a failure -- the line "
-                "is past SDSS's red limit above z ~ 0.84."
+                "ends at %.1f A rest (%.0f A observed, measured from the file). "
+                "Not a failure -- the line is past the red limit of this "
+                "spectrograph at this redshift."
                 % (float(row.get("z_queue", float("nan"))), rest_max,
                    rest_max * (1.0 + float(row.get("z_queue", 0.0)))))
     if np.isfinite(rest_min) and rest_min > 4940.0:

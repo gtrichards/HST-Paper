@@ -90,8 +90,98 @@ def fetch(info):
     return None, "download failed"
 
 
+#: Nominal wavelength limits, used only when the file is not on disk.  The
+#: legacy spectrograph runs 3800-9100 A and BOSS 3600-10400; the original code
+#: applied the legacy pair to every spectrum, which under-reported BOSS coverage
+#: by about 650 A in the rest frame and made rest_max wrong by more than 50 A for
+#: 297 of 315 files.  That mattered twice over: it hid [O III] 5007 on sixteen
+#: objects above z 0.84 whose BOSS spectra do reach it, and it marked
+#: covers_2500 False for twenty-two objects at z 0.45-0.52 whose BOSS spectra
+#: reach 2500 A at the blue end -- index 317 among them, one of the rows flagged
+#: as short of a luminosity.
+NOMINAL = {"legacy": (3800.0, 9100.0), "boss": (3600.0, 10400.0)}
+
+
+def coverage(path, z, run2d=None):
+    """(rest_lo, rest_hi, how) for one spectrum, MEASURED from the file.
+
+    Falls back to the nominal limits for the spectrograph when the file is not
+    on disk, and says which it used, so a manifest row can never silently claim
+    a coverage that was assumed rather than observed.
+    """
+    import numpy as np
+    if path and os.path.exists(path):
+        try:
+            from astropy.io import fits
+            with fits.open(path) as h:
+                d = h[1].data
+                lam = 10.0 ** np.asarray(d["loglam"], float)
+                iv = np.asarray(d["ivar"], float)
+            good = lam[np.isfinite(lam) & np.isfinite(iv) & (iv > 0)]
+            if good.size:
+                return (float(good.min() / (1 + z)), float(good.max() / (1 + z)), "file")
+        except Exception:
+            pass
+    #: run2d 26 and 103/104 are legacy reductions; v5_* and integers >= 100 that
+    #: are not 103/104 are BOSS.  When in doubt assume legacy, the narrower of
+    #: the two, so coverage is under-claimed rather than over-claimed.
+    key = "boss" if str(run2d).strip().startswith("v5") else "legacy"
+    lo, hi = NOMINAL[key]
+    return (lo / (1 + z), hi / (1 + z), "nominal(%s)" % key)
+
+
+def recompute(write=True, quiet=False):
+    """Recompute the coverage columns of an existing manifest from the files.
+
+    Separate from the fetch so the table can be corrected without re-resolving
+    or re-downloading 315 spectra.  Adds coverage_from and covers_oiii to rows
+    written before those existed.
+    """
+    if not os.path.exists(MAN):
+        if not quiet:
+            print("no manifest at %s" % MAN)
+        return 0
+    rows = list(csv.DictReader(open(MAN)))
+    changed = 0
+    for r in rows:
+        try:
+            z = float(r.get("z_queue"))
+        except (TypeError, ValueError):
+            continue
+        fn = str(r.get("fn_sdss") or "").strip()
+        lo, hi, how = coverage(os.path.join(OUT, fn) if fn else None, z, r.get("run2d"))
+        new = dict(rest_min="%.1f" % round(lo, 1), rest_max="%.1f" % round(hi, 1),
+                   coverage_from=how,
+                   covers_2500=str(bool(lo <= 2490 and hi >= 2510)),
+                   covers_mgii=str(bool(lo <= 2780 and hi >= 2820)),
+                   covers_oiii=str(bool(lo <= 4940 and hi >= 5010)))
+        if any(str(r.get(k, "")) != v for k, v in new.items()):
+            changed += 1
+        r.update(new)
+    if write and rows:
+        cols = list(rows[0].keys())
+        for c in ("coverage_from", "covers_oiii"):
+            if c not in cols:
+                cols.append(c)
+        with open(MAN, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=cols)
+            w.writeheader(); w.writerows(rows)
+    if not quiet:
+        def _t(v):
+            return v is True or str(v).strip().lower() == "true"
+        print("recomputed coverage for %d rows; %d changed" % (len(rows), changed))
+        print("   measured from the file : %d" % sum(1 for r in rows
+                                                     if r.get("coverage_from") == "file"))
+        print("   covering Mg II 2800 A  : %d" % sum(1 for r in rows if _t(r["covers_mgii"])))
+        print("   covering 2500 A        : %d" % sum(1 for r in rows if _t(r["covers_2500"])))
+        print("   covering [O III] 5007  : %d" % sum(1 for r in rows if _t(r["covers_oiii"])))
+    return changed
+
+
 def main():
     args = [a for a in sys.argv[1:]]
+    if args and args[0] == "--recompute-coverage":
+        return 0 if recompute() is not None else 1
     flags = ("1", "2")
     if args and args[0].startswith("--flag"):
         flags = tuple(args[0].split("=", 1)[1].split(","))
@@ -120,7 +210,10 @@ def main():
             continue
         path, how = fetch(info)
         zq = float(q["z"]) if q.get("z") else float("nan")
-        rest_lo, rest_hi = 3800.0 / (1 + zq), 9100.0 / (1 + zq)
+        _fn = "%04d/spec-%04d-%05d-%04d.fits" % (info["plate"], info["plate"],
+                                                 info["mjd"], info["fiber"])
+        rest_lo, rest_hi, cov_how = coverage(os.path.join(OUT, _fn), zq,
+                                             info.get("run2d"))
         rows.append(dict(index=i, row_num=q.get("row_num"), name_pub=q.get("name_pub"),
                          designation=q.get("designation"),
                          plate=info["plate"], mjd=info["mjd"], fiber=info["fiber"],
@@ -130,7 +223,14 @@ def main():
                          fn_sdss="%04d/spec-%04d-%05d-%04d.fits"
                                  % (info["plate"], info["plate"], info["mjd"], info["fiber"]),
                          rest_min=round(rest_lo, 1), rest_max=round(rest_hi, 1),
-                         covers_2500=bool(rest_lo <= 2500), covers_mgii=bool(rest_lo <= 2800),
+                         coverage_from=cov_how,
+                         #: Both ends, not just the blue one.  The old test asked
+                         #: only whether the blue cutoff was blueward of the line,
+                         #: so an object whose spectrum ended short of 2500 A in
+                         #: the red was still marked as covering it.
+                         covers_2500=bool(rest_lo <= 2490 and rest_hi >= 2510),
+                         covers_mgii=bool(rest_lo <= 2780 and rest_hi >= 2820),
+                         covers_oiii=bool(rest_lo <= 4940 and rest_hi >= 5010),
                          status=how))
         if path is None:
             bad.append((i, "download failed for %s" % rows[-1]["fn_sdss"]))
