@@ -328,13 +328,20 @@ for n, i in enumerate(todo, 1):
                            env=dict(os.environ, HSTICA_REBIN=REBIN))
     if not os.path.exists(os.path.join(fold, "OIII_redshift.png")):
         # Skip check_oiii.py's own "figure -> not drawn" line: the useful note is
-        # the reason above it, e.g. "no usable SDSS spectrum".
+        # the reason above it, which unavailable_reason() now spells out.
         _out = [ln.strip() for ln in (_oiii.stdout or "").splitlines()
                 if ln.strip() and not ln.strip().startswith("figure ->")]
-        fl.append("no_oiii_figure")
+        _why = (_out[-1] if _out else "check_oiii.py wrote no figure")
+        #: Two different things, and only one of them is a failure.  Above
+        #: z ~ 0.84 [O III] 5007 sits past the red end of an SDSS spectrum, so
+        #: every object from index 424 onward -- 51 of them -- cannot have the
+        #: figure at all.  Flagging that the same way as a retrieval or fitting
+        #: failure would bury the real cases under physics.
+        fl.append("oiii_out_of_range" if "outside the SDSS spectrum" in _why
+                  or "blueward of the SDSS coverage" in _why else "no_oiii_figure")
         while len(notes) < len(fl) - 1:
             notes.append("")
-        notes.append((_out[-1] if _out else "check_oiii.py wrote no figure")[:160])
+        notes.append(_why[:200])
 
     best = None
     for p in sorted(glob.glob(os.path.join(fold, "records", "*.json"))):

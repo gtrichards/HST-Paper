@@ -328,9 +328,54 @@ def plot(index, out_dir=None):
     return out
 
 
-def report(r):
+def unavailable_reason(index):
+    """Why measure() returned None for this index, in words.
+
+    "no usable SDSS spectrum" was the only message, and it was wrong for the
+    commonest case.  Above z ~= 0.84 [O III] 5007 redshifts past the red end of
+    an SDSS spectrum, so every object from index 424 to the end of the queue has
+    a perfectly good spectrum that simply does not reach the line -- 51 of them.
+    Reporting that as "no usable spectrum" sends anyone reading
+    prepared_flags.csv looking for a retrieval failure that is not there.
+    """
+    try:
+        sd = pd.read_csv(SDSS_TABLE)
+    except Exception:
+        return "sdss_spectra.csv not readable"
+    row = sd[sd["index"].astype("Int64") == int(index)]
+    if not len(row):
+        return "no SDSS row for this index in sdss_spectra.csv"
+    row = row.iloc[0]
+    fn = str(row.get("fn_sdss") or "").strip()
+    if not fn:
+        return "no SDSS spectrum retrieved (fn_sdss empty; status %s)" % row.get("status")
+    if not os.path.exists(os.path.join(SDSS_LITE, fn)):
+        return "SDSS file missing from disk: %s" % fn
+    #: The redshift test, done from the table rather than by reopening the file:
+    #: rest_max is the reddest rest wavelength the spectrum reaches.
+    try:
+        rest_max = float(row.get("rest_max"))
+        rest_min = float(row.get("rest_min"))
+    except (TypeError, ValueError):
+        rest_max = rest_min = float("nan")
+    if np.isfinite(rest_max) and rest_max < 5010.0:
+        return ("[O III] 5007 is outside the SDSS spectrum at z = %.4f: coverage "
+                "ends at %.1f A rest (%.0f A observed). Not a failure -- the line "
+                "is past SDSS's red limit above z ~ 0.84."
+                % (float(row.get("z_queue", float("nan"))), rest_max,
+                   rest_max * (1.0 + float(row.get("z_queue", 0.0)))))
+    if np.isfinite(rest_min) and rest_min > 4940.0:
+        return ("[O III] 5007 is blueward of the SDSS coverage at z = %.4f: "
+                "coverage starts at %.1f A rest." % (float(row.get("z_queue", float("nan"))), rest_min))
+    return ("SDSS spectrum covers [O III] but too few good pixels to fit "
+            "(needs 25 in 4940-5080 A and 8 in the side bands)")
+
+
+def report(r, index=None):
     if r is None:
-        return "  no usable SDSS spectrum"
+        return "  [O III] not measured: %s" % (unavailable_reason(index)
+                                               if index is not None else
+                                               "no usable SDSS spectrum")
     L = ["  %s (index %d), catalogue z = %.6f, %s" % (r["name"], r["index"], r["z_cat"], r["fn"]),
          "    [O III] peak S/N %.1f over %d px" % (r["peak_snr"], r["n_px"])]
     if "single_dv" in r:
@@ -398,7 +443,7 @@ def main():
         sd = pd.read_csv(SDSS_TABLE)
         idx += sorted(int(i) for i in sd["index"].dropna().astype(int) if i >= a.all_from)
     for i in idx:
-        print(report(measure(i)))
+        print(report(measure(i), index=i))
         if a.plot:
             out = plot(i)
             print("    figure -> %s" % (out or "not drawn"))
