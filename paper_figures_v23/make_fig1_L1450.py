@@ -1,0 +1,181 @@
+"""
+Figure 1 (v23 sample): log L_1450 versus redshift.
+
+Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
+  * HST sample = the adopted v23 sample: CIV_measurements_v23.csv rows with
+    CIVgood_manmask 2 or 3 (349 objects; 345 have a 1450 A flux).
+  * HST luminosity is at 1450 A, from Data/HST_F1450_v23.csv (made by
+    extract_f1450.py).  Same formula Trevor used at 2500 A, including (1+z).
+  * M_BH categories still come from the old catalogue
+    (HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv), matched by
+    position within 5 arcsec.  Objects not in it are plotted as "no M_BH".
+  * SDSS and GNIRS-DQS have no 1450 A luminosity; their 1350 A luminosity
+    (LOGL1350_dr16) is plotted instead and labelled as such.  For a typical
+    quasar slope the difference is ~0.02 dex.
+  * The secondary L_bol axis and the L_bol = 3e45 line are removed, because
+    Trevor's bolometric correction is for L_2500.  The Temple option is
+    removed because Temple+21 gives L3000, not L1450.
+
+Usage:
+    PYTHONPATH=~/Work/git python make_fig1_L1450.py
+Output: Figures/Fig1_L1450_versus_z.pdf
+"""
+
+import os
+import sys
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import palettable
+import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
+from astropy.cosmology import FlatLambdaCDM
+from astropy.coordinates import SkyCoord
+from astropy.table import Table
+import astropy.units as u
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "Plotting Code"))
+from plotting_utils import plot_contour
+
+cosmo = FlatLambdaCDM(Om0=0.3, H0=70)
+C_ANG = 2.998e18           # speed of light in Angstrom/s
+LAM = 1450.                # rest wavelength of the luminosity, Angstrom
+
+plt.rcParams['xtick.top'] = True
+plt.rcParams['ytick.right'] = True
+
+
+def designation_to_coord(des):
+    """'J000543.05-500654.5' -> SkyCoord."""
+    s = des[1:]
+    sign = "+" if "+" in s else "-"
+    ra, dec = s.split(sign)
+    ra = "%sh%sm%ss" % (ra[0:2], ra[2:4], ra[4:])
+    dec = "%s%sd%sm%ss" % (sign, dec[0:2], dec[2:4], dec[4:])
+    return SkyCoord(ra, dec)
+
+
+def load_hst_data(data_dir):
+    # adopted sample: manmask 2 or 3
+    hst = pd.read_csv(os.path.join(data_dir, "CIV_measurements_v23.csv"))
+    hst = hst[hst["CIVgood_manmask"].isin([2, 3])]
+
+    # attach F1450 (observed-frame f_lambda at rest 1450 A, erg/s/cm2/A)
+    f1450 = pd.read_csv(os.path.join(data_dir, "HST_F1450_v23.csv"))
+    hst = hst.merge(f1450, on="row_num")
+    hst = hst[np.isfinite(hst["F1450"])].reset_index(drop=True)
+
+    z_hst = hst["z"].values
+    DLcm_hst = cosmo.luminosity_distance(z_hst).value * 3.086e24  # Mpc to cm
+
+    # Trevor's formula, at 1450 instead of 2500:
+    # f_nu = f_lambda * lambda^2 / c, then L_nu = 4 pi D_L^2 f_nu (1+z)
+    fnu1450_hst = hst["F1450"].values * LAM / (C_ANG / LAM)
+    logLnu1450_hst = (np.log10(4. * np.pi) + np.log10(fnu1450_hst) +
+                      2 * np.log10(DLcm_hst) + np.log10(1. + z_hst))
+
+    # M_BH categories from the old catalogue, matched by position
+    old = pd.read_csv(os.path.join(
+        data_dir, "HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv"))
+    c_new = SkyCoord([designation_to_coord(d) for d in hst["designation"]])
+    c_old = SkyCoord(old["_RA"].values * u.deg, old["_DE"].values * u.deg)
+    idx, sep, _ = c_new.match_to_catalog_sky(c_old)
+    in_old = sep < 5 * u.arcsec
+    logMBH = np.where(in_old, old["log M_BH"].values[idx], np.nan)
+    qual = np.where(in_old, old["MBH_source_qual"].values[idx], np.nan)
+
+    maskMBH = ~np.isnan(logMBH)
+    maskMBH_rm = maskMBH & (qual < 2)
+    maskMBH_sr = maskMBH & (qual >= 2)
+    print("  HST: %d matched to old catalogue, %d with M_BH (%d RM)"
+          % (in_old.sum(), maskMBH.sum(), maskMBH_rm.sum()))
+
+    return {
+        'z': z_hst,
+        'logL': logLnu1450_hst,
+        'mask_rm': maskMBH_rm,
+        'mask_sr': maskMBH_sr,
+        'mask_no_mbh': ~maskMBH
+    }
+
+
+def load_sdss_rankine_data(data_dir):
+    sdss_tbl = Table.read(os.path.join(
+        data_dir, "Rankine20_CIV_HeII_wDelGI_wdr16luminosity.fits"))
+    names = [n for n in sdss_tbl.colnames if len(sdss_tbl[n].shape) <= 1]
+    sdss = sdss_tbl[names].to_pandas()
+    sdss = sdss[(sdss["LOGL1350_dr16"] > 0) & (sdss["good"] == True)]
+
+    # LOGL1350_dr16 is log(lambda L_lambda); convert to L_nu
+    logLnu1350_sdss = sdss["LOGL1350_dr16"].values - np.log10(C_ANG / 1350.)
+    return {'z': sdss["z_paul"].values, 'logL': logLnu1350_sdss}
+
+
+def load_gnirs_data(data_dir):
+    gnirs = pd.read_csv(os.path.join(data_dir, "gnirsdqs_wRankine_wdr16Lum.csv"))
+    gnirs = gnirs[(gnirs["good"] == True) & (gnirs["LOGL1350_dr16"].values > 0)]
+    logLnu1350_gnirs = gnirs["LOGL1350_dr16"].values - np.log10(C_ANG / 1350.)
+    return {'z': gnirs["z_paul"].values, 'logL': logLnu1350_gnirs}
+
+
+def create_figure(hst_data, sdss_data, gnirs_data):
+    cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
+    fig, ax = plt.subplots(1, 1, figsize=(10, 9))
+
+    # HST sample (same symbols as Trevor's figure)
+    ax.plot(hst_data['z'][hst_data['mask_rm']],
+            hst_data['logL'][hst_data['mask_rm']],
+            marker="o", markersize=15, markerfacecolor=cs[3],
+            markeredgecolor="k", label="HST, RM $M_{BH}$",
+            linestyle="", zorder=3)
+    ax.plot(hst_data['z'][hst_data['mask_sr']],
+            hst_data['logL'][hst_data['mask_sr']],
+            marker="o", markersize=13.5, markerfacecolor="w",
+            markeredgecolor=cs[3], mew=1.8,
+            label="HST, Scaling Relation $M_{BH}$", linestyle="", zorder=2)
+    ax.plot(hst_data['z'][hst_data['mask_no_mbh']],
+            hst_data['logL'][hst_data['mask_no_mbh']],
+            marker="^", markersize=16.5, markerfacecolor=cs[4],
+            markeredgecolor="k", label="HST, no $M_{BH}$",
+            linestyle="", zorder=2)
+
+    # SDSS contours and GNIRS-DQS (both at 1350 A)
+    plot_contour(sdss_data['z'], sdss_data['logL'], c=cs[2], mark="o",
+                 nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
+                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)")
+    ax.plot(gnirs_data['z'], gnirs_data['logL'], marker="v", markersize=11,
+            markerfacecolor=cs[2], markeredgecolor="k",
+            label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=3)
+
+    ax.set_xlabel('Redshift', fontsize=35)
+    ax.set_ylabel(r'log\,$L_{1450\AA}$ [erg\,s$^{-1}$\,Hz$^{-1}$]', fontsize=35)
+    ax.tick_params(axis='both', which='major', labelsize=27.5)
+    ax.legend(frameon=True, labelspacing=0.1, loc="lower right",
+              prop={"size": 20})
+    ax.set_xlim(-0.16575, 3.25)
+    plt.tight_layout()
+    return fig, ax
+
+
+def main():
+    data_dir = os.path.join(HERE, "..", "Data")
+    out_dir = os.path.join(HERE, "..", "Figures")
+    os.makedirs(out_dir, exist_ok=True)
+
+    hst_data = load_hst_data(data_dir)
+    sdss_data = load_sdss_rankine_data(data_dir)
+    gnirs_data = load_gnirs_data(data_dir)
+    print("  HST %d, SDSS %d, GNIRS-DQS %d"
+          % (len(hst_data['z']), len(sdss_data['z']), len(gnirs_data['z'])))
+    print("  HST log L1450 range %.2f to %.2f"
+          % (hst_data['logL'].min(), hst_data['logL'].max()))
+
+    create_figure(hst_data, sdss_data, gnirs_data)
+    out = os.path.join(out_dir, "Fig1_L1450_versus_z.pdf")
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
+    print("saved", out)
+
+
+if __name__ == "__main__":
+    main()
