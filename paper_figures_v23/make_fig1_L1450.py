@@ -5,7 +5,7 @@ Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
   * HST sample = the adopted v23 sample: CIV_measurements_v23.csv rows with
     CIVgood_manmask 2 or 3 (349 objects; 345 have a 1450 A flux).
   * HST luminosity is at 1450 A, from Data/HST_F1450_v23.csv (made by
-    extract_f1450.py).  Same formula Trevor used at 2500 A, including (1+z).
+    extract_f1450.py), computed in hst_sample.py.  Same formula Trevor used at 2500 A, including (1+z).
   * M_BH categories still come from the old catalogue
     (HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv), matched by
     position within 5 arcsec (hst_sample.py).  Objects not in it are plotted as "no M_BH".
@@ -28,43 +28,26 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import palettable
 import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
-from astropy.cosmology import FlatLambdaCDM
 from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "Plotting Code"))
 from plotting_utils import plot_contour
-from hst_sample import load_adopted
+from hst_sample import load_adopted, add_logL1450
 
-cosmo = FlatLambdaCDM(Om0=0.3, H0=70)
 C_ANG = 2.998e18           # speed of light in Angstrom/s
-LAM = 1450.                # rest wavelength of the luminosity, Angstrom
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
 
 
 def load_hst_data(data_dir):
-    # adopted sample (manmask 2 or 3) with Trevor's M_BH categories
-    hst = load_adopted(data_dir)
-
-    # attach F1450 (observed-frame f_lambda at rest 1450 A, erg/s/cm2/A)
-    f1450 = pd.read_csv(os.path.join(data_dir, "HST_F1450_v23.csv"))
-    hst = hst.merge(f1450, on="row_num")
-    hst = hst[np.isfinite(hst["F1450"])].reset_index(drop=True)
-
-    z_hst = hst["z"].values
-    DLcm_hst = cosmo.luminosity_distance(z_hst).value * 3.086e24  # Mpc to cm
-
-    # Trevor's formula, at 1450 instead of 2500:
-    # f_nu = f_lambda * lambda^2 / c, then L_nu = 4 pi D_L^2 f_nu (1+z)
-    fnu1450_hst = hst["F1450"].values * LAM / (C_ANG / LAM)
-    logLnu1450_hst = (np.log10(4. * np.pi) + np.log10(fnu1450_hst) +
-                      2 * np.log10(DLcm_hst) + np.log10(1. + z_hst))
-
+    # adopted sample (manmask 2 or 3) with Trevor's M_BH categories and L1450
+    hst = add_logL1450(load_adopted(data_dir), data_dir)
+    hst = hst[np.isfinite(hst["logLnu1450"])].reset_index(drop=True)
     return {
-        'z': z_hst,
-        'logL': logLnu1450_hst,
+        'z': hst["z"].values,
+        'logL': hst["logLnu1450"].values,
         'mask_rm': hst["mask_rm"].values,
         'mask_sr': hst["mask_sr"].values,
         'mask_no_mbh': hst["mask_no_mbh"].values
