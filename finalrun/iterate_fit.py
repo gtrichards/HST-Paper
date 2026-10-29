@@ -270,6 +270,37 @@ LUM_WINDOWS = ((1450.0, 1445.0, 1465.0),
                (2500.0, 2490.0, 2510.0))
 
 
+#: A mask range that reaches into the 1445-1465 A window does not announce
+#: itself anywhere: the fit succeeds, the veto passes, and only the luminosity
+#: is wrong.  Index 457 is the case that found it -- GTR's block began at
+#: 1459.24 and so cut 5.8 A out of the window, leaving the anchor 41 pixels
+#: instead of 58 and log L1450 0.325 DEX LOW (45.605 against 45.930).  Moving
+#: that one edge to 1465.0 also tightened the component spread from 748 to 612
+#: km/s and pulled the scale from 1.17 to 1.10.
+#:
+#: A sweep of all 59 adopted rows whose masks touch the window put the rest in
+#: proportion: the median |dlogL| from clipping them clear is 0.0012 dex and the
+#: maximum 0.040, with none above 0.05.  The failure is NOT gradual -- below
+#: about 2 A of overlap the anchor keeps enough pixels that its median is
+#: unmoved, and 457's 5.8 A is the only case in the pass that mattered.  Hence a
+#: threshold rather than a blanket warning: 2.0 A, the point the sweep shows the
+#: damage starts.
+ANCHOR_WINDOW = (1445.0, 1465.0)
+ANCHOR_OVERLAP_WARN = 2.0
+
+
+def anchor_overlap(mask_ranges, window=ANCHOR_WINDOW):
+    """(total Angstroms of `mask_ranges` inside `window`, the offending ranges)."""
+    lo0, hi0 = window
+    tot, which = 0.0, []
+    for lo, hi in mask_ranges or ():
+        a, b = max(float(lo), lo0), min(float(hi), hi0)
+        if b > a:
+            tot += b - a
+            which.append([round(float(lo), 2), round(float(hi), 2)])
+    return tot, which
+
+
 def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
     """Monochromatic luminosities from the ICA reconstruction.
 
@@ -719,6 +750,12 @@ def main():
     print("   masks: %d ranges (%.1f A total) + %d pixels   unmask: %d ranges + %d pixels   comps: %s"
           % (len(mask_ranges), sum(hi - lo for lo, hi in mask_ranges), len(mask_pixels),
              len(unmask_ranges), len(unmask_pixels), comps or "auto"))
+    _anch_A, _anch_r = anchor_overlap(mask_ranges)
+    if _anch_A >= ANCHOR_OVERLAP_WARN:
+        print("   *** MASK EATS %.1f A OF THE 1445-1465 A LUMINOSITY ANCHOR: %s"
+              % (_anch_A, " ".join("%g-%g" % (a, b) for a, b in _anch_r)))
+        print("       log L1450 is measured over that window, so this biases it with no "
+              "other symptom. See index 457, where 5.8 A cost 0.325 dex.")
     if sub.get("no_civ_data"):
         veto_msg = "NO DATA IN 1500-1600 A -- blueshift is extrapolated  *** REJECT ***"
     elif sub["ok"]:

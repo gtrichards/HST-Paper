@@ -343,6 +343,22 @@ for n, i in enumerate(todo, 1):
             notes.append("")
         notes.append(_why[:200])
 
+    #: The same anchor guard iterate_fit.py prints, surfaced as a flag so a mask
+    #: saved AFTER an object was prepared is still caught on the next run.
+    if stem in store:
+        try:
+            import iterate_fit as _IF
+            _A, _r = _IF.anchor_overlap((store.get(stem) or {}).get("mask_ranges"))
+            if _A >= _IF.ANCHOR_OVERLAP_WARN:
+                fl.append("mask_eats_1450_anchor")
+                while len(notes) < len(fl) - 1:
+                    notes.append("")
+                notes.append("%.1f A of 1445-1465 masked (%s); log L1450 is biased with no other "
+                             "symptom -- see index 457, 5.8 A cost 0.325 dex"
+                             % (_A, " ".join("%g-%g" % (a, b) for a, b in _r)))
+        except Exception:
+            pass
+
     best = None
     for p in sorted(glob.glob(os.path.join(fold, "records", "*.json"))):
         j = json.load(open(p)); r = j["result"]; sc = j["civ_subcontinuum"]
