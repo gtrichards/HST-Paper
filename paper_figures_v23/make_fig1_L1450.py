@@ -15,6 +15,7 @@ Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
   * The secondary L_bol axis and the L_bol = 3e45 line are removed, because
     Trevor's bolometric correction is for L_2500.  The Temple option is
     removed because Temple+21 gives L3000, not L1450.
+  * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
 
 Usage:
     PYTHONPATH=~/Work/git python make_fig1_L1450.py
@@ -31,8 +32,7 @@ import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
 from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "Plotting Code"))
-from plotting_utils import plot_contour
+from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted, add_logL1450
 
 C_ANG = 2.998e18           # speed of light in Angstrom/s
@@ -97,7 +97,7 @@ def create_figure(hst_data, sdss_data, gnirs_data):
     # SDSS contours and GNIRS-DQS (both at 1350 A)
     plot_contour(sdss_data['z'], sdss_data['logL'], c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
-                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)")
+                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)", zorder=1)
     ax.plot(gnirs_data['z'], gnirs_data['logL'], marker="v", markersize=11,
             markerfacecolor=cs[2], markeredgecolor="k",
             label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=3)
@@ -108,6 +108,10 @@ def create_figure(hst_data, sdss_data, gnirs_data):
     ax.legend(frameon=True, labelspacing=0.1, loc="lower right",
               prop={"size": 20})
     ax.set_xlim(-0.16575, 3.25)
+    # Trevor used 27.1-32.5 for L2500; extended down to take in the low-L
+    # HST objects (lowest is NGC 4395 at 24.83).  Explicit limits are needed
+    # because Trevor's plot_contour pads its grid far beyond the data.
+    ax.set_ylim(24.5, 32.6)
     plt.tight_layout()
     return fig, ax
 

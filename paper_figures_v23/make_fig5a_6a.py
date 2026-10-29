@@ -15,7 +15,10 @@ panels of the paper's Figs 5 and 6).  What changed:
     repository (github.com/trevormccaffrey/CIV_Distance), assumed cloned at
     ~/Work/git/CIV_Distance.  SDSS and GNIRS distances are the catalogue values
     Trevor used (CIV_Distance, CIV_dist_ICA_tvm).
-  * plot_contour is the shared version in Plotting Code/plotting_utils.py.
+  * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
+  * Fig 5a y axis extended down from -600 to -1300 km/s to take in the HST
+    objects redward of systemic.  4C 55.17 (-1603 km/s; next lowest is -1186)
+    is deliberately left off, to be noted in the caption.
   * The +-0.02 jitter Trevor added to the SDSS distances (so the KDE does not
     see ties) is kept, with a fixed random seed so the figure is reproducible.
 
@@ -35,8 +38,7 @@ import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
 from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "Plotting Code"))
-from plotting_utils import plot_contour
+from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted, add_logL1450
 
 CIVDIST_DIR = os.path.expanduser("~/Work/git/CIV_Distance/")
@@ -104,6 +106,10 @@ def main():
     c4dist_gnirs = gnirs["CIV_dist_ICA_tvm"].values
     print("  SDSS %d, GNIRS-DQS %d" % (len(sdss), len(gnirs)))
 
+    # Trevor used 27.1-32.4 for L2500; extended down to take in the low-L
+    # HST objects (lowest is NGC 4395 at 24.83).  Explicit limits are needed
+    # because Trevor's plot_contour pads its grid far beyond the data.
+    xlim = (24.5, 32.6)
     xlabel = r'log\,$L_{1450\AA}$ [erg\,s$^{-1}$\,Hz$^{-1}$]'
 
     # ---- Fig 5a: blueshift vs L (Trevor's cell 22) ----
@@ -111,21 +117,22 @@ def main():
     plot_hst(ax, logL_hst, c4blue_hst, *masks)
     plot_contour(logL_sdss, c4blue_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
-                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)")
+                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)", zorder=1)
     ax.plot(logL_gnirs, c4blue_gnirs, marker="v", markersize=11,
             markerfacecolor=cs[2], markeredgecolor="k",
             label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=1)
     ax.set_ylabel(r'CIV Blueshift [km\,s$^{-1}$]', fontsize=35)
     ax.set_xlabel(xlabel, fontsize=35)
+    ax.set_xlim(xlim)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.legend(frameon=True, labelspacing=0.1, loc="upper left", prop={"size": 20})
-    ax.set_ylim(-599.99, 6199)
+    ax.set_ylim(-1299.99, 6199)   # Trevor: -599.99; see docstring
     plt.tight_layout()
     out = os.path.join(out_dir, "Fig5a_CIV_blue_versus_L1450.pdf")
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
     print("saved", out)
-    off = (c4blue_hst < -599.99) | (c4blue_hst > 6199)
+    off = (c4blue_hst < -1299.99) | (c4blue_hst > 6199)
     print("  Fig 5a HST points outside the y limits: %d %s"
           % (off.sum(), list(hst.loc[off, "common_name"])))
 
@@ -135,12 +142,13 @@ def main():
     rng = np.random.default_rng(0)
     plot_contour(logL_sdss, c4dist_sdss + rng.uniform(-0.02, 0.02, len(c4dist_sdss)),
                  c=cs[2], mark="o", nlevels=[0.05, 0.25, 0.50, 0.75, 0.95],
-                 ax=ax, linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)")
+                 ax=ax, linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)", zorder=1)
     ax.plot(logL_gnirs, c4dist_gnirs, marker="v", markersize=11,
             markerfacecolor=cs[2], markeredgecolor="k",
             label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=1)
     ax.set_ylabel('CIV Distance [Scaled Units]', fontsize=35)
     ax.set_xlabel(xlabel, fontsize=35)
+    ax.set_xlim(xlim)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.set_ylim(-0.05, 1.25)
     plt.tight_layout()

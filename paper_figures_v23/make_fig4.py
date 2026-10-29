@@ -7,10 +7,12 @@ which made figures/CIV_logEW_versus_blue_ICA.pdf.  What changed:
   * HST sample = the adopted v23 sample (manmask 2 or 3), with CIV_blue and
     CIV_EW from CIV_measurements_v23.csv instead of CIV_blue_tvm / CIV_EW_tvm.
   * M_BH categories from the old catalogue, matched by position (hst_sample.py).
-  * plot_contour is the shared version in Plotting Code/plotting_utils.py
-    (Trevor's own version evaluates the KDE at every SDSS point and is very
-    slow); NaN/inf are removed before calling it, which Trevor's did internally.
-Everything else (SDSS and GNIRS selections, symbols, limits) is as in cell 19.
+  * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
+  * y axis extended from 2.72 to 2.92 to take in the high-EW HST objects.
+    Two objects are deliberately left off the plot, each far from the rest
+    (to be noted in the caption): Mrk 1310 (EW 1139 A, log 3.06; next highest
+    is log 2.87) and 4C 55.17 (blueshift -1603 km/s; next lowest is -1186).
+Everything else (SDSS and GNIRS selections, symbols, x limits) is as in cell 19.
 
 Blueshift convention: positive = blueshifted.
 
@@ -29,8 +31,7 @@ import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
 from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "Plotting Code"))
-from plotting_utils import plot_contour
+from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted
 
 plt.rcParams['xtick.top'] = True
@@ -83,7 +84,7 @@ def main():
 
     plot_contour(c4blueICA_sdss, c4logewICA_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
-                 linewidths=1.5, s=3, alpha=0.4, label="SDSS")
+                 linewidths=1.5, s=3, alpha=0.4, label="SDSS", zorder=1)
 
     ax.plot(c4blueICA_gnirs, c4logewICA_gnirs, marker="v", markersize=13.5,
             markerfacecolor=cs[2], markeredgecolor="k", label="GNIRS-DQS",
@@ -94,12 +95,12 @@ def main():
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.legend(frameon=True, labelspacing=0.1, loc="best", prop={"size": 20})
     ax.set_xlim(-1299.99, 6199)
-    ax.set_ylim(0.62, 2.72)
+    ax.set_ylim(0.62, 2.92)   # Trevor: 2.72; see docstring
     plt.tight_layout()
 
     # report HST points that fall outside Trevor's axis limits
     off = ((c4blueICA_hst < -1299.99) | (c4blueICA_hst > 6199) |
-           (c4logewICA_hst < 0.62) | (c4logewICA_hst > 2.72))
+           (c4logewICA_hst < 0.62) | (c4logewICA_hst > 2.92))
     print("  HST points outside the axis limits: %d" % off.sum())
     for _, r in hst[off].iterrows():
         print("    row %d %s  blue %.0f  EW %.1f"
