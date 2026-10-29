@@ -16,3 +16,10 @@
 final/*
 !final/spectrum_overrides.csv
 !final/name_overrides.csv
+# bal_status.csv is hand-curated too: which adopted objects are BALs, with
+# the evidence for each.  Needed to read the Mg II sweep, where a BAL is
+# EXPECTED to show the model exceeding the observed line (index 422), so a
+# high ratio is a signature rather than a failure.  Text-matching the ledger
+# for "BAL" does not reproduce it -- five hits are boilerplate about an
+# unreliable test and three are cross-references to other objects.
+!final/bal_status.csv
