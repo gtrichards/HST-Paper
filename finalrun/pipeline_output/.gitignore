@@ -1,13 +1,18 @@
 # pipeline_output holds derived products -- rebinned spectra, staged exposures,
 # fit figures and their JSON records -- which are regenerated from the archive
 # by the scripts in finalrun/ and are far too large to version.  Everything here
-# is ignored EXCEPT the hand-authored decision tables under final/, which are
+# is ignored EXCEPT the hand-authored override tables under final/, which are
 # inputs rather than outputs: without them the pipeline runs and quietly
-# produces different spectra and no grades.
+# produces different spectra.
+#
+# decisions.csv is NOT among them any more.  The ledger's canonical copy is
+# Data/decisions.csv; a second copy lived here and went stale twice, sitting at
+# 204 rows for three weeks while the real ledger passed 450.  rebin_path.py now
+# names the one ledger and every reader imports it, so a copy here would be a
+# duplicate with nothing reading it.  Past versions remain in git history.
 *
 !.gitignore
 !final/
 final/*
-!final/decisions.csv
 !final/spectrum_overrides.csv
 !final/name_overrides.csv
