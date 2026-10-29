@@ -37,7 +37,7 @@ OUTDIR = os.path.join(HERE, "pipeline_output")
 from rebin_path import ITERDIR   # env HSTICA_ITERDIR overrides
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
 FINAL = os.path.join(OUTDIR, "final")
-DECISIONS = os.path.join(FINAL, "decisions.csv")
+from rebin_path import DECISIONS   # env HSTICA_DECISIONS overrides
 OUT = os.path.join(FINAL, "redshift_check.csv")
 CACHE = os.path.join(FINAL, "redshift_check_cache.json")
 

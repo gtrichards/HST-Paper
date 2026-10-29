@@ -71,7 +71,7 @@ FIT_TREES = [CHOSEN,
              os.path.join(OUTDIR, "fit_iterations_v23"),
              ITERDIR]
 FINAL = os.path.join(OUTDIR, "final")
-DECISIONS = os.path.join(FINAL, "decisions.csv")
+from rebin_path import DECISIONS   # env HSTICA_DECISIONS overrides
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
 XLSX = "/Users/gtr/Dropbox/HST/Summer2026/CIV_measurements_v22.xlsx"
 OUT = os.path.join(FINAL, "CIV_measurements_v23.csv")

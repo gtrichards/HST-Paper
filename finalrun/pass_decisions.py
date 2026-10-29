@@ -69,7 +69,7 @@ FIT_TREES = [os.path.join(OUTDIR, "chosen_visit", "fits"),
              ITERDIR]
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
 FINAL = os.path.join(OUTDIR, "final")
-DECISIONS = os.path.join(FINAL, "decisions.csv")
+from rebin_path import DECISIONS   # env HSTICA_DECISIONS overrides
 TABLE = os.path.join(FINAL, "pass_decisions.csv")
 ZCHECK = os.path.join(FINAL, "redshift_check.csv")
 PLOTS = os.path.join(FINAL, "plots")

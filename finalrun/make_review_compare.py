@@ -11,6 +11,7 @@ above the other on the same axes, and the whole thing is wide and short.
 Filenames sort by index; review_compare.csv carries the size of the change.
 """
 import os, glob, json
+from rebin_path import DECISIONS as _DECISIONS   # env HSTICA_DECISIONS overrides
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
@@ -87,7 +88,7 @@ def main():
     # from does, keyed the same way.
     import csv as _csv
     fold = {}
-    for d0 in _csv.DictReader(open('pipeline_output/final/decisions.csv')):
+    for d0 in _csv.DictReader(open(_DECISIONS)):
         f = d0['folder']
         if f[:3].isdigit():
             fold[int(f[:3])] = f

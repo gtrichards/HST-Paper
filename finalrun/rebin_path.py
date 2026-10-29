@@ -62,3 +62,27 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 ITERDIR = os.environ.get("HSTICA_ITERDIR",
                          os.path.join(_HERE, "pipeline_output", "fit_iterations"))
 ITERDIR_IS_OVERRIDDEN = ITERDIR != os.path.join(_HERE, "pipeline_output", "fit_iterations")
+
+
+#: The decisions ledger: one row per v22 object, the verdict and its reasoning.
+#:
+#: The canonical copy lives in the paper repository, because that is what gets
+#: committed, reviewed and cited; finalrun/pipeline_output/final/decisions.csv
+#: was a working copy of it.  Keeping two copies failed the way two copies
+#: always do.  On 2026-10-29, at the end of the 474-object pass, the working
+#: copy held 454 rows against the canonical 474: it was missing every object
+#: from indices 458-474 and the three gap rows (377, 389, 403) that the
+#: completeness check had just added.  build_paper_table.py reads this file to
+#: decide which objects carry a measurement, so a table built that morning
+#: would have silently dropped the verdicts for twenty objects -- the same
+#: silent-staleness failure that build_paper_table's own comments were written
+#: about.
+#:
+#: There is now one ledger and the readers all name it here.  Override for a
+#: session -- to build a table against an older ledger, say -- with
+#:
+#:     export HSTICA_DECISIONS=/path/to/some/other/decisions.csv
+#:
+DECISIONS_CANONICAL = "/Users/gtr/Work/git/HST-Paper/Data/decisions.csv"
+DECISIONS = os.environ.get("HSTICA_DECISIONS", DECISIONS_CANONICAL)
+DECISIONS_IS_OVERRIDDEN = DECISIONS != DECISIONS_CANONICAL
