@@ -8,7 +8,7 @@ Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
     extract_f1450.py).  Same formula Trevor used at 2500 A, including (1+z).
   * M_BH categories still come from the old catalogue
     (HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv), matched by
-    position within 5 arcsec.  Objects not in it are plotted as "no M_BH".
+    position within 5 arcsec (hst_sample.py).  Objects not in it are plotted as "no M_BH".
   * SDSS and GNIRS-DQS have no 1450 A luminosity; their 1350 A luminosity
     (LOGL1350_dr16) is plotted instead and labelled as such.  For a typical
     quasar slope the difference is ~0.02 dex.
@@ -29,13 +29,12 @@ import matplotlib.pyplot as plt
 import palettable
 import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
 from astropy.cosmology import FlatLambdaCDM
-from astropy.coordinates import SkyCoord
 from astropy.table import Table
-import astropy.units as u
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "Plotting Code"))
 from plotting_utils import plot_contour
+from hst_sample import load_adopted
 
 cosmo = FlatLambdaCDM(Om0=0.3, H0=70)
 C_ANG = 2.998e18           # speed of light in Angstrom/s
@@ -45,20 +44,9 @@ plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
 
 
-def designation_to_coord(des):
-    """'J000543.05-500654.5' -> SkyCoord."""
-    s = des[1:]
-    sign = "+" if "+" in s else "-"
-    ra, dec = s.split(sign)
-    ra = "%sh%sm%ss" % (ra[0:2], ra[2:4], ra[4:])
-    dec = "%s%sd%sm%ss" % (sign, dec[0:2], dec[2:4], dec[4:])
-    return SkyCoord(ra, dec)
-
-
 def load_hst_data(data_dir):
-    # adopted sample: manmask 2 or 3
-    hst = pd.read_csv(os.path.join(data_dir, "CIV_measurements_v23.csv"))
-    hst = hst[hst["CIVgood_manmask"].isin([2, 3])]
+    # adopted sample (manmask 2 or 3) with Trevor's M_BH categories
+    hst = load_adopted(data_dir)
 
     # attach F1450 (observed-frame f_lambda at rest 1450 A, erg/s/cm2/A)
     f1450 = pd.read_csv(os.path.join(data_dir, "HST_F1450_v23.csv"))
@@ -74,28 +62,12 @@ def load_hst_data(data_dir):
     logLnu1450_hst = (np.log10(4. * np.pi) + np.log10(fnu1450_hst) +
                       2 * np.log10(DLcm_hst) + np.log10(1. + z_hst))
 
-    # M_BH categories from the old catalogue, matched by position
-    old = pd.read_csv(os.path.join(
-        data_dir, "HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv"))
-    c_new = SkyCoord([designation_to_coord(d) for d in hst["designation"]])
-    c_old = SkyCoord(old["_RA"].values * u.deg, old["_DE"].values * u.deg)
-    idx, sep, _ = c_new.match_to_catalog_sky(c_old)
-    in_old = sep < 5 * u.arcsec
-    logMBH = np.where(in_old, old["log M_BH"].values[idx], np.nan)
-    qual = np.where(in_old, old["MBH_source_qual"].values[idx], np.nan)
-
-    maskMBH = ~np.isnan(logMBH)
-    maskMBH_rm = maskMBH & (qual < 2)
-    maskMBH_sr = maskMBH & (qual >= 2)
-    print("  HST: %d matched to old catalogue, %d with M_BH (%d RM)"
-          % (in_old.sum(), maskMBH.sum(), maskMBH_rm.sum()))
-
     return {
         'z': z_hst,
         'logL': logLnu1450_hst,
-        'mask_rm': maskMBH_rm,
-        'mask_sr': maskMBH_sr,
-        'mask_no_mbh': ~maskMBH
+        'mask_rm': hst["mask_rm"].values,
+        'mask_sr': hst["mask_sr"].values,
+        'mask_no_mbh': hst["mask_no_mbh"].values
     }
 
 
