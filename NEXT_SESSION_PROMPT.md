@@ -8,9 +8,9 @@ Paste this (or point the session at this file) to start.
 
 Two things, and **only** these two:
 
-1. **Update the plotting code** so the paper's figures are made from the
-   measurements we just finished, instead of the old catalogue they currently
-   read.
+1. **Get the updated figures into the paper.** The v23 figure code already
+   exists and has already produced four PDFs; what has not happened is putting
+   them in the document. See "The actual plotting problem" below.
 2. **Help with Section 2 only** — specifically, the part that describes how the
    sample was assembled and how we established that we are not missing HST
    spectra, and not including objects that have none. I want the *description of
@@ -79,42 +79,78 @@ say `_COMBINED` while the fit lives in `_COS`. That is deliberate; do not
 
 ## The actual plotting problem
 
-`Plotting Code/make_fig1.py` (L versus z) and `make_fig2.py` currently read the
-**old** HST catalogue:
+**The v23 figure and table code already exists.** `HST-Paper/paper_figures_v23/`
+is tracked and working. Do not start from `Plotting Code/`, which is the older
+generation reading the superseded 207-row catalogue.
 
 ```
-Data/HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv   207 rows
-Data/HST_CIV_Sulentic2007_HSLA2018_1Jan2023.csv             208 rows
-    columns CIV_blue_tvm, CIV_EW_tvm, CIVgood_tvm
+paper_figures_v23/
+  hst_sample.py        load_adopted(): the v23 table restricted to the adopted sample
+  extract_f1450.py     -> Data/HST_F1450_v23.csv, the 1450 A continuum flux for
+                          every adopted object. This already solves the luminosity
+                          problem; do not rebuild it.
+  make_fig1_L1450.py   -> Figures/Fig1_L1450_versus_z.pdf
+  make_fig4.py         -> Figures/Fig4_CIV_logEW_versus_blue.pdf
+  make_fig5a_6a.py     -> Figures/Fig5a_CIV_blue_versus_L1450.pdf
+                          Figures/Fig6a_CIV_dist_versus_L1450.pdf
+  make_table1.py       -> Tables/table1_master_sample_v23.tex + .csv
+  make_table2.py       -> Tables/table2_civ_v23.tex + .csv  (superseded, see below)
+  trevor_contour.py    plot_contour, copied verbatim from Trevor's CIVplot.ipynb
 ```
 
-The new table is 474 rows with `CIV_blue`, `CIV_EW`, `CIVgood_manmask`. So the
-figures are being made from roughly 200 superseded measurements while 349
-current ones sit unused. `Notebooks/L_versus_z.ipynb` already references the
-v23 table and manmask; `Plotting Code/` does not.
+All four figures exist, generated 2026-10-29. Several need
+`PYTHONPATH=~/Work/git` for `CIV_Distance`.
 
-**There is a gap you will hit immediately: `CIV_measurements_v23.csv` has no
-luminosity column, and Figure 1 is luminosity versus redshift.** The
-luminosities exist, but only inside the `BEST_*.json` records. Census of the 349
-adopted objects:
+**THE REAL GAP IS THAT NONE OF THE FIGURES ARE IN THE PAPER.** The Overleaf
+document still plots the older ICA-era versions, and the v23 PDFs have never
+been copied into its `figures/` directory or referenced. The paper uses AASTeX
+`\plotone`, not `\includegraphics` — there is exactly one `\includegraphics` in
+`main.tex` and it is commented out. The mapping to work through:
 
 ```
-log L1450 measured : 345 (99%)   median 45.43
-log L1700 measured : 247 (71%)   median 45.40
-log L2500 measured :  97 (28%)   median 44.96
-
-L1450 only 102 | L1450+L1700 147 | all three 96 | none 0
+main.tex:258  figures/L_versus_z_ICA_new.pdf                -> Fig1_L1450_versus_z.pdf
+main.tex:343  figures/CIV_logEW_versus_blue_ICA.pdf         -> Fig4_CIV_logEW_versus_blue.pdf
+main.tex:363  figures/L_and_Lwise_versus_blue_ICA_labeled.pdf -> Fig5a_CIV_blue_versus_L1450.pdf
+main.tex:374  figures/L_and_Lwise_versus_c4dist_ICA_labeled.pdf -> Fig6a_CIV_dist_versus_L1450.pdf
 ```
 
-So the first real task is probably to extend `build_paper_table.py` to carry the
-monochromatic luminosities into the table, then point the plotting code at it.
-Decide that with me before doing it.
+Those four are the obvious swaps. The other eight active `\plotone` calls are
+figures this pass does not touch. Check each mapping with GTR before swapping:
+the old figures are two-panel in at least two cases (`L_and_Lwise_...` shows
+L and L_WISE together) while the v23 versions are single-panel, so a swap may
+change what the caption promises.
 
-Some luminosities carry caveats recorded in the ledger — a handful of objects
-have a continuum normalisation that rises to the red (the "419 family", 47 of
-369 by one count) and their L1450 is flagged provisional in the note. If the
-luminosity axis matters to a figure, those are worth surfacing rather than
-silently plotting.
+**The tables are already in Overleaf and merged.** As of 2026-10-30, Table 2's
+four measurement columns (Spec., Blueshift, EW, D_CIV) were moved into Table 1,
+which is now a 13-column `\rotate` landscape `deluxetable*` at `\scriptsize`;
+`table2_civ_v23.tex` is no longer input. The reason was that Table 2 was an
+unstarred `deluxetable` declaring seven columns, so it overlapped itself inside
+one column of the two-column layout. `make_table2.py` still works, so the split
+version is a revert of `make_table1.py` away.
+
+Table 1 keeps both `Inst.` (every instrument the archive holds) and `Spec.`
+(the one the measurement came from under the single-visit policy). They differ
+for 39% of measured objects and 135 objects list more than one instrument, so
+that distinction is exactly what Section 2 needs; do not collapse them.
+
+Luminosity caveat worth carrying into any figure with an L axis: a number of
+objects have a continuum normalisation that rises to the red (the "419 family")
+and their L1450 is flagged provisional in the ledger note. Worth surfacing
+rather than silently plotting.
+
+**You cannot verify a build locally.** `main.tex` does not compile on this
+machine and does not at HEAD either, before any changes: `aastex62.cls` hits
+`Command \l already defined` against TeX Live 2026. Overleaf runs an older
+distribution. Verify structurally instead — column spec against row width,
+balanced environments, `\tablenotemark` against `\tablenotetext`, every citation
+key resolving — and ask GTR for the Overleaf log if something breaks.
+
+**Pushing to Overleaf.** The paper repo is `/Users/gtr/Work/git/5bb25899051ceb07efc729f4`,
+branch `main`, and its `origin` IS Overleaf — so pushing there is correct and is
+not the forbidden `origin` (that rule is about the `HST-Paper` repo). Fetch
+first: collaborators edit in Overleaf and the remote moves. On 2026-10-30 there
+was an unmerged commit from alexandros.pratsos touching `main.tex` and
+`refs.bib`; rebase onto that work rather than over it.
 
 ---
 
@@ -199,7 +235,9 @@ damage scales with how much SDSS is added (rms ratio 1.04 at <300 px added,
 continuum: scale inside the healthy 0.88-1.00 band rises from 67% to 75%.
 
 Neither of these changes the adopted measurements. Both are recorded in
-`finalrun/sweeps/` with their outputs in `pipeline_output/final/`.
+`finalrun/sweeps/` with their outputs in `pipeline_output/final/`. So the
+figures should be made from the adopted HST-only measurements as they stand;
+no SDSS reprocessing is pending.
 
 ---
 
