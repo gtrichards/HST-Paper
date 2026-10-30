@@ -24,7 +24,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import palettable
-import richardsplot as rplot
+# NOT `import richardsplot`: that resolves to the package's EMPTY
+# __init__.py and the style silently never applies -- sans-serif, ticks
+# outward, no minor ticks, usetex off.  The style is richardsplot/richardsplot.py.
+from richardsplot import richardsplot as rplot
 from astropy.cosmology import FlatLambdaCDM
 from astropy.table import Table
 
@@ -59,12 +62,32 @@ def load_hst_data(data_dir):
     """
     hst_file = os.path.join(data_dir, "HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv")
     hst = pd.read_csv(hst_file)
-    
+
+    # F2500_AP IS NOT THE FLUX AT 2500 A.  It is the co-adder's Continuum
+    # Normalisation there -- the erg/s/cm2/A scale factor -- without the
+    # spectrum.  Matched against the v23 fit records, the old column equals
+    # our continuum_scale alone to -0.009 dex over 73 objects, where the flux
+    # is continuum_scale x the model value.  Using it raw makes every HST
+    # luminosity in this figure 0.236 dex (a factor of 1.7) TOO LOW, flat in
+    # redshift.  The same defect sits in F1450_spec, where the factor is 2.97.
+    # Data/HST_old_catalogue_fluxes_corrected.csv supplies F2500_AP x the model
+    # value, object by object (paper_figures_v23/fix_old_f2500.py); 195 of the
+    # 207 rows can be corrected, the other 12 have no v23 fit and are dropped
+    # rather than plotted wrong.
+    corr = pd.read_csv(os.path.join(data_dir,
+                                    "HST_old_catalogue_fluxes_corrected.csv"))
+    hst = hst.merge(corr[["Final_Name", "F2500_corr"]], on="Final_Name", how="left")
+    _n_drop = int(hst["F2500_corr"].isna().sum())
+    if _n_drop:
+        print("  dropping %d of %d objects with no v23 fit, so no corrected F2500"
+              % (_n_drop, len(hst)))
+    hst = hst[np.isfinite(hst["F2500_corr"].values)].reset_index(drop=True)
+
     z_hst = hst["z"].values
     DLcm_hst = cosmo.luminosity_distance(z_hst).value * 3.086e24  # Mpc to cm
-    
+
     # Compute luminosities in erg/s/Hz (convert f_lambda to f_nu)
-    fnu2500_hst = hst["F2500_AP"].values * 2500. / (2.998e18/2500)
+    fnu2500_hst = hst["F2500_corr"].values * 2500. / (2.998e18/2500)
     logLnu2500_hst = (np.log10(4.*np.pi) + np.log10(fnu2500_hst) + 
                       2*np.log10(DLcm_hst) + np.log10(1.+z_hst))
     
