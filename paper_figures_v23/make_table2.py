@@ -87,7 +87,7 @@ def main():
 \tablenotetext{a}{Index in Table~\ref{tab:master_sample}.}
 \tablenotetext{b}{Spectrum the measurement was made from; SPLICE: two instruments joined, see \S2. IUE objects are not yet measured.}
 \tablenotetext{c}{Positive values are blueshifted relative to systemic.}
-\tablenotetext{d}{\civ\ distance: position along the best-fit curve through the SDSS quasars in the blueshift--$\log$\,EW plane [REF].}
+\tablenotetext{d}{\civ\ distance: position along the best-fit curve through the SDSS quasars in the blueshift--$\log$\,EW plane \citep{Rivera2020,Richards2021}, computed with the code of \citet{CIVDistance}.}
 \tablenotetext{e}{As in Table~\ref{tab:master_sample}: 3\,=\,measured; 2\,=\,measured, with a reservation; 1\,=\,IUE only, not yet measured.}
 \end{deluxetable}
 """

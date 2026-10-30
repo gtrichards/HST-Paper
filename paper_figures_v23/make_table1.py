@@ -39,6 +39,24 @@ def norm(name):
     return re.sub(r"[^a-z0-9]", "", str(name).lower())
 
 
+#: The legacy compilation (HST_CIV_Sulentic2007_HSLA2018.csv, column z_src)
+#: records most individual literature redshifts as arXiv links.  Each was
+#: looked up (arXiv + doi.org) and is cited here by its refs.bib key.
+#: Zheng et al. (2019) supplies 16 objects and gets its own superscript (Z);
+#: the rest are listed object by object under L.
+ZHENG = "https://arxiv.org/pdf/1710.10703.pdf"
+LIT_CITE = {
+    "https://arxiv.org/pdf/1506.00635.pdf": r"\citealt{Koch2015}",
+    "https://arxiv.org/pdf/1507.06317.pdf": r"\citealt{Richter2016}",
+    "https://arxiv.org/pdf/2108.11958.pdf": r"\citealt{Fox2021}",
+    "Muzahid+2018,MNRAS": r"\citealt{Muzahid2018}",   # COS-Weak: likely, not confirmed
+    "DR7": r"SDSS DR7, \citealt{Schneider2010}",
+    "Borisov, Voikhanskaya & Fabrika 1991": r"Borisov, Voikhanskaya \& Fabrika (1991)",
+    "http://quasar.square7.ch/fqm/1411+442.html": r"web compilation, not a refereed source",
+    "nan": r"no source recorded",
+}
+
+
 def z_code(row):
     """Superscript code for the source of the redshift used (footnote a)."""
     if row["z_revised"]:
@@ -54,6 +72,8 @@ def z_code(row):
         return "S"
     if leg == "NED":
         return "N"
+    if leg == ZHENG:
+        return "Z"
     return "L"                           # an individual literature value
 
 
@@ -81,7 +101,10 @@ def main():
     assert np.allclose(t.loc[other, "z"], t.loc[other, "best_z"], atol=5e-5)
 
     t["z_code"] = t.apply(z_code, axis=1)
-    t["z_src_text"] = np.where(t["z_code"] == "L", t["z_src_legacy"], "")
+    t["z_src_text"] = np.where(t["z_code"].isin(["L", "Z"]), t["z_src_legacy"], "")
+    lit = t[t["z_code"] == "L"].sort_values("row_num")
+    lit_note = "; ".join("\\#%d %s" % (r["row_num"], LIT_CITE[str(r["z_src_legacy"])])
+                         for _, r in lit.iterrows())
 
     # ---- LaTeX ----
     def fmt_int(v):
@@ -119,14 +142,14 @@ def main():
 \startdata
 """
     foot = r"""\enddata
-\tablenotetext{a}{Systemic redshift used in the fits. No superscript: Wu \& Shen (2022) $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: Sulentic et al.\ (2007) (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: Barth et al.\ (2015) or Bentz \& Katz (2015) (%d); $^{\rm K}$: Kaspi et al.\ (2000) (%d); $^{\rm L}$: individual literature values (%d); $^{\rm O}$: revised in this work, see \S2 (%d).}
+\tablenotetext{a}{Systemic redshift used in the fits. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
 \tablenotetext{b}{SDSS spectroscopic coverage: 1\,=\,SDSS spectrum available; 2\,=\,SDSS spectrum covers rest-frame Mg\,\textsc{ii}\,$\lambda2798$ [$3800\,\text{\AA}/(1+z) \leq 2798\,\text{\AA}$].}
 \tablenotetext{c}{In Sulentic+2007 (DOI: 10.1086/519916); 1\,=\,yes.}
 \tablenotetext{d}{Bitmask of catalog memberships: Sul\,=\,1 (Sulentic+2007); K00\,=\,2 (Kaspi+2000); B15\,=\,4 (Barth+2015); D15\,=\,8 (Du+2015); Be15\,=\,16 (Bentz+2015); S16\,=\,32 (Shen+2016 SDSS-RM); M21\,=\,64 (Matthews+2021); NLS1\,=\,128 (Rakshit+2017); RK20\,=\,256 (Rakshit+2020 SDSS AGN catalog).}
 \tablenotetext{e}{\civ\ status: 3\,=\,measured; 2\,=\,measured, with a reservation; 1\,=\,IUE only, not yet measured; 0\,=\,excluded (see \S2).}
 \end{deluxetable*}
 """ % (n.get("", 0), n.get("S", 0), n.get("N", 0), n.get("B", 0),
-       n.get("K", 0), n.get("L", 0), n.get("O", 0))
+       n.get("K", 0), n.get("Z", 0), n.get("L", 0), lit_note, n.get("O", 0))
 
     os.makedirs(OUT_DIR, exist_ok=True)
     out = os.path.join(OUT_DIR, "table1_master_sample_v23.tex")
