@@ -173,7 +173,15 @@ def main():
     lines = []
     for _, r in t.sort_values("row_num").iterrows():
         des = r["designation"].replace("-", "$-$")
-        z = "%.4f" % r["z"]
+        # FIVE decimals, not four.  This column is the redshift USED IN THE FIT,
+        # an input to our velocities rather than a measurement we are claiming,
+        # so it needs enough digits to reproduce them.  Rounding to 4 dp costs
+        # up to 14.6 km/s at z = 0.03 (peak-to-peak ~29 km/s, 0.42 of the
+        # 69.03 km/s quantisation); 5 dp costs 1.5 km/s.  GTR, 2026-10-30:
+        # "a 30 km/s error is half a quantum".  340 of the 474 source values
+        # carry 5 or more decimals; the rest gain a trailing zero, which is
+        # honest here because the value shown is the one that was used.
+        z = "%.5f" % r["z"]
         z = "$%s^{\\rm %s}$" % (z, r["z_code"]) if r["z_code"] else "$%s$" % z
         if r["CIVgood_manmask"] in (2, 3):
             vals = "%d & %.1f & %.2f" % (round(r["CIV_blue"]), r["CIV_EW"],
@@ -215,7 +223,7 @@ def main():
 \startdata
 """
     foot = r"""\enddata
-\tablenotetext{a}{Systemic redshift used in the fits. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
+\tablenotetext{a}{Systemic redshift used in the fits, quoted to five decimals so that the \civ\ velocities are reproducible to $\sim$1.5\,km\,s$^{-1}$, well inside the 69\,km\,s$^{-1}$ quantisation; four decimals would cost up to 15\,km\,s$^{-1}$ at the low-redshift end. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
 \tablenotetext{b}{Every instrument the archive holds for this object. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Where the adopted spectrum is not among those listed it is given in parentheses: SPLICE denotes two instruments joined (\S2), and \#452 is an instrument-listing error, not a splice. IUE objects are not yet measured.}
 \tablenotetext{c}{SDSS spectroscopic coverage: 1\,=\,SDSS spectrum available; 2\,=\,SDSS spectrum covers rest-frame Mg\,\textsc{ii}\,$\lambda2798$ [$3800\,\text{\AA}/(1+z) \leq 2798\,\text{\AA}$].}
 \tablenotetext{d}{In Sulentic+2007 (DOI: 10.1086/519916); 1\,=\,yes.}
