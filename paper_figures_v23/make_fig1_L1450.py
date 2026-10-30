@@ -50,12 +50,20 @@ def load_hst_data(data_dir):
     # adopted sample (manmask 2 or 3) with Trevor's M_BH categories and L1450
     hst = add_logL1450(load_adopted(data_dir), data_dir)
     hst = hst[np.isfinite(hst["logLnu1450"])].reset_index(drop=True)
+    # F1450_est marks the four objects whose 1450 A continuum normalisation
+    # could not be measured and was extrapolated (extract_f1450.py).  The
+    # Scaling-Relation group already uses a white face, so "estimated" cannot
+    # also be open; it is drawn as a ring around whichever symbol the object
+    # already has.
+    est = (hst["F1450_est"].values == 1) if "F1450_est" in hst.columns \
+        else np.zeros(len(hst), bool)
     return {
         'z': hst["z"].values,
         'logL': hst["logLnu1450"].values,
         'mask_rm': hst["mask_rm"].values,
         'mask_sr': hst["mask_sr"].values,
-        'mask_no_mbh': hst["mask_no_mbh"].values
+        'mask_no_mbh': hst["mask_no_mbh"].values,
+        'est': est
     }
 
 
@@ -99,6 +107,14 @@ def create_figure(hst_data, sdss_data, gnirs_data):
             markeredgecolor="k", label="HST, no $M_{BH}$",
             linestyle="", zorder=2)
 
+    # the four estimated L1450 values, ringed so they are visibly not measured
+    if hst_data['est'].any():
+        ax.plot(hst_data['z'][hst_data['est']],
+                hst_data['logL'][hst_data['est']],
+                marker="o", markersize=24, markerfacecolor="none",
+                markeredgecolor="k", mew=1.4, linestyle="", zorder=4,
+                label=r"$L_{1450}$ extrapolated (%d)" % hst_data['est'].sum())
+
     # SDSS contours and GNIRS-DQS (both at 1350 A)
     plot_contour(sdss_data['z'], sdss_data['logL'], c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
@@ -108,7 +124,13 @@ def create_figure(hst_data, sdss_data, gnirs_data):
             label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=3)
 
     ax.set_xlabel('Redshift', fontsize=35)
-    ax.set_ylabel(r'log\,$L_{1450\AA}$ [erg\,s$^{-1}$\,Hz$^{-1}$]', fontsize=35)
+    # The Angstrom is OUT of the subscript: \AA at subscript size in Computer
+    # Modern sets the ring well clear of the A and reads as a degree sign.
+    # Written as L_nu(1450 A) rather than L_{1450A} because the axis is
+    # erg/s/Hz -- this is the specific luminosity per unit frequency, and the
+    # old label left it ambiguous whether it meant nu L_nu.
+    ax.set_ylabel(r'$\log L_\nu(1450\,\mathrm{\AA})$ [erg\,s$^{-1}$\,Hz$^{-1}$]',
+                  fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.legend(frameon=True, labelspacing=0.1, loc="lower right",
               prop={"size": 20})
