@@ -20,6 +20,8 @@ Two things, and **only** these two:
 conclusions, no abstract. If you think a result deserves prose, say so in chat
 and leave it to me.
 
+As a reminder the git repo for the paper is in /Users/gtr/Work/git/5bb25899051ceb07efc729f4
+
 I will decide whether to add the IUE and GNIRS-DQS data after I have seen the
 updated plots. Do not start on that unless I ask.
 
@@ -136,6 +138,23 @@ that provenance only exists in the ledger and in your work. Specifically:
   against the students' master).
 
 Write that as a factual methods description. Nothing else.
+
+### The reference for the C IV distance
+
+```
+DOI: 10.17918/CIVdistance
+```
+
+GTR supplied this on 2026-10-30 as the citable record for the C IV distance —
+the quantity this whole pass measures, and the one `main.tex` already treats as
+a defined concept (line 57: "Talk about \civ\ distance as a proxy for \lledd").
+It is **not** yet in `refs.bib` (120 entries, none matching), and nothing in
+either repository referenced it before.
+
+Cite it wherever Section 2 defines the measured quantity. The blueshift
+definition currently sits in `main.tex` around lines 329-332, alongside an
+unresolved `[FIX: We use linear fit, should be using power-law fit?]` note that
+is GTR's to settle, not yours.
 
 ---
 
