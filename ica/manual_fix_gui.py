@@ -1520,7 +1520,12 @@ def _monochromatic(res, rebin_path):
             if m.sum() > 3:
                 scale = float(np.nanmedian(cc[m]))
         f_real = f0 * scale if np.isfinite(scale) else np.nan
-        lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0
+        # (1+z) is required: rebinning/coadd.py:526 divides only the WAVELENGTH
+        # by (1+z), so f_real is observed-frame flux density on a rest-frame
+        # wavelength axis.  Must match iterate_fit.py, which carries the full
+        # explanation.  Added 2026-10-30; without it every logL here was low by
+        # log10(1+z).
+        lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0 * (1.0 + z)
                  if (np.isfinite(dl_cm) and np.isfinite(f_real)) else np.nan)
         out[w0] = dict(f_lambda=f0,
                        logL=(float(np.log10(lam_l)) if (np.isfinite(lam_l) and lam_l > 0)

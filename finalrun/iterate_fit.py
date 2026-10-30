@@ -394,7 +394,22 @@ def monochromatic(res, z, spec_path=None, windows=LUM_WINDOWS):
         # looks sound out there.  Record the reddest and bluest calibrated
         # anchors so the scale can be extrapolated later without refitting.
         f_real = f0 * scale if np.isfinite(scale) else np.nan
-        lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0
+        # (1+z) IS REQUIRED HERE and was missing until 2026-10-30.
+        # rebinning/coadd.py:526 writes the table as
+        #     Table([final_wave/(1+z), final_flux, ...])
+        # -- only the WAVELENGTH is divided.  The flux column and the
+        # Continuum Normalisation that rescales it to erg/s/cm2/A are written
+        # untouched, so f_real is OBSERVED-frame flux density sitting on a
+        # rest-frame wavelength axis, not rest-frame flux density.  For an
+        # observed f_lambda,
+        #     nu_rest L_nu(rest) = 4 pi D_L^2 lambda_obs f_lambda(obs)
+        #                        = 4 pi D_L^2 lambda_rest (1+z) f_lambda(obs)
+        # Without the factor every monochromatic luminosity was low by
+        # log10(1+z): a median of 0.116 dex over the adopted sample and 0.347
+        # dex at the highest redshift, and monotonic in z, so it tilted the
+        # L-z relation rather than merely offsetting it.  Found by GTR asking
+        # why Figure 1 disagreed with the ledger; the figure was right.
+        lam_l = (4.0 * np.pi * dl_cm ** 2 * f_real * w0 * (1.0 + z)
                  if (np.isfinite(dl_cm) and np.isfinite(f_real)) else np.nan)
         out[k] = dict(f_lambda=f0, f_lambda_cgs=f_real,
                       logL=(float(np.log10(lam_l)) if (np.isfinite(lam_l) and lam_l > 0)

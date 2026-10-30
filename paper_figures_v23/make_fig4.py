@@ -27,7 +27,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import palettable
-import richardsplot as rplot   # noqa: F401  (sets Trevor's plot style)
+# NOT `import richardsplot`: that resolves to the package's __init__.py, which
+# is EMPTY, so the style silently never applies and the figure comes out in
+# matplotlib defaults -- sans-serif, ticks outward, no minor ticks, and with
+# usetex off so \, prints literally and \AA renders in math italic.  The
+# style lives in richardsplot/richardsplot.py and has to be named twice.
+from richardsplot import richardsplot as rplot   # noqa: F401
 from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
