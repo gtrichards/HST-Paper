@@ -222,12 +222,16 @@ def main():
 }
 \startdata
 """
+    # Footnote e: the v22 table listed "Sul = 1" and every other bit shifted by
+    # one.  The bits below are the ones the v22 notebook actually assigns
+    # (CATALOG_BITS, plus 128 and 256 folded in later), checked against known
+    # objects: PG 0804+761 = 9 (Kaspi + Bentz), NGC 5548 = 8 (Bentz).
     foot = r"""\enddata
 \tablenotetext{a}{Systemic redshift used in the fits, quoted to five decimals so that the \civ\ velocities are reproducible to $\sim$1.5\,km\,s$^{-1}$, well inside the 69\,km\,s$^{-1}$ quantisation; four decimals would cost up to 15\,km\,s$^{-1}$ at the low-redshift end. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
 \tablenotetext{b}{Every instrument the archive holds for this object. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Where the adopted spectrum is not among those listed it is given in parentheses: SPLICE denotes two instruments joined (\S2), and \#452 is an instrument-listing error, not a splice. IUE objects are not yet measured.}
 \tablenotetext{c}{SDSS spectroscopic coverage: 1\,=\,SDSS spectrum available; 2\,=\,SDSS spectrum covers rest-frame Mg\,\textsc{ii}\,$\lambda2798$ [$3800\,\text{\AA}/(1+z) \leq 2798\,\text{\AA}$].}
 \tablenotetext{d}{In Sulentic+2007 (DOI: 10.1086/519916); 1\,=\,yes.}
-\tablenotetext{e}{Bitmask of catalog memberships: Sul\,=\,1 (Sulentic+2007); K00\,=\,2 (Kaspi+2000); B15\,=\,4 (Barth+2015); D15\,=\,8 (Du+2015); Be15\,=\,16 (Bentz+2015); S16\,=\,32 (Shen+2016 SDSS-RM); M21\,=\,64 (Matthews+2021); NLS1\,=\,128 (Rakshit+2017); RK20\,=\,256 (Rakshit+2020 SDSS AGN catalog).}
+\tablenotetext{e}{Bitmask of catalog memberships (bits as assigned by CATALOG\_BITS in the sample-construction code; Sulentic+2007 membership is the separate Sul column): K00\,=\,1 (Kaspi+2000); B15\,=\,2 (Barth+2015); D15\,=\,4 (Du+2015); Be15\,=\,8 (Bentz \& Katz 2015); S16\,=\,16 (Shen+2016 SDSS-RM); NLS1\,=\,128 (Rakshit+2017); RK20\,=\,256 (Rakshit+2020 SDSS AGN catalog). Bits 32 (Matthews+2021) and 64 (Rankine+2020) are defined but set for no object here.}
 \tablenotetext{f}{Positive values are blueshifted relative to systemic. Quantised at 69.03\,km\,s$^{-1}$ by construction.}
 \tablenotetext{g}{\civ\ distance: position along the best-fit curve through the SDSS quasars in the blueshift--$\log$\,EW plane \citep{Rivera2020,Richards2021}, computed with the code of \citet{CIVDistance}.}
 \tablenotetext{h}{\civ\ status: 3\,=\,measured; 2\,=\,measured, with a reservation; 1\,=\,IUE only, not yet measured; 0\,=\,excluded (see \S2).}
