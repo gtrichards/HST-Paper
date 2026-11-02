@@ -39,7 +39,7 @@ import pandas as pd
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from hst_sample import designation_to_coord
+from hst_sample import designation_to_coord, add_logL1450
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "Data")
@@ -134,6 +134,16 @@ def main():
     assert len(d) == meas.sum(), "CIV_distance dropped a point"
     t["CIV_dist"] = np.nan
     t.loc[meas, "CIV_dist"] = d
+    # log L_nu(1450 A), erg/s/Hz -- the same calculation as Figure 1's y axis
+    # (hst_sample.add_logL1450), so the table and the figure cannot disagree.
+    # F1450_est = 1 marks the four objects whose 1450 A continuum is
+    # extrapolated (extract_f1450.py); tested on the 345 measured objects that
+    # extrapolation is good to 0.02-0.03 dex.  Measured objects only.
+    t = add_logL1450(t, DATA)
+    t.loc[~meas, "logLnu1450"] = np.nan
+    t["L_est"] = meas & (t["F1450_est"].fillna(0).values == 1)
+    assert t.loc[meas, "logLnu1450"].notna().all(), "a measured object has no L1450"
+
     # Spec. is the spectrum the measurement came from, which is NOT the Inst.
     # column: that lists every instrument the archive holds, and the two differ
     # for 39 per cent of measured objects because of the single-visit policy.
@@ -184,10 +194,11 @@ def main():
         z = "%.5f" % r["z"]
         z = "$%s^{\\rm %s}$" % (z, r["z_code"]) if r["z_code"] else "$%s$" % z
         if r["CIVgood_manmask"] in (2, 3):
-            vals = "%d & %.1f & %.2f" % (round(r["CIV_blue"]), r["CIV_EW"],
-                                         r["CIV_dist"])
+            vals = "%d & %.1f & %.2f & %.2f%s" % (
+                round(r["CIV_blue"]), r["CIV_EW"], r["CIV_dist"], r["logLnu1450"],
+                r"$^{\dagger}$" if r["L_est"] else "")
         else:
-            vals = " & & "
+            vals = " & & & "
         lines.append("  %d & %s & %s & %s & %s & %s & %s & %s & %s & %d \\\\"
                      % (r["row_num"], des, r["common_name"], z, r["inst_cell"],
                         fmt_int(r["sdss_flag"]), fmt_int(r["sul_flag"]),
@@ -199,7 +210,7 @@ def main():
 
 \begin{longrotatetable}
 \startlongtable
-\begin{deluxetable*}{rllccccrrrrc}
+\begin{deluxetable*}{rllccccrrrrrc}
 \tabletypesize{\scriptsize}
 \tablecaption{Master AGN Sample with HST/IUE Rest-Frame \civ\ Coverage and Adopted \civ\ Measurements\label{tab:master_sample}}
 \tablewidth{0pt}
@@ -215,10 +226,12 @@ def main():
   \colhead{Blueshift\tablenotemark{f}} &
   \colhead{EW} &
   \colhead{$D_{\rm C\,IV}$\tablenotemark{g}} &
-  \colhead{Q\tablenotemark{h}} \\
+  \colhead{$\log L_\nu(1450\,\mathrm{\AA})$\tablenotemark{h}} &
+  \colhead{Q\tablenotemark{i}} \\
   \colhead{} & \colhead{} & \colhead{} & \colhead{} & \colhead{} &
   \colhead{} & \colhead{} & \colhead{} &
-  \colhead{(km\,s$^{-1}$)} & \colhead{(\AA)} & \colhead{} & \colhead{}
+  \colhead{(km\,s$^{-1}$)} & \colhead{(\AA)} & \colhead{} &
+  \colhead{(erg\,s$^{-1}$\,Hz$^{-1}$)} & \colhead{}
 }
 \startdata
 """
@@ -234,7 +247,8 @@ def main():
 \tablenotetext{e}{Bitmask of catalog memberships (bits as assigned by CATALOG\_BITS in the sample-construction code; Sulentic+2007 membership is the separate Sul column): K00\,=\,1 (Kaspi+2000); B15\,=\,2 (Barth+2015); D15\,=\,4 (Du+2015); Be15\,=\,8 (Bentz \& Katz 2015); S16\,=\,16 (Shen+2016 SDSS-RM); NLS1\,=\,128 (Rakshit+2017); RK20\,=\,256 (Rakshit+2020 SDSS AGN catalog). Bits 32 (Matthews+2021) and 64 (Rankine+2020) are defined but set for no object here.}
 \tablenotetext{f}{Positive values are blueshifted relative to systemic. Quantised at 69.03\,km\,s$^{-1}$ by construction.}
 \tablenotetext{g}{\civ\ distance: position along the best-fit curve through the SDSS quasars in the blueshift--$\log$\,EW plane \citep{Rivera2020,Richards2021}, computed with the code of \citet{CIVDistance}.}
-\tablenotetext{h}{\civ\ status: 3\,=\,measured; 2\,=\,measured, with a reservation; 1\,=\,IUE only, not yet measured; 0\,=\,excluded (see \S2).}
+\tablenotetext{h}{Specific luminosity at rest-frame 1450\,\AA, from the calibrated continuum under the adopted fit, as plotted in Figure~1. $^{\dagger}$: the continuum calibration does not reach 1450\,\AA\ and is extrapolated along the object's own power law (4 objects); tested on the measured objects, this is accurate to 0.02--0.03\,dex.}
+\tablenotetext{i}{\civ\ status: 3\,=\,measured; 2\,=\,measured, with a reservation; 1\,=\,IUE only, not yet measured; 0\,=\,excluded (see \S2).}
 \end{deluxetable*}
 \end{longrotatetable}
 """ % (n.get("", 0), n.get("S", 0), n.get("N", 0), n.get("B", 0),
@@ -245,7 +259,7 @@ def main():
     open(out, "w").write(head + "\n".join(lines) + "\n" + foot)
     t[["row_num", "designation", "common_name", "z", "z_code", "z_src_text",
        "instrument", "spectrum", "sdss_flag", "sul_flag", "cat_flags",
-       "CIV_blue", "CIV_EW", "CIV_dist", "CIVgood_manmask"]
+       "CIV_blue", "CIV_EW", "CIV_dist", "logLnu1450", "L_est", "CIVgood_manmask"]
       ].to_csv(out.replace(".tex", ".csv"), index=False)
     print("wrote", out)
     print("z sources:", n)
