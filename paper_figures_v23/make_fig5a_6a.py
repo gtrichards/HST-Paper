@@ -7,7 +7,8 @@ Adapted from Trevor McCaffrey's L_versus_blueshift.ipynb
 panels of the paper's Figs 5 and 6).  What changed:
   * HST sample = the adopted v23 sample (manmask 2 or 3), CIV_blue and CIV_EW
     from CIV_measurements_v23.csv; M_BH categories and L1450 from hst_sample.py.
-  * x axis is L_1450 for HST and L_1350 for SDSS / GNIRS-DQS, as in Fig 1.
+  * x axis is L_1450 for all samples; SDSS / GNIRS-DQS interpolated to
+    1450 A per object (ref_samples.py), as in Fig 1.
     The secondary L_bol axis and the L_bol = 3e45 line are removed (Trevor's
     bolometric correction is for L_2500).
   * HST C IV distance is computed here from (CIV_blue, log CIV_EW) with
@@ -45,6 +46,7 @@ from astropy.table import Table
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted, add_logL1450
+from ref_samples import load_sdss, load_gnirs
 
 CIVDIST_DIR = os.path.expanduser("~/Work/git/CIV_Distance/")
 sys.path.insert(0, CIVDIST_DIR)
@@ -93,20 +95,15 @@ def main():
              hst["mask_no_mbh"].values)
     print("  HST with L1450: %d" % len(hst))
 
-    # ---- SDSS: Rankine+20, good, with a 1350 A luminosity ----
-    sdss_tbl = Table.read(os.path.join(
-        data_dir, "Rankine20_CIV_HeII_wDelGI_wdr16luminosity.fits"))
-    names = [n for n in sdss_tbl.colnames if len(sdss_tbl[n].shape) <= 1]
-    sdss = sdss_tbl[names].to_pandas()
-    sdss = sdss[(sdss["LOGL1350_dr16"] > 0) & (sdss["good"] == True)]
-    logL_sdss = sdss["LOGL1350_dr16"].values - np.log10(C_ANG / 1350.)  # to L_nu
+    # ---- SDSS: Rankine+20, luminosity interpolated to 1450 A (ref_samples.py) ----
+    sdss = load_sdss(data_dir)
+    logL_sdss = sdss["logLnu1450"].values
     c4blue_sdss = sdss["CIV_blue"].values
     c4dist_sdss = sdss["CIV_Distance"].values
 
     # ---- GNIRS-DQS ----
-    gnirs = pd.read_csv(os.path.join(data_dir, "gnirsdqs_wRankine_wdr16Lum.csv"))
-    gnirs = gnirs[(gnirs["good"] == True) & (gnirs["LOGL1350_dr16"].values > 0)]
-    logL_gnirs = gnirs["LOGL1350_dr16"].values - np.log10(C_ANG / 1350.)
+    gnirs = load_gnirs(data_dir)
+    logL_gnirs = gnirs["logLnu1450"].values
     c4blue_gnirs = gnirs["CIV_blue"].values
     c4dist_gnirs = gnirs["CIV_dist_ICA_tvm"].values
     print("  SDSS %d, GNIRS-DQS %d" % (len(sdss), len(gnirs)))
@@ -122,10 +119,10 @@ def main():
     plot_hst(ax, logL_hst, c4blue_hst, *masks)
     plot_contour(logL_sdss, c4blue_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
-                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)", zorder=1)
+                 linewidths=1.5, s=3, alpha=0.4, label="SDSS", zorder=1)
     ax.plot(logL_gnirs, c4blue_gnirs, marker="v", markersize=11,
             markerfacecolor=cs[2], markeredgecolor="k",
-            label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=1)
+            label="GNIRS-DQS", linestyle="", zorder=1)
     ax.set_ylabel(r'CIV Blueshift [km\,s$^{-1}$]', fontsize=35)
     ax.set_xlabel(xlabel, fontsize=35)
     ax.set_xlim(xlim)
@@ -147,10 +144,10 @@ def main():
     rng = np.random.default_rng(0)
     plot_contour(logL_sdss, c4dist_sdss + rng.uniform(-0.02, 0.02, len(c4dist_sdss)),
                  c=cs[2], mark="o", nlevels=[0.05, 0.25, 0.50, 0.75, 0.95],
-                 ax=ax, linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)", zorder=1)
+                 ax=ax, linewidths=1.5, s=3, alpha=0.4, label="SDSS", zorder=1)
     ax.plot(logL_gnirs, c4dist_gnirs, marker="v", markersize=11,
             markerfacecolor=cs[2], markeredgecolor="k",
-            label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=1)
+            label="GNIRS-DQS", linestyle="", zorder=1)
     ax.set_ylabel('CIV Distance [Scaled Units]', fontsize=35)
     ax.set_xlabel(xlabel, fontsize=35)
     ax.set_xlim(xlim)

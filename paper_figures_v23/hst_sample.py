@@ -8,6 +8,7 @@ adopted sample (CIVgood_manmask 2 or 3; 349 objects), with three columns added:
                                 HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv,
                                 matched by position within 5 arcsec (NaN if the
                                 object is not in the old catalogue)
+    rm_classical, rm_other, rm_none -- RM-program membership from cat_flags
     mask_rm, mask_sr, mask_no_mbh -- Trevor's M_BH categories:
                                 RM mass (qual < 2), scaling-relation mass
                                 (qual >= 2), no mass
@@ -58,6 +59,17 @@ def load_adopted(data_dir):
     hst["mask_no_mbh"] = ~maskMBH
     print("  HST adopted: %d, in old catalogue %d, with M_BH %d (RM %d)"
           % (len(hst), in_old.sum(), maskMBH.sum(), hst["mask_rm"].sum()))
+
+    # RM-program membership, from Table 1's catalogue bitmask (cat_flags), which
+    # covers all objects -- unlike the M_BH columns above, which exist only for
+    # objects in the old catalogue.  Bits: Kaspi+00 = 1, Barth+15 = 2,
+    # Du+15 (SEAMBH) = 4, Bentz & Katz 15 = 8, Shen+16 (SDSS-RM) = 16.
+    f = hst["cat_flags"].fillna(0).astype(int).values
+    hst["rm_classical"] = (f & (1 | 2 | 8)) > 0
+    hst["rm_other"] = ((f & (4 | 16)) > 0) & ~hst["rm_classical"].values
+    hst["rm_none"] = ~hst["rm_classical"].values & ~hst["rm_other"].values
+    print("  RM programs: classical %d, SDSS-RM/SEAMBH only %d, none %d"
+          % (hst["rm_classical"].sum(), hst["rm_other"].sum(), hst["rm_none"].sum()))
     return hst
 
 

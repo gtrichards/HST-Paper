@@ -6,12 +6,17 @@ Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
     CIVgood_manmask 2 or 3 (349 objects; 345 have a 1450 A flux).
   * HST luminosity is at 1450 A, from Data/HST_F1450_v23.csv (made by
     extract_f1450.py), computed in hst_sample.py.  Same formula Trevor used at 2500 A, including (1+z).
-  * M_BH categories still come from the old catalogue
-    (HST_CIV_Sulentic2007_HSLA2018_finalprops_f2500AP.csv), matched by
-    position within 5 arcsec (hst_sample.py).  Objects not in it are plotted as "no M_BH".
-  * SDSS and GNIRS-DQS have no 1450 A luminosity; their 1350 A luminosity
-    (LOGL1350_dr16) is plotted instead and labelled as such.  For a typical
-    quasar slope the difference is ~0.02 dex.
+  * HST symbols mark RM-program membership (hst_sample.py, from Table 1's
+    catalogue bitmask): classical RM (Kaspi+00, Barth+15, Bentz & Katz 15),
+    SDSS-RM / SEAMBH only (Shen+16, Du+15), and not RM.  Trevor's M_BH
+    categories were dropped: the masses exist only for objects in the old
+    catalogue, so "no M_BH" had come to mean "not in the old catalogue".
+  * The four objects whose L1450 is extrapolated (F1450_est in
+    HST_F1450_v23.csv) are not marked: tested on the 345 measured objects the
+    extrapolation is good to 0.02-0.03 dex (1 sigma), well inside the symbol
+    (half-height 0.11-0.12 dex on this axis).
+  * SDSS and GNIRS-DQS are interpolated to 1450 A per object
+    (ref_samples.py).
   * The secondary L_bol axis and the L_bol = 3e45 line are removed, because
     Trevor's bolometric correction is for L_2500.  The Temple option is
     removed because Temple+21 gives L3000, not L1450.
@@ -39,6 +44,7 @@ from astropy.table import Table
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted, add_logL1450
+from ref_samples import load_sdss, load_gnirs
 
 C_ANG = 2.998e18           # speed of light in Angstrom/s
 
@@ -47,81 +53,55 @@ plt.rcParams['ytick.right'] = True
 
 
 def load_hst_data(data_dir):
-    # adopted sample (manmask 2 or 3) with Trevor's M_BH categories and L1450
+    # adopted sample (manmask 2 or 3) with RM-program groups and L1450
     hst = add_logL1450(load_adopted(data_dir), data_dir)
     hst = hst[np.isfinite(hst["logLnu1450"])].reset_index(drop=True)
-    # F1450_est marks the four objects whose 1450 A continuum normalisation
-    # could not be measured and was extrapolated (extract_f1450.py).  The
-    # Scaling-Relation group already uses a white face, so "estimated" cannot
-    # also be open; it is drawn as a ring around whichever symbol the object
-    # already has.
-    est = (hst["F1450_est"].values == 1) if "F1450_est" in hst.columns \
-        else np.zeros(len(hst), bool)
     return {
         'z': hst["z"].values,
         'logL': hst["logLnu1450"].values,
-        'mask_rm': hst["mask_rm"].values,
-        'mask_sr': hst["mask_sr"].values,
-        'mask_no_mbh': hst["mask_no_mbh"].values,
-        'est': est
+        'rm_classical': hst["rm_classical"].values,
+        'rm_other': hst["rm_other"].values,
+        'rm_none': hst["rm_none"].values,
     }
 
 
 def load_sdss_rankine_data(data_dir):
-    sdss_tbl = Table.read(os.path.join(
-        data_dir, "Rankine20_CIV_HeII_wDelGI_wdr16luminosity.fits"))
-    names = [n for n in sdss_tbl.colnames if len(sdss_tbl[n].shape) <= 1]
-    sdss = sdss_tbl[names].to_pandas()
-    sdss = sdss[(sdss["LOGL1350_dr16"] > 0) & (sdss["good"] == True)]
-
-    # LOGL1350_dr16 is log(lambda L_lambda); convert to L_nu
-    logLnu1350_sdss = sdss["LOGL1350_dr16"].values - np.log10(C_ANG / 1350.)
-    return {'z': sdss["z_paul"].values, 'logL': logLnu1350_sdss}
+    sdss = load_sdss(data_dir)
+    return {'z': sdss["z_paul"].values, 'logL': sdss["logLnu1450"].values}
 
 
 def load_gnirs_data(data_dir):
-    gnirs = pd.read_csv(os.path.join(data_dir, "gnirsdqs_wRankine_wdr16Lum.csv"))
-    gnirs = gnirs[(gnirs["good"] == True) & (gnirs["LOGL1350_dr16"].values > 0)]
-    logLnu1350_gnirs = gnirs["LOGL1350_dr16"].values - np.log10(C_ANG / 1350.)
-    return {'z': gnirs["z_paul"].values, 'logL': logLnu1350_gnirs}
+    gnirs = load_gnirs(data_dir)
+    return {'z': gnirs["z_paul"].values, 'logL': gnirs["logLnu1450"].values}
 
 
 def create_figure(hst_data, sdss_data, gnirs_data):
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
     fig, ax = plt.subplots(1, 1, figsize=(10, 9))
 
-    # HST sample (same symbols as Trevor's figure)
-    ax.plot(hst_data['z'][hst_data['mask_rm']],
-            hst_data['logL'][hst_data['mask_rm']],
-            marker="o", markersize=15, markerfacecolor=cs[3],
-            markeredgecolor="k", label="HST, RM $M_{BH}$",
-            linestyle="", zorder=3)
-    ax.plot(hst_data['z'][hst_data['mask_sr']],
-            hst_data['logL'][hst_data['mask_sr']],
-            marker="o", markersize=13.5, markerfacecolor="w",
-            markeredgecolor=cs[3], mew=1.8,
-            label="HST, Scaling Relation $M_{BH}$", linestyle="", zorder=2)
-    ax.plot(hst_data['z'][hst_data['mask_no_mbh']],
-            hst_data['logL'][hst_data['mask_no_mbh']],
-            marker="^", markersize=16.5, markerfacecolor=cs[4],
-            markeredgecolor="k", label="HST, no $M_{BH}$",
-            linestyle="", zorder=2)
+    # HST sample.  zorder: not-RM triangles at the bottom, classical RM above
+    # them, and the open SDSS-RM/SEAMBH circles on top so none is hidden.
+    z, L = hst_data['z'], hst_data['logL']
+    m = hst_data['rm_classical']
+    ax.plot(z[m], L[m], marker="o", markersize=15, markerfacecolor=cs[3],
+            markeredgecolor="k", linestyle="", zorder=3,
+            label="HST, classical RM (%d)" % m.sum())
+    m = hst_data['rm_other']
+    ax.plot(z[m], L[m], marker="o", markersize=13.5, markerfacecolor="w",
+            markeredgecolor=cs[3], mew=1.8, linestyle="", zorder=4,
+            label="HST, SDSS-RM/SEAMBH (%d)" % m.sum())
+    m = hst_data['rm_none']
+    ax.plot(z[m], L[m], marker="^", markersize=16.5, markerfacecolor=cs[4],
+            markeredgecolor="k", linestyle="", zorder=2,
+            label="HST, not RM (%d)" % m.sum())
 
-    # the four estimated L1450 values, ringed so they are visibly not measured
-    if hst_data['est'].any():
-        ax.plot(hst_data['z'][hst_data['est']],
-                hst_data['logL'][hst_data['est']],
-                marker="o", markersize=24, markerfacecolor="none",
-                markeredgecolor="k", mew=1.4, linestyle="", zorder=4,
-                label=r"$L_{1450}$ extrapolated (%d)" % hst_data['est'].sum())
-
-    # SDSS contours and GNIRS-DQS (both at 1350 A)
+    # SDSS contours and GNIRS-DQS, both interpolated to 1450 A
     plot_contour(sdss_data['z'], sdss_data['logL'], c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
-                 linewidths=1.5, s=3, alpha=0.4, label=r"SDSS ($L_{1350}$)", zorder=1)
+                 linewidths=1.5, s=3, alpha=0.4, label="SDSS", zorder=1)
     ax.plot(gnirs_data['z'], gnirs_data['logL'], marker="v", markersize=11,
             markerfacecolor=cs[2], markeredgecolor="k",
-            label=r"GNIRS-DQS ($L_{1350}$)", linestyle="", zorder=3)
+            label="GNIRS-DQS", linestyle="", zorder=3)
 
     ax.set_xlabel('Redshift', fontsize=35)
     # The Angstrom is OUT of the subscript: \AA at subscript size in Computer
