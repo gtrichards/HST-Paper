@@ -5,10 +5,15 @@ Adapted from Plotting Code/make_fig2.py (and Notebooks/EV1_optical.ipynb).
 What changed:
   * HST sample = the adopted v23 sample (manmask 2 or 3), with the same symbols
     as Figs 1, 4, 5a, 6a (hst_sample.plot_hst).
-  * HST optical values: Sulentic et al. (2007) where they exist (127 objects),
-    otherwise Rakshit et al. (2020) (another 127), GTR 2026-11-03.  Rakshit's
-    R(Fe II) = EW(Fe II, 4434-4684 A) / EW(Hbeta broad), the same definition as
-    the SDSS contours.  95 adopted objects have neither and are not plotted.
+  * HST optical values from Rakshit et al. (2020) where they exist, otherwise
+    Sulentic et al. (2007) (GTR 2026-11-03, "B"): Rakshit's R(Fe II) =
+    EW(Fe II, 4434-4684 A) / EW(Hbeta broad) and FWHM(Hbeta broad) are the
+    same measurements as the SDSS contours.  --sulentic-first reverses the
+    priority ("C") and writes Fig2_EV1_optical_sulentic_first.pdf/png, for
+    comparison.  94 adopted objects have neither and are not plotted.
+  * SDSS quasars with R(Fe II) = 0 exactly (25%: Fe II not measured, recorded
+    as 0) are left out of the contours and the scatter, which they distorted
+    into a vertical streak; the number left out is written on the plot.
   * Both sets of values, and the source used, are written to
     Data/HST_optical_EV1_v23.csv; for the objects with both, the comparison is
     printed (for the text).
@@ -42,8 +47,12 @@ plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
 
 
-def hst_optical(data_dir):
-    """Adopted sample with FWHM(Hbeta) and R(Fe II): Sulentic, else Rakshit."""
+def hst_optical(data_dir, sulentic_first=False):
+    """Adopted sample with FWHM(Hbeta) and R(Fe II).
+
+    Rakshit+20 where available, else Sulentic+07; or the reverse when
+    sulentic_first is True.
+    """
     hst = load_adopted(data_dir)
     c = SkyCoord([designation_to_coord(d) for d in hst["designation"]])
 
@@ -65,20 +74,23 @@ def hst_optical(data_dir):
     hst["Hb_rk"] = mc["hbeta_fwhm_rk20"].values[j]
     hst["RFe_rk"] = mc["rfeii_rk20"].values[j]
 
-    # adopted values: Sulentic where both of its numbers exist, else Rakshit
+    # adopted values: the preferred source where both its numbers exist,
+    # otherwise the other one
     has_sul = hst["Hb_sul"].notna() & hst["RFe_sul"].notna()
     has_rk = hst["Hb_rk"].notna() & hst["RFe_rk"].notna() & (hst["Hb_rk"] > 0)
-    hst["opt_source"] = np.where(has_sul, "Sulentic07", np.where(has_rk, "Rakshit20", ""))
-    hst["Hb_fwhm"] = np.where(has_sul, hst["Hb_sul"], np.where(has_rk, hst["Hb_rk"], np.nan))
-    hst["RFeII"] = np.where(has_sul, hst["RFe_sul"], np.where(has_rk, hst["RFe_rk"], np.nan))
-    hst["RFeII_upper"] = has_sul & hst["RFe_sul_upper"]
+    use_sul = has_sul if sulentic_first else (has_sul & ~has_rk)
+    use_rk = has_rk & ~use_sul
+    hst["opt_source"] = np.where(use_sul, "Sulentic07", np.where(use_rk, "Rakshit20", ""))
+    hst["Hb_fwhm"] = np.where(use_sul, hst["Hb_sul"], np.where(use_rk, hst["Hb_rk"], np.nan))
+    hst["RFeII"] = np.where(use_sul, hst["RFe_sul"], np.where(use_rk, hst["RFe_rk"], np.nan))
+    hst["RFeII_upper"] = use_sul & hst["RFe_sul_upper"]
 
     # for the text: how the two sources compare where both exist
     b = has_sul & has_rk
     ratio = hst.loc[b, "Hb_rk"] / hst.loc[b, "Hb_sul"]
     dR = hst.loc[b, "RFe_rk"] - hst.loc[b, "RFe_sul"]
-    print("  optical values: Sulentic %d, Rakshit %d, neither %d"
-          % (has_sul.sum(), (~has_sul & has_rk).sum(), (~has_sul & ~has_rk).sum()))
+    print("  optical values used: Rakshit %d, Sulentic %d, neither %d"
+          % (use_rk.sum(), use_sul.sum(), (~use_sul & ~use_rk).sum()))
     print("  overlap (both sources): N = %d" % b.sum())
     print("    FWHM(Hb) Rakshit/Sulentic: median %.2f, 16-84%% %.2f-%.2f"
           % (ratio.median(), ratio.quantile(.16), ratio.quantile(.84)))
@@ -88,14 +100,18 @@ def hst_optical(data_dir):
 
 
 def main():
+    import sys
+    sulentic_first = "--sulentic-first" in sys.argv
+    suffix = "_sulentic_first" if sulentic_first else ""
     data_dir = os.path.join(HERE, "..", "Data")
     out_dir = os.path.join(HERE, "..", "Figures")
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
 
-    hst = hst_optical(data_dir)
-    hst[["row_num", "common_name", "Hb_sul", "RFe_sul", "RFe_sul_upper", "Hb_rk",
+    hst = hst_optical(data_dir, sulentic_first)
+    if not sulentic_first:   # the saved table records the adopted (Rakshit-first) choice
+      hst[["row_num", "common_name", "Hb_sul", "RFe_sul", "RFe_sul_upper", "Hb_rk",
          "RFe_rk", "opt_source", "Hb_fwhm", "RFeII", "RFeII_upper"]].to_csv(
-        os.path.join(data_dir, "HST_optical_EV1_v23.csv"), index=False)
+          os.path.join(data_dir, "HST_optical_EV1_v23.csv"), index=False)
     hst = hst[hst["opt_source"] != ""].reset_index(drop=True)
 
     # SDSS: Rakshit+20, objects with Fe II, Hbeta EW and FWHM (as in the old code)
@@ -103,6 +119,10 @@ def main():
     sdss = sdss[sdss["EWFe-OP"].notna() & sdss["EWHb-BR"].notna() & sdss["FWHMHb-BR"].notna()]
     RFeII_sdss = (sdss["EWFe-OP"] / sdss["EWHb-BR"]).values
     Hb_sdss = sdss["FWHMHb-BR"].values
+    # R(Fe II) = 0 exactly: Fe II not measured; left out (see docstring)
+    zero = RFeII_sdss == 0
+    n_zero = int(zero.sum())
+    RFeII_sdss, Hb_sdss = RFeII_sdss[~zero], Hb_sdss[~zero]
 
     # GNIRS-DQS (as in the old code)
     gnirs = pd.read_csv(os.path.join(data_dir, "gnirsdqs_wRankine_wdr16Lum.csv"))
@@ -123,6 +143,9 @@ def main():
     ax.plot(RFeII_gnirs, Hb_gnirs, marker="v", markersize=11, markerfacecolor=cs[2],
             markeredgecolor="k", label="GNIRS-DQS", linestyle="", zorder=2)
 
+    ax.text(0.97, 0.60, "SDSS with R(Fe\\,{\\sc ii})\\,=\\,0 not shown\n(%s, %d\\%%)"
+            % (format(n_zero, ","), round(100 * n_zero / (n_zero + len(Hb_sdss)))),
+            transform=ax.transAxes, ha="right", va="top", fontsize=14)
     ax.set_xlabel('R(Fe\\,{\\sc ii})', fontsize=35)
     ax.set_ylabel(r'FWHM(H$\beta$) [km\,s$^{-1}$]', fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
@@ -135,7 +158,7 @@ def main():
     print("  HST points outside the axis limits: %d %s"
           % (off.sum(), list(hst.loc[off, "common_name"])))
     os.makedirs(out_dir, exist_ok=True)
-    out = os.path.join(out_dir, "Fig2_EV1_optical.pdf")
+    out = os.path.join(out_dir, "Fig2_EV1_optical%s.pdf" % suffix)
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
     print("saved", out)
