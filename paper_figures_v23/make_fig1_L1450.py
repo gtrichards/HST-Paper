@@ -20,8 +20,9 @@ Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
   * The secondary L_bol axis is removed (Trevor's bolometric correction is
     for L_2500).  The L_bol = 3e45 erg/s line -- where AGN wind feedback has
     been argued to matter (Veilleux+13; Zakamska & Greene 14) -- is kept,
-    moved to 1450 A with Runnoe, Brotherton & Shang (2012) eq. 9 and their
-    L_bol = 0.75 L_iso viewing-angle factor: log L_nu(1450) = 29.59.  The Temple option is
+    placed with Krawczyk et al. (2013) eq. 9 and moved from 2500 to 1450 A
+    with the median SDSS continuum: log L_nu(1450) = 29.79 (see
+    lbol_to_lognu1450).  The Temple option is
     removed because Temple+21 gives L3000, not L1450.
   * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
 
@@ -52,19 +53,30 @@ from ref_samples import load_sdss, load_gnirs
 C_ANG = 2.998e18           # speed of light in Angstrom/s
 
 
+#: median log[lambda L_lambda(2500) / lambda L_lambda(1450)] for the 118,638
+#: SDSS quasars with both luminosities (Wu & Shen 2022, via ref_samples.py),
+#: the population Krawczyk et al. built their mean SED from.
+LAML2500_MINUS_LAML1450 = -0.089
+
+
 def lbol_to_lognu1450(logLbol):
     """log L_nu(1450 A) [erg/s/Hz] for a given log L_bol [erg/s].
 
-    Inverts Runnoe, Brotherton & Shang 2012 (MNRAS 422, 478), eq. 9,
-        log L_iso = 4.74 + 0.91 log(1450 L_1450),
-    with their viewing-angle adjustment L_bol = 0.75 L_iso (Table 4 note).
-    For L_bol = 3e45 this gives 29.59; other reasonable choices (no 0.75
-    factor; their linear zeta_1450 = 4.2; Trevor's old L2500 line moved to
-    1450 A) give 29.45-29.66.
+    Krawczyk et al. 2013 (ApJS 206, 4; 10.1088/0067-0049/206/1/4), eq. 9:
+        log L_bol = 0.9869 log(nu L_nu at 2500 A) + 1.051
+    (no anisotropy correction, as published), inverted for lambda L_lambda at
+    2500 A and moved to 1450 A with the median SDSS continuum above.
+    For L_bol = 3e45 this gives 29.79.
+
+    For comparison: adding Runnoe et al. 2012's 0.75 anisotropy factor gives
+    29.92; Runnoe et al. 2012 eq. 9 at 1450 A gives 29.59.  Trevor's old line
+    (Plotting Code/make_fig1.py) used this same Krawczyk relation but converted
+    L_nu(2500) with c/1549.48 A instead of c/2500 A, which put it 0.21 dex low.
     """
-    log_liso = logLbol - np.log10(0.75)
-    log_lamL1450 = (log_liso - 4.74) / 0.91
+    log_lamL2500 = (logLbol - 1.051) / 0.9869
+    log_lamL1450 = log_lamL2500 - LAML2500_MINUS_LAML1450
     return log_lamL1450 - np.log10(C_ANG / 1450.)       # lambda L_lambda -> L_nu
+
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
