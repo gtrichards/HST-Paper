@@ -6,7 +6,7 @@ Adapted from Trevor McCaffrey's CIVplot.ipynb, cell 19
 which made figures/CIV_logEW_versus_blue_ICA.pdf.  What changed:
   * HST sample = the adopted v23 sample (manmask 2 or 3), with CIV_blue and
     CIV_EW from CIV_measurements_v23.csv instead of CIV_blue_tvm / CIV_EW_tvm.
-  * M_BH categories from the old catalogue, matched by position (hst_sample.py).
+  * HST symbols mark RM-program membership, as in Fig 1 (hst_sample.plot_hst).
   * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
   * y axis extended from 2.72 to 2.92 to take in the high-EW HST objects.
     Two objects are deliberately left off the plot, each far from the rest
@@ -37,7 +37,7 @@ from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
-from hst_sample import load_adopted
+from hst_sample import load_adopted, plot_hst
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
@@ -52,9 +52,6 @@ def main():
     hst = load_adopted(data_dir)
     c4blueICA_hst = hst["CIV_blue"].values
     c4logewICA_hst = np.log10(hst["CIV_EW"].values)
-    maskMBH_rm = hst["mask_rm"].values
-    maskMBH_sr = hst["mask_sr"].values
-    mask_no_mbh = hst["mask_no_mbh"].values
 
     # SDSS: Rankine+20, all rows (Trevor's 'good' cut was commented out)
     sdss_tbl = Table.read(os.path.join(
@@ -77,15 +74,7 @@ def main():
     # ---- plot (Trevor's cell 19) ----
     fig, ax = plt.subplots(1, 1, figsize=(9, 9))
 
-    ax.plot(c4blueICA_hst[maskMBH_rm], c4logewICA_hst[maskMBH_rm], marker="o",
-            markersize=15, markerfacecolor=cs[3], markeredgecolor="k",
-            label="HST, RM $M_{BH}$", linestyle="", zorder=3)
-    ax.plot(c4blueICA_hst[maskMBH_sr], c4logewICA_hst[maskMBH_sr], marker="o",
-            markersize=13.5, markerfacecolor="w", markeredgecolor=cs[3], mew=1.8,
-            label="HST, Scaling Relation $M_{BH}$", linestyle="", zorder=2)
-    ax.plot(c4blueICA_hst[mask_no_mbh], c4logewICA_hst[mask_no_mbh], marker="^",
-            markersize=16.5, markerfacecolor=cs[4], markeredgecolor="k",
-            label="HST, no $M_{BH}$", linestyle="", zorder=2)
+    plot_hst(ax, c4blueICA_hst, c4logewICA_hst, hst)
 
     plot_contour(c4blueICA_sdss, c4logewICA_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,

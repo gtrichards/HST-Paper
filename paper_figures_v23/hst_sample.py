@@ -87,3 +87,26 @@ def add_logL1450(hst, data_dir):
     hst["logLnu1450"] = (np.log10(4. * np.pi) + np.log10(fnu1450) +
                          2 * np.log10(DLcm) + np.log10(1. + z))
     return hst
+
+
+def plot_hst(ax, x, y, hst):
+    """HST symbols by RM program, shared by Figures 1, 4, 5a and 6a.
+
+    hst is the table from load_adopted (rows aligned with x and y).  zorder:
+    "other" triangles at the bottom, classical RM above them, and the open
+    SDSS-RM/SEAMBH circles on top so none is hidden.
+    """
+    import palettable
+    cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
+    m = hst["rm_classical"].values
+    ax.plot(x[m], y[m], marker="o", markersize=15, markerfacecolor=cs[3],
+            markeredgecolor="k", linestyle="", zorder=3,
+            label="HST, classical RM (%d)" % m.sum())
+    m = hst["rm_other"].values
+    ax.plot(x[m], y[m], marker="o", markersize=13.5, markerfacecolor="w",
+            markeredgecolor=cs[3], mew=1.8, linestyle="", zorder=4,
+            label="HST, SDSS-RM/SEAMBH (%d)" % m.sum())
+    m = hst["rm_none"].values
+    ax.plot(x[m], y[m], marker="^", markersize=16.5, markerfacecolor=cs[4],
+            markeredgecolor="k", linestyle="", zorder=2,
+            label="HST, other (%d)" % m.sum())

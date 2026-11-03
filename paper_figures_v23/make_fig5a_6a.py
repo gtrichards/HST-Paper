@@ -46,7 +46,7 @@ from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
-from hst_sample import load_adopted, add_logL1450
+from hst_sample import load_adopted, add_logL1450, plot_hst
 from ref_samples import load_sdss, load_gnirs
 from make_fig1_L1450 import lbol_to_lognu1450   # one definition for all figures
 
@@ -58,24 +58,6 @@ C_ANG = 2.998e18           # speed of light in Angstrom/s
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
-
-
-def plot_hst(ax, x, y, rm_classical, rm_other, rm_none):
-    """HST symbols by RM program, as in Figure 1 (make_fig1_L1450.py).
-
-    zorder: not-RM triangles at the bottom, classical RM above them, and the
-    open SDSS-RM/SEAMBH circles on top so none is hidden.
-    """
-    cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
-    ax.plot(x[rm_classical], y[rm_classical], marker="o", markersize=15,
-            markerfacecolor=cs[3], markeredgecolor="k", linestyle="", zorder=3,
-            label="HST, classical RM (%d)" % rm_classical.sum())
-    ax.plot(x[rm_other], y[rm_other], marker="o", markersize=13.5,
-            markerfacecolor="w", markeredgecolor=cs[3], mew=1.8, linestyle="",
-            zorder=4, label="HST, SDSS-RM/SEAMBH (%d)" % rm_other.sum())
-    ax.plot(x[rm_none], y[rm_none], marker="^", markersize=16.5,
-            markerfacecolor=cs[4], markeredgecolor="k", linestyle="", zorder=2,
-            label="HST, other (%d)" % rm_none.sum())
 
 
 def main():
@@ -97,8 +79,6 @@ def main():
     # CIV_distance silently skips a point it cannot place on the curve,
     # which would shift every later value; make sure that did not happen
     assert len(c4dist_hst) == len(hst), "CIV_distance dropped a point"
-    masks = (hst["rm_classical"].values, hst["rm_other"].values,
-             hst["rm_none"].values)
     print("  HST with L1450: %d" % len(hst))
 
     # ---- SDSS: Rankine+20, luminosity interpolated to 1450 A (ref_samples.py) ----
@@ -125,7 +105,7 @@ def main():
 
     # ---- Fig 5a: blueshift vs L (Trevor's cell 22) ----
     fig, ax = plt.subplots(1, 1, figsize=(9, 9.5))
-    plot_hst(ax, logL_hst, c4blue_hst, *masks)
+    plot_hst(ax, logL_hst, c4blue_hst, hst)
     plot_contour(logL_sdss, c4blue_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
                  linewidths=1.5, s=3, alpha=0.4, label="SDSS", zorder=1)
@@ -151,7 +131,7 @@ def main():
 
     # ---- Fig 6a: C IV distance vs L (Trevor's cell 24) ----
     fig, ax = plt.subplots(1, 1, figsize=(9, 9.5))
-    plot_hst(ax, logL_hst, c4dist_hst, *masks)
+    plot_hst(ax, logL_hst, c4dist_hst, hst)
     rng = np.random.default_rng(0)
     plot_contour(logL_sdss, c4dist_sdss + rng.uniform(-0.02, 0.02, len(c4dist_sdss)),
                  c=cs[2], mark="o", nlevels=[0.05, 0.25, 0.50, 0.75, 0.95],

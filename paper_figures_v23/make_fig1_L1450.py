@@ -47,7 +47,7 @@ from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
-from hst_sample import load_adopted, add_logL1450
+from hst_sample import load_adopted, add_logL1450, plot_hst
 from ref_samples import load_sdss, load_gnirs
 
 C_ANG = 2.998e18           # speed of light in Angstrom/s
@@ -89,9 +89,7 @@ def load_hst_data(data_dir):
     return {
         'z': hst["z"].values,
         'logL': hst["logLnu1450"].values,
-        'rm_classical': hst["rm_classical"].values,
-        'rm_other': hst["rm_other"].values,
-        'rm_none': hst["rm_none"].values,
+        'table': hst,
     }
 
 
@@ -109,21 +107,7 @@ def create_figure(hst_data, sdss_data, gnirs_data):
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
     fig, ax = plt.subplots(1, 1, figsize=(10, 9))
 
-    # HST sample.  zorder: not-RM triangles at the bottom, classical RM above
-    # them, and the open SDSS-RM/SEAMBH circles on top so none is hidden.
-    z, L = hst_data['z'], hst_data['logL']
-    m = hst_data['rm_classical']
-    ax.plot(z[m], L[m], marker="o", markersize=15, markerfacecolor=cs[3],
-            markeredgecolor="k", linestyle="", zorder=3,
-            label="HST, classical RM (%d)" % m.sum())
-    m = hst_data['rm_other']
-    ax.plot(z[m], L[m], marker="o", markersize=13.5, markerfacecolor="w",
-            markeredgecolor=cs[3], mew=1.8, linestyle="", zorder=4,
-            label="HST, SDSS-RM/SEAMBH (%d)" % m.sum())
-    m = hst_data['rm_none']
-    ax.plot(z[m], L[m], marker="^", markersize=16.5, markerfacecolor=cs[4],
-            markeredgecolor="k", linestyle="", zorder=2,
-            label="HST, other (%d)" % m.sum())
+    plot_hst(ax, hst_data['z'], hst_data['logL'], hst_data['table'])
 
     # SDSS contours and GNIRS-DQS, both interpolated to 1450 A
     plot_contour(sdss_data['z'], sdss_data['logL'], c=cs[2], mark="o",
