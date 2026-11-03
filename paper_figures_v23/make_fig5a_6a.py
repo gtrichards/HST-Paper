@@ -6,7 +6,7 @@ Adapted from Trevor McCaffrey's L_versus_blueshift.ipynb
 24, which made L_versus_blue_ICA.pdf and L_versus_c4dist_ICA.pdf (the left
 panels of the paper's Figs 5 and 6).  What changed:
   * HST sample = the adopted v23 sample (manmask 2 or 3), CIV_blue and CIV_EW
-    from CIV_measurements_v23.csv; M_BH categories and L1450 from hst_sample.py.
+    from CIV_measurements_v23.csv; RM-program groups (as in Fig 1) and L1450 from hst_sample.py.
   * x axis is L_1450 for all samples; SDSS / GNIRS-DQS interpolated to
     1450 A per object (ref_samples.py), as in Fig 1.
     The secondary L_bol axis is removed.  The L_bol = 3e45 erg/s line is
@@ -60,18 +60,22 @@ plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
 
 
-def plot_hst(ax, x, y, mask_rm, mask_sr, mask_no_mbh):
-    """Trevor's three HST symbols."""
+def plot_hst(ax, x, y, rm_classical, rm_other, rm_none):
+    """HST symbols by RM program, as in Figure 1 (make_fig1_L1450.py).
+
+    zorder: not-RM triangles at the bottom, classical RM above them, and the
+    open SDSS-RM/SEAMBH circles on top so none is hidden.
+    """
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
-    ax.plot(x[mask_rm], y[mask_rm], marker="o", markersize=15,
-            markerfacecolor=cs[3], markeredgecolor="k",
-            label="HST, RM $M_{BH}$", linestyle="", zorder=3)
-    ax.plot(x[mask_sr], y[mask_sr], marker="o", markersize=13.5,
-            markerfacecolor="w", markeredgecolor=cs[3], mew=1.8,
-            label="HST, Scaling $M_{BH}$", linestyle="", zorder=2)
-    ax.plot(x[mask_no_mbh], y[mask_no_mbh], marker="^", markersize=16.5,
-            markerfacecolor=cs[4], markeredgecolor="k",
-            label="HST, no $M_{BH}$", linestyle="", zorder=2)
+    ax.plot(x[rm_classical], y[rm_classical], marker="o", markersize=15,
+            markerfacecolor=cs[3], markeredgecolor="k", linestyle="", zorder=3,
+            label="HST, classical RM (%d)" % rm_classical.sum())
+    ax.plot(x[rm_other], y[rm_other], marker="o", markersize=13.5,
+            markerfacecolor="w", markeredgecolor=cs[3], mew=1.8, linestyle="",
+            zorder=4, label="HST, SDSS-RM/SEAMBH (%d)" % rm_other.sum())
+    ax.plot(x[rm_none], y[rm_none], marker="^", markersize=16.5,
+            markerfacecolor=cs[4], markeredgecolor="k", linestyle="", zorder=2,
+            label="HST, not RM (%d)" % rm_none.sum())
 
 
 def main():
@@ -93,8 +97,8 @@ def main():
     # CIV_distance silently skips a point it cannot place on the curve,
     # which would shift every later value; make sure that did not happen
     assert len(c4dist_hst) == len(hst), "CIV_distance dropped a point"
-    masks = (hst["mask_rm"].values, hst["mask_sr"].values,
-             hst["mask_no_mbh"].values)
+    masks = (hst["rm_classical"].values, hst["rm_other"].values,
+             hst["rm_none"].values)
     print("  HST with L1450: %d" % len(hst))
 
     # ---- SDSS: Rankine+20, luminosity interpolated to 1450 A (ref_samples.py) ----
@@ -114,7 +118,10 @@ def main():
     # HST objects (lowest is NGC 4395 at 24.83).  Explicit limits are needed
     # because Trevor's plot_contour pads its grid far beyond the data.
     xlim = (24.5, 32.6)
-    xlabel = r'log\,$L_{1450\AA}$ [erg\,s$^{-1}$\,Hz$^{-1}$]'
+    # same label as Figure 1's y axis: the Angstrom outside the subscript (at
+    # subscript size its ring sat clear of the A and read as a degree sign),
+    # and L_nu written out because the axis is erg/s/Hz, not nu L_nu
+    xlabel = r'$\log L_\nu(1450\,\mathrm{\AA})$ [erg\,s$^{-1}$\,Hz$^{-1}$]'
 
     # ---- Fig 5a: blueshift vs L (Trevor's cell 22) ----
     fig, ax = plt.subplots(1, 1, figsize=(9, 9.5))
@@ -126,7 +133,7 @@ def main():
             markerfacecolor=cs[2], markeredgecolor="k",
             label="GNIRS-DQS", linestyle="", zorder=1)
     ax.set_ylabel(r'CIV Blueshift [km\,s$^{-1}$]', fontsize=35)
-    ax.set_xlabel(xlabel, fontsize=35)
+    ax.set_xlabel(xlabel, fontsize=32)
     ax.set_xlim(xlim)
     # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
     ax.axvline(lbol_to_lognu1450(np.log10(3e45)), color="b", ls="-", zorder=1)
@@ -153,7 +160,7 @@ def main():
             markerfacecolor=cs[2], markeredgecolor="k",
             label="GNIRS-DQS", linestyle="", zorder=1)
     ax.set_ylabel('CIV Distance [Scaled Units]', fontsize=35)
-    ax.set_xlabel(xlabel, fontsize=35)
+    ax.set_xlabel(xlabel, fontsize=32)
     ax.set_xlim(xlim)
     # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
     ax.axvline(lbol_to_lognu1450(np.log10(3e45)), color="b", ls="-", zorder=1)
