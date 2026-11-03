@@ -310,7 +310,13 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         new_binned_waves, new_binned_fluxes, new_binned_errs, new_binned_masks = \
         LowerResHSTRebin_TVM.HSTLowResRebin(waves[i,:],fluxes[i,:],flux_errs[i,:],masks[i,:],Identifier,z)
         #and morph each individual exposure
-        continuum = spec_morph.cont_filtered(new_binned_waves, new_binned_fluxes, z, Identifier)
+        # IUE coverage sits inside the UV line forest, so the default 100 A
+        # median window often contains no line-free pixel.  See the note in
+        # spec_morph.cont_filtered.  Override per run with HSTICA_CONT_HALFWIDTH.
+        _hw = float(os.environ.get("HSTICA_CONT_HALFWIDTH",
+                                   250.0 if data_origin == "IUE" else 100.0))
+        continuum = spec_morph.cont_filtered(new_binned_waves, new_binned_fluxes, z,
+                                             Identifier, halfwidth=_hw)
 
         #if 1450Å in this exposure, add to list
         if min(new_binned_waves)/(1+z)<1450 and max(new_binned_waves)/(1+z)>1450:

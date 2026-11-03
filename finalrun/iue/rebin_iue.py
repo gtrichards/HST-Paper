@@ -30,6 +30,8 @@ Output: iue/rebin/<NAME>_IUE.fits and iue/rebin_log.csv
 """
 import os, sys, glob, warnings, io, contextlib
 warnings.filterwarnings("ignore")
+import shutil
+
 import numpy as np
 import pandas as pd
 from astropy.io import fits
@@ -42,6 +44,8 @@ TABLE = "/Users/gtr/Work/git/HST-Paper/Data/CIV_measurements_v23.csv"
 SPECTRA = os.path.join(HERE, "spectra")
 OUTDIR = os.path.join(HERE, "rebin")
 LOG = os.path.join(HERE, "rebin_log.csv")
+CHOSEN = os.path.join(HERE, "iue_chosen_run.csv")
+STAGE = os.path.join(HERE, "chosen_run_work")
 
 
 def safe(name):
@@ -50,6 +54,10 @@ def safe(name):
 
 def main():
     os.makedirs(OUTDIR, exist_ok=True)
+    chosen = None
+    if os.path.exists(CHOSEN):
+        chosen = pd.read_csv(CHOSEN).set_index("common_name")
+        print("using the chosen run for %d objects (%s)\n" % (len(chosen), os.path.basename(CHOSEN)))
     tab = pd.read_csv(TABLE)
     m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
     only = set(sys.argv[1:])
@@ -58,7 +66,22 @@ def main():
         name = str(r["common_name"]); z = float(r["z"])
         if only and name not in only:
             continue
-        path = os.path.join(SPECTRA, safe(name))
+        # Only the CHOSEN RUN's exposures, staged into a scratch directory --
+        # the IUE analogue of the single-visit policy (choose_run_iue.py).
+        # Co-adding every exposure averages years of a variable source and, on
+        # 3C 120, produced a spectrum with a negative median where the data are
+        # +8.8e-15.  One run is what the HST pass would have used.
+        if chosen is not None and name in chosen.index:
+            files = str(chosen.loc[name, "files"]).split(";")
+            files = [f for f in files if f and os.path.exists(f)]
+            if not files:
+                print("  %-14s chosen run has no files" % name, flush=True); continue
+            path = os.path.join(STAGE, safe(name))
+            shutil.rmtree(path, ignore_errors=True); os.makedirs(path, exist_ok=True)
+            for f in files:
+                shutil.copy(f, os.path.join(path, os.path.basename(f)))
+        else:
+            path = os.path.join(SPECTRA, safe(name))
         if not os.path.isdir(path):
             print("  %-14s no retrieved spectra" % name, flush=True); continue
         buf = io.StringIO()

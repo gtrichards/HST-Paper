@@ -321,7 +321,21 @@ def emission_lines2(wavelength):
            NeV | NeVI | OII | HeI | HD | HG | HB_OIII | HA )
 
 
-def cont_filtered(wave, flux, z, Identifier):
+def cont_filtered(wave, flux, z, Identifier, halfwidth=100.0):
+    """Local-median continuum.
+
+    `halfwidth` is the half-width in Angstrom of the window the median is taken
+    over, default 100 as it has always been for HST.  It became a parameter on
+    2026-11-03 for IUE: a low-redshift object's IUE coverage is roughly
+    1114-1960 A rest, which is almost entirely inside the UV line forest, so
+    emission_lines2 flags about 70 per cent of it and the unflagged stretches
+    can be 230 A apart.  A 100 A window then lands with no unflagged pixel
+    inside it and returns NaN -- on 3C 120 that left the continuum undefined
+    over three quarters of the range even though the figure shows a flat,
+    obvious continuum at co-add S/N above 20.  The data were never the problem;
+    the window was.  Widening it for IUE does not touch any HST product, which
+    still calls this with the default.
+    """
     # AP: Fixed to handle edge cases where emission lines extend to array boundaries
     #Ignore BAL troughs
     bal = np.zeros(len(wave))
@@ -335,7 +349,7 @@ def cont_filtered(wave, flux, z, Identifier):
         if em[k] or bal[k]:
             med_flux[k] = np.nan
         else:
-            waverange = np.abs(wave-wave[k])<100 #use pixels within 100Å
+            waverange = np.abs(wave-wave[k])<halfwidth #pixels within halfwidth (default 100Å)
             med_flux[k] = np.nanmedian(flux[(~em)&(waverange)])
 
     #locate indices where nan (i.e. emission line) appears

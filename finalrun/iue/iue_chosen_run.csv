@@ -1,0 +1,23 @@
+row_num,common_name,z,camera,run_lo,run_hi,n_exp,run_sn,n_runs,n_exp_total,chosen_by,files
+68,3C 120,0.033,SWP,23799,24165,5,18.74,27,41,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/3C_120/mastDownload/IUE/swp23799/swp23799mxlo_vo.fits;/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/3C_120/mastDownload/IUE/swp23880/swp23880mxlo_vo.fits;/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/3C_120/mastDownload/IUE/swp24115/swp24115mxlo_vo.fits;/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/3C_120/mastDownload/IUE/swp24155/swp24155mxlo_vo.fits;/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/3C_120/mastDownload/IUE/swp24165/swp24165mxlo_vo.fits
+76,MCG8-11-11,0.0205,SWP,26906,27022,2,4.43,6,8,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/MCG8-11-11/mastDownload/IUE/swp26906/swp26906mxlo_vo.fits;/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/MCG8-11-11/mastDownload/IUE/swp27022/swp27022mxlo_vo.fits
+80,MKN 6,0.0188,SWP,13545,13545,1,0.71,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/MKN_6/mastDownload/IUE/swp13545/swp13545mxlo_vo.fits
+81,MKN 374,0.0426,SWP,30214,30214,1,6.3,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/MKN_374/mastDownload/IUE/swp30214/swp30214mxlo_vo.fits
+100,OJ 49,0.1738,SWP,14200,14200,1,11.2,3,3,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/OJ_49/mastDownload/IUE/swp14200/swp14200mxlo_vo.fits
+119,Q 0906+484,0.1173,SWP,32463,32463,1,9.31,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/Q_0906+484/mastDownload/IUE/swp32463/swp32463mxlo_vo.fits
+123,MKN 704,0.0286,SWP,20255,20255,1,4.34,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/MKN_704/mastDownload/IUE/swp20255/swp20255mxlo_vo.fits
+136,PG 0934+0119,0.0503,SWP,53197,53197,1,1.83,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/PG_0934+0119/mastDownload/IUE/swp53197/swp53197mxlo_vo.fits
+141,3C 227,0.0862,SWP,9292,9292,1,1.61,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/3C_227/mastDownload/IUE/swp09292/swp09292mxlo_vo.fits
+229,PG 1151+117,0.176,SWP,30201,30201,1,9.1,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/PG_1151+117/mastDownload/IUE/swp30201/swp30201mxlo_vo.fits
+243,WAS 49,0.0633,SWP,47371,47371,1,0.68,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/WAS_49/mastDownload/IUE/swp47371/swp47371mxlo_vo.fits
+273,IR1249-13,0.0146,SWP,30167,30167,1,4.35,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/IR1249-13/mastDownload/IUE/swp30167/swp30167mxlo_vo.fits
+288,PKS 1308+326,0.9946,LWP,2859,2859,1,1.94,3,4,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/PKS_1308+326/mastDownload/IUE/lwp02859/lwp02859mxlo_vo.fits
+290,PG1310-1051,0.0343,SWP,53889,53889,1,5.38,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/PG1310-1051/mastDownload/IUE/swp53889/swp53889mxlo_vo.fits
+306,MCG-6-30-15,0.0075,SWP,51595,51595,1,0.97,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/MCG-6-30-15/mastDownload/IUE/swp51595/swp51595mxlo_vo.fits
+309,NGC 5273,0.0036,SWP,34825,34825,1,1.61,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/NGC_5273/mastDownload/IUE/swp34825/swp34825mxlo_vo.fits
+318,IC 4329A,0.016,SWP,15883,15883,1,0.94,2,5,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/IC_4329A/mastDownload/IUE/swp15883/swp15883mxlo_vo.fits
+363,QSO1419+48,0.0726,SWP,18951,18951,1,7.57,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/QSO1419+48/mastDownload/IUE/swp18951/swp18951mxlo_vo.fits
+393,Q 1525+227,0.2539,SWP,22204,22204,1,1.78,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/Q_1525+227/mastDownload/IUE/swp22204/swp22204mxlo_vo.fits
+416,PG 1617+175,0.114,SWP,47662,47662,1,11.49,2,2,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/PG_1617+175/mastDownload/IUE/swp47662/swp47662mxlo_vo.fits
+420,QSO 1629+372,0.9254,LWP,25862,25862,1,22.15,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/QSO_1629+372/mastDownload/IUE/lwp25862/lwp25862mxlo_vo.fits
+424,1635+119,0.1474,SWP,33232,33232,1,0.76,1,1,automatic,/Users/gtr/Work/projects/hstica/finalrun/iue/spectra/1635+119/mastDownload/IUE/swp33232/swp33232mxlo_vo.fits
