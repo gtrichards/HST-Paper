@@ -9,8 +9,9 @@ panels of the paper's Figs 5 and 6).  What changed:
     from CIV_measurements_v23.csv; M_BH categories and L1450 from hst_sample.py.
   * x axis is L_1450 for all samples; SDSS / GNIRS-DQS interpolated to
     1450 A per object (ref_samples.py), as in Fig 1.
-    The secondary L_bol axis and the L_bol = 3e45 line are removed (Trevor's
-    bolometric correction is for L_2500).
+    The secondary L_bol axis is removed.  The L_bol = 3e45 erg/s line is
+    kept, as a vertical line at the same L_nu(1450) as Fig 1's horizontal one
+    (Krawczyk et al. 2013; make_fig1_L1450.lbol_to_lognu1450).
   * HST C IV distance is computed here from (CIV_blue, log CIV_EW) with
     Trevor's own CIV_distance() and best-fit curve, from the CIV_Distance
     repository (github.com/trevormccaffrey/CIV_Distance), assumed cloned at
@@ -47,6 +48,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted, add_logL1450
 from ref_samples import load_sdss, load_gnirs
+from make_fig1_L1450 import lbol_to_lognu1450   # one definition for all figures
 
 CIVDIST_DIR = os.path.expanduser("~/Work/git/CIV_Distance/")
 sys.path.insert(0, CIVDIST_DIR)
@@ -126,6 +128,8 @@ def main():
     ax.set_ylabel(r'CIV Blueshift [km\,s$^{-1}$]', fontsize=35)
     ax.set_xlabel(xlabel, fontsize=35)
     ax.set_xlim(xlim)
+    # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
+    ax.axvline(lbol_to_lognu1450(np.log10(3e45)), color="b", ls="-", zorder=1)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.legend(frameon=True, labelspacing=0.1, loc="upper left", prop={"size": 20})
     ax.set_ylim(-1299.99, 6199)   # Trevor: -599.99; see docstring
@@ -151,6 +155,8 @@ def main():
     ax.set_ylabel('CIV Distance [Scaled Units]', fontsize=35)
     ax.set_xlabel(xlabel, fontsize=35)
     ax.set_xlim(xlim)
+    # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
+    ax.axvline(lbol_to_lognu1450(np.log10(3e45)), color="b", ls="-", zorder=1)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.set_ylim(-0.05, 1.25)
     plt.tight_layout()
