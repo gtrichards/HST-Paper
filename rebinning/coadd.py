@@ -391,7 +391,24 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
     Step 3: Now that data are rebinned, co-add them
             to get the variance-weighted median spectrum.
     """
-    if data_origin=="FOS" or data_origin=="STIS" or data_origin=="COS" or data_origin=="SDSS-RM":
+    #: IUE joined this branch on 2026-11-03, by GTR's decision: "we can co-add in
+    #: the same way as for HST (spectra taken nearby in time)".  Until then "IUE"
+    #: was absent from this list, so every IUE object fell through to the
+    #: no-co-add `else` below and the product carried old_binned_*[0] -- the
+    #: FIRST exposure alone.  3C 120's chosen run has five exposures and four of
+    #: them were read, rebinned and discarded; rebinning that one file by itself
+    #: reproduced the five-exposure product bit for bit, which is how this was
+    #: found.  The chosen-run policy (finalrun/iue/choose_run_iue.py) already
+    #: selects one observing run per object, so the exposures reaching here are
+    #: close in time by construction -- the IUE analogue of the single-visit
+    #: policy, and what makes co-adding them the same operation as for HST.
+    #:
+    #: screen_exposures below is called with its default drop=False, so it scores
+    #: and reports without removing anything; adding IUE here therefore buys the
+    #: co-addition without subjecting IUE to a screening statistic tuned on STIS
+    #: echelle orders.
+    if (data_origin=="FOS" or data_origin=="STIS" or data_origin=="COS"
+            or data_origin=="SDSS-RM" or data_origin=="IUE"):
         keep_exp, _dropped = screen_exposures(old_binned_fluxes, old_binned_errs,
                                               old_binned_masks, Identifier, data_origin)
         if not keep_exp.all():
