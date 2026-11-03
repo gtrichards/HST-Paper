@@ -3,7 +3,12 @@ The SDSS (Rankine+20) and GNIRS-DQS comparison samples, shared by the figure
 scripts, with their luminosity moved to 1450 A so it is on the same axis as HST.
 
 Both catalogues give log(lambda L_lambda) at 1350 and 2500 A (LOGL1350_dr16,
-LOGL2500_dr16).  For each object the value at 1450 A is interpolated along
+LOGL2500_dr16).  These are Wu & Shen (2022) DR16Q spectral-property values
+(LOGL1350, LOGL2500; EBV_dr16 is their EBV), joined by position in TOPCAT on
+2023-01-02.  Checked 2026-11-02 against dr16q_prop_Oct23_2022.fits.gz from
+http://quasar.astro.illinois.edu/paper_data/DR16Q/ (the release that first had
+LOGL2500): every SDSS value (130,118 at 1350, 138,554 at 2500) and every
+GNIRS-DQS value (169, 165) is identical.  For each object the value at 1450 A is interpolated along
 that object's own power law between the two:
 
     log lamL(1450) = log lamL(1350)
