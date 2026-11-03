@@ -17,8 +17,11 @@ Adapted from Plotting Code/make_fig1.py (Trevor McCaffrey).  What changed:
     (half-height 0.11-0.12 dex on this axis).
   * SDSS and GNIRS-DQS are interpolated to 1450 A per object
     (ref_samples.py).
-  * The secondary L_bol axis and the L_bol = 3e45 line are removed, because
-    Trevor's bolometric correction is for L_2500.  The Temple option is
+  * The secondary L_bol axis is removed (Trevor's bolometric correction is
+    for L_2500).  The L_bol = 3e45 erg/s line -- where AGN wind feedback has
+    been argued to matter (Veilleux+13; Zakamska & Greene 14) -- is kept,
+    moved to 1450 A with Runnoe, Brotherton & Shang (2012) eq. 9 and their
+    L_bol = 0.75 L_iso viewing-angle factor: log L_nu(1450) = 29.59.  The Temple option is
     removed because Temple+21 gives L3000, not L1450.
   * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
 
@@ -47,6 +50,21 @@ from hst_sample import load_adopted, add_logL1450
 from ref_samples import load_sdss, load_gnirs
 
 C_ANG = 2.998e18           # speed of light in Angstrom/s
+
+
+def lbol_to_lognu1450(logLbol):
+    """log L_nu(1450 A) [erg/s/Hz] for a given log L_bol [erg/s].
+
+    Inverts Runnoe, Brotherton & Shang 2012 (MNRAS 422, 478), eq. 9,
+        log L_iso = 4.74 + 0.91 log(1450 L_1450),
+    with their viewing-angle adjustment L_bol = 0.75 L_iso (Table 4 note).
+    For L_bol = 3e45 this gives 29.59; other reasonable choices (no 0.75
+    factor; their linear zeta_1450 = 4.2; Trevor's old L2500 line moved to
+    1450 A) give 29.45-29.66.
+    """
+    log_liso = logLbol - np.log10(0.75)
+    log_lamL1450 = (log_liso - 4.74) / 0.91
+    return log_lamL1450 - np.log10(C_ANG / 1450.)       # lambda L_lambda -> L_nu
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
@@ -103,6 +121,10 @@ def create_figure(hst_data, sdss_data, gnirs_data):
             markerfacecolor=cs[2], markeredgecolor="k",
             label="GNIRS-DQS", linestyle="", zorder=3)
 
+    # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
+    L_wind = lbol_to_lognu1450(np.log10(3e45))
+    ax.plot([-1e5, 1e5], [L_wind, L_wind], "-b", zorder=1)
+
     ax.set_xlabel('Redshift', fontsize=35)
     # The Angstrom is OUT of the subscript: \AA at subscript size in Computer
     # Modern sets the ring well clear of the A and reads as a degree sign.
@@ -133,6 +155,8 @@ def main():
     gnirs_data = load_gnirs_data(data_dir)
     print("  HST %d, SDSS %d, GNIRS-DQS %d"
           % (len(hst_data['z']), len(sdss_data['z']), len(gnirs_data['z'])))
+    print("  L_bol = 3e45 line at log L_nu(1450) = %.3f"
+          % lbol_to_lognu1450(np.log10(3e45)))
     print("  HST log L1450 range %.2f to %.2f"
           % (hst_data['logL'].min(), hst_data['logL'].max()))
 
