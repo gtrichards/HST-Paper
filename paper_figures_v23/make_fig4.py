@@ -91,7 +91,7 @@ def main():
     ax.set_xlabel(r'CIV Blueshift [km\,s$^{-1}$]', fontsize=35)
     ax.set_ylabel(r'$\log_{10}$\,CIV\,EW [Å]', fontsize=35)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
-    ax.legend(frameon=True, labelspacing=0.1, loc="best", prop={"size": 20})
+    ax.legend(frameon=True, labelspacing=0.1, loc="best", prop={"size": 16})
     ax.set_xlim(-1299.99, 6199)
     ax.set_ylim(0.62, 2.92)   # Trevor: 2.72; see docstring
     plt.tight_layout()

@@ -131,7 +131,7 @@ def create_figure(hst_data, sdss_data, gnirs_data):
                   fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.legend(frameon=True, labelspacing=0.1, loc="lower right",
-              prop={"size": 20})
+              prop={"size": 16})
     ax.set_xlim(-0.16575, 3.25)
     # Trevor used 27.1-32.5 for L2500; extended down to take in the low-L
     # HST objects (lowest is NGC 4395 at 24.83).  Explicit limits are needed

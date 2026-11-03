@@ -125,7 +125,7 @@ def main():
     # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
     ax.axvline(lbol_to_lognu1450(np.log10(3e45)), color="b", ls="-", zorder=1)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
-    ax.legend(frameon=True, labelspacing=0.1, loc="upper left", prop={"size": 20})
+    ax.legend(frameon=True, labelspacing=0.1, loc="upper left", prop={"size": 16})
     ax.set_ylim(-1299.99, 6199)   # Trevor: -599.99; see docstring
     plt.tight_layout()
     if labeled:

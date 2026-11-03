@@ -90,26 +90,36 @@ def add_logL1450(hst, data_dir):
 
 
 def plot_hst(ax, x, y, hst):
-    """HST symbols by RM program, shared by Figures 1, 4, 5a and 6a.
+    """HST symbols, shared by Figures 1, 4, 5a and 6a.
 
-    hst is the table from load_adopted (rows aligned with x and y).  zorder:
-    "other" triangles at the bottom, classical RM above them, and the open
-    SDSS-RM/SEAMBH circles on top so none is hidden.
+    Colour = RM program: classical RM pink, SDSS-RM/SEAMBH orange, other green
+    (circles for the RM groups, triangles for other).  Fill = C IV status:
+    filled for Q = 3 (manmask 3), open for Q = 2 (measured with a reservation),
+    matching Table 1's Q column.  hst is the table from load_adopted (rows
+    aligned with x and y).  zorder: filled points by group (other at the
+    bottom), then all the open points above every filled one, so the
+    reservations are never hidden.
     """
     import palettable
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
-    m = hst["rm_classical"].values
-    ax.plot(x[m], y[m], marker="o", markersize=15, markerfacecolor=cs[3],
-            markeredgecolor="k", linestyle="", zorder=3,
-            label="HST, classical RM (%d)" % m.sum())
-    m = hst["rm_other"].values
-    ax.plot(x[m], y[m], marker="o", markersize=13.5, markerfacecolor="w",
-            markeredgecolor=cs[3], mew=1.8, linestyle="", zorder=4,
-            label="HST, SDSS-RM/SEAMBH (%d)" % m.sum())
-    m = hst["rm_none"].values
-    ax.plot(x[m], y[m], marker="^", markersize=16.5, markerfacecolor=cs[4],
-            markeredgecolor="k", linestyle="", zorder=2,
-            label="HST, other (%d)" % m.sum())
+    q2 = hst["CIVgood_manmask"].values == 2
+    groups = [  # (mask, colour, marker, size, filled zorder, label)
+        (hst["rm_classical"].values, cs[3], "o", 15, 3, "HST, classical RM"),
+        (hst["rm_other"].values, cs[1], "o", 15, 4, "HST, SDSS-RM/SEAMBH"),
+        (hst["rm_none"].values, cs[4], "^", 16.5, 2, "HST, other"),
+    ]
+    for g, col, mk, ms, zo, lab in groups:
+        f, o = g & ~q2, g & q2
+        ax.plot(x[f], y[f], marker=mk, markersize=ms, markerfacecolor=col,
+                markeredgecolor="k", linestyle="", zorder=zo,
+                label="%s (%d; %d open)" % (lab, g.sum(), o.sum()))
+        ax.plot(x[o], y[o], marker=mk, markersize=0.9 * ms, markerfacecolor="w",
+                markeredgecolor=col, mew=1.8, linestyle="", zorder=zo + 3,
+                label="_nolegend_")
+    # legend key for the open symbols
+    ax.plot([], [], marker="o", markersize=12, markerfacecolor="w",
+            markeredgecolor="0.3", mew=1.8, linestyle="",
+            label="open: measured with a reservation (Q=2)")
 
 
 def label_objects(ax, x, y, hst, figure, data_dir):
