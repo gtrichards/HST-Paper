@@ -72,6 +72,56 @@ from rebinning import spec_morph
 _SDSS_REF_SPEC = Path(__file__).parent.parent / "Data" / "spec-0266-51630-0080.fits"
 
 
+def _descale(cont, *factors):
+    """Divide `factors` out of a continuum so that arb flux x continuum = f_lambda.
+
+    The invariant the "Continuum Normalisation" column is supposed to satisfy is
+
+        Coadded Flux (Arbitrary Units) x Continuum Normalisation = f_lambda
+
+    in the OBSERVED frame -- only the wavelength column is de-redshifted on the
+    way out.  Every division applied to the stored flux has to be multiplied back
+    in here, and every multiplication divided out, or the column is not that
+    number and there is no absolute scale.
+
+    It was not that number until 2026-11-03.  `spec_morph.morph2` MULTIPLIES the
+    flux by its morph coefficient -- `cont_morph / cont_spec`, the reference
+    quasar continuum over the continuum of the already-normalised spectrum, so
+    about 3, since it lifts a spectrum sitting near 1 up onto the reference
+    continuum -- and nothing divided that coefficient back out of the continuum
+    column.  So `cn x arb` over-counted the continuum once and every luminosity
+    built on it was high by the morph coefficient: a median 0.495 dex across the
+    399 chosen-visit products with 1450 A coverage, and because the coefficient
+    is the reference continuum sampled at the observed wavelength it is
+    redshift-dependent (0.497 dex at z < 0.5 against 0.432 dex at z = 1-1.5), so
+    it was a tilt in L-z and not a constant offset.  Verified against two
+    independent archives: NGC 3783's raw FOS exposures give f_lambda(1450) =
+    6.86e-14 where this column already read 6.84e-14 and the recorded
+    f_lambda_cgs read 2.05e-13, high by exactly its own f_lambda of 2.995; 3C
+    120's native IUE MXLO co-add gives 1.04e-14 against cn x arb of 2.91e-14,
+    which divided by that object's morph coefficient of 2.9345 is 9.90e-15.
+
+    The morph itself is correct and deliberate -- it is Rankine's prescription,
+    and it is what the ICA components are fitted against -- so nothing here
+    touches the flux.  Blueshifts and equivalent widths are measured on the
+    morphed spectrum and are unaffected; only the recovery of the absolute scale
+    was wrong.
+
+    A factor that is zero or non-finite leaves no recoverable scale at that
+    pixel, so the continuum is NaN there rather than infinite: that is already
+    how an uncalibrated pixel is reported, and it keeps a near-zero morph
+    coefficient -- which happens where `cont_spec` crosses zero, as it does on
+    the six COS objects whose red edge collapses -- from manufacturing an
+    enormous flux out of a pixel that has no scale at all.
+    """
+    out = np.asarray(cont, float).copy()
+    for f in factors:
+        f = np.asarray(f, float)
+        good = np.isfinite(f) & (f != 0)
+        out = np.where(good, out / np.where(good, f, 1.0), np.nan)
+    return out
+
+
 def _weighted_median_pair(fluxes, errs, weights):
     """Weighted median of the contributing exposures at one pixel.
 
@@ -489,9 +539,15 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
             #: again by varweighted_continuum just above, so the product of the
             #: two is what restores it; the SDSS segment carries its own
             #: sdss_continuum.
-            final_cont = np.concatenate((
-                varweighted_cont[argstart:argcut] * varweighted_continuum[argstart:argcut],
-                sdss_continuum))
+            #: Both segments are morphed twice: the HST half by
+            #: varweighted_morph_factor and the SDSS half by sdss_morph_factor
+            #: above, then the concatenation again by final_morph_factor, which
+            #: this branch does apply to the flux.  All of it divides back out.
+            final_cont = _descale(np.concatenate((
+                _descale(varweighted_cont[argstart:argcut] * varweighted_continuum[argstart:argcut],
+                         varweighted_morph_factor[argstart:argcut]),
+                _descale(sdss_continuum, sdss_morph_factor))),
+                final_morph_factor)
         else:
             #there's a gap between HST and SDSS waves
             gap_wave    = 10.**np.arange(np.log10(max(hst_wave_new))+final_res, np.log10(min(sdss_wave)), final_res)
@@ -506,9 +562,15 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
             final_mask = np.concatenate((varweighted_mask[argstart:], gap_ones, sdss_ANDMask))
             #: Same as the overlap case above; the gap itself has no continuum,
             #: matching the NaN flux already written there.
+            #: Only one morph each here, unlike the overlap case above: this
+            #: branch discards morph2's flux into `_` and never multiplies
+            #: final_morph_factor into final_flux or final_errs, so it must not
+            #: be divided out of the continuum either.
             final_cont = np.concatenate((
-                varweighted_cont[argstart:] * varweighted_continuum[argstart:],
-                gap_nans, sdss_continuum))
+                _descale(varweighted_cont[argstart:] * varweighted_continuum[argstart:],
+                         varweighted_morph_factor[argstart:]),
+                gap_nans,
+                _descale(sdss_continuum, sdss_morph_factor)))
     else:
         """
         Step 5b: Morph variance-weighted-median-continuum-normalized HST spectrum.
@@ -518,7 +580,11 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         final_flux = varweighted_flux[argstart:]
         final_errs = varweighted_errs[argstart:] * varweighted_morph_factor[argstart:]
         final_mask = varweighted_mask[argstart:]
-        final_cont = varweighted_cont[argstart:]
+        #: morph2 just multiplied the flux by varweighted_morph_factor, and the
+        #: line above multiplies the errors by it too; divide it out of the
+        #: continuum so that arb x cn is f_lambda again.  See _descale.
+        final_cont = _descale(varweighted_cont[argstart:],
+                              varweighted_morph_factor[argstart:])
     """
     Finally, save!
     """

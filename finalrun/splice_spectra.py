@@ -84,7 +84,23 @@ C_CONT = "Continuum Normalisation"
 STEP = 1e-4 * np.log(10.0)
 
 MAST = os.path.join(HERE, "data_v23", "MAST_v23")
-REBIN = os.path.join(HERE, "pipeline_output", "chosen_visit", "rebin")
+#: The rebinned products this reads the chosen visit from, and writes the
+#: spliced product back into.  Overridable, following the same convention
+#: rebin_path.py sets for the rest of the pass, so the splice can be rebuilt
+#: against a corrected tree:
+#:
+#:     HSTICA_REBIN=.../chosen_visit/rebin_morphfix python splice_spectra.py --index 90
+#:
+#: which is how index 90 was rebuilt on 2026-11-03 after the morph coefficient
+#: was divided out of the Continuum Normalisation column
+#: (sweeps/fix_luminosity_morph.py).  The splice carries each side's continuum
+#: column through unchanged rather than recomputing it, so it inherits whatever
+#: the source products hold -- including, before that date, the morph factor
+#: that should never have been in them.  The donor is rebinned by this script
+#: itself, so a re-run picks up the corrected code for the donor and the
+#: corrected tree for the host.
+REBIN = os.environ.get(
+    "HSTICA_REBIN", os.path.join(HERE, "pipeline_output", "chosen_visit", "rebin"))
 WORK = os.path.join(HERE, "pipeline_output", "chosen_visit", "splice_work")
 
 #: Columns of the rebinned products, and the SDSS log lattice they share.
