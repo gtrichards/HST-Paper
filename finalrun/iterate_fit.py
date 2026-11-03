@@ -464,7 +464,12 @@ def main():
         # they have already worked; start there rather than from a blank slate.
         # Ranges and pixels are rest-frame wavelengths, and the combined spectrum
         # shares the lattice of its constituents, so they carry straight across.
-        store = json.load(open("/Users/gtr/Work/git/HST-Paper/ica/manual_fix_overrides.json"))
+        # The GUI writes IUE overrides to a separate store (open_fitter_iue.sh
+        # points --overrides at iue/iue_overrides.json) so IUE work cannot land
+        # in the 474-object HST pass.  Honour the same choice here.
+        _store_path = os.environ.get(
+            "HSTICA_OVERRIDES", "/Users/gtr/Work/git/HST-Paper/ica/manual_fix_overrides.json")
+        store = json.load(open(_store_path))
         e = store.get(args.from_store)
         if e is None:
             sys.exit("no curated override for %r" % args.from_store)

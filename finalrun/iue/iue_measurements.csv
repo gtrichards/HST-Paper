@@ -1,0 +1,2 @@
+object_name,spec_name,redshift,CIV_blueshift,CIV_EW,f2500,components_used,override_source,override_summary,plot_file,saved_utc
+3C 120_IUE,3C 120_IUE,0.033,197.48560807496355,150.89084782835636,0.4852074553084204,,none,"json: 8 mask ranges, 2 mask pixs",3C_120_IUE.png,2026-11-03T16:10:20Z
