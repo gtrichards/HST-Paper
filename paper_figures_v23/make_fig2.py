@@ -20,8 +20,9 @@ What changed:
   * The one Sulentic R(Fe II) upper limit is drawn with a leftward arrow.
   * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
   * --labeled writes ONLY Fig2_EV1_optical_labeled.pdf/png, naming the HST
-    objects with the 4 largest R(Fe II) and all with FWHM(Hbeta) > 10000 km/s
-    (GTR 2026-11-03); the plain figure is not touched.
+    objects with the 4 largest R(Fe II) and all with FWHM(Hbeta) > 10000 km/s,
+    plus hst_sample.ALWAYS_LABEL (I Zw 1, PDS 456) (GTR 2026-11-03); the plain
+    figure is not touched.
 
 Data:   Data/Sulentic2007Tables1_2.fit (VizieR, Sulentic+07 Tables 1-2)
         Data/master_catalog_v22.csv    (hbeta_fwhm_rk20, rfeii_rk20 =
@@ -43,7 +44,7 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 
 from trevor_contour import plot_contour   # Trevor's original, see that file
-from hst_sample import load_adopted, plot_hst, designation_to_coord
+from hst_sample import load_adopted, plot_hst, designation_to_coord, ALWAYS_LABEL
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 plt.rcParams['xtick.top'] = True
@@ -149,6 +150,7 @@ def main():
 
     if labeled:   # 4 largest R(Fe II), and every FWHM(Hbeta) > 10000 km/s
         lab = hst["RFeII"].rank(ascending=False, method="first").le(4).values | (y > 10000)
+        lab = lab | hst["row_num"].isin(ALWAYS_LABEL).values   # I Zw 1, PDS 456
         for xi, yi, n in zip(x[lab], y[lab], hst["common_name"].values[lab]):
             ax.annotate(n, (xi, yi), xytext=(6, 3), textcoords="offset points",
                         fontsize=11, zorder=10)

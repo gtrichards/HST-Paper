@@ -122,6 +122,11 @@ def plot_hst(ax, x, y, hst):
             label="open: measured with a reservation (Q=2)")
 
 
+#: Objects named in EVERY labeled figure, in addition to each figure's own list
+#: (Table 1 row numbers): I Zw 1 (#22) and PDS 456 (#436), GTR 2026-11-03.
+ALWAYS_LABEL = {22, 436}
+
+
 def label_objects(ax, x, y, hst, figure, data_dir):
     """Name the objects listed for this figure in Data/labeled_objects_v23.csv.
 
@@ -131,7 +136,7 @@ def label_objects(ax, x, y, hst, figure, data_dir):
     point, with no attempt to stop them overlapping.
     """
     lab = pd.read_csv(os.path.join(data_dir, "labeled_objects_v23.csv"))
-    want = set(lab.loc[lab["figure"].astype(str) == figure, "row_num"])
+    want = set(lab.loc[lab["figure"].astype(str) == figure, "row_num"]) | ALWAYS_LABEL
     m = hst["row_num"].isin(want).values
     for xi, yi, n in zip(x[m], y[m], hst["common_name"].values[m]):
         ax.annotate(n, (xi, yi), xytext=(4, 4), textcoords="offset points",
