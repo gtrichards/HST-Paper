@@ -39,16 +39,28 @@ LEDGER = "/Users/gtr/Work/git/HST-Paper/Data/decisions.csv"
 MARK = "*** LUMINOSITY CORRECTION, 2026-11-03 (MORPH COEFFICIENT)"
 QUOTES = re.compile(r"(?:log\s*)?L\s*_?(?:1450|1700|2500)\s*(?:=|of|is|:)?\s*\d{2}\.\d{1,4}", re.I)
 
-#: The objects whose adopted product could not be regenerated, so whose
-#: luminosity is NOT corrected and is still high by the morph coefficient.
-#: fix_luminosity_morph.py refuses to write a product whose flux, errors or mask
-#: do not come back bit-identical, and index 237's did not: 353 pixels change
-#: their finite/NaN pattern and the flux differs by a median 14 per cent, so the
-#: adopted product is not reproducible from the current code and staged
-#: exposures.  That is a pre-existing irreproducibility, unrelated to this fix --
-#: the only executable change to coadd.py is the final_cont assignments, which
-#: cannot touch flux -- but it means this row cannot be corrected here.
-UNCORRECTED = {237}
+#: Objects whose adopted product could not be regenerated, and whose luminosity
+#: is therefore NOT corrected.  Empty as of 2026-11-03.
+#:
+#: Index 237 was the only entry.  fix_luminosity_morph.py refuses to write a
+#: product whose flux, errors or mask do not come back bit-identical, and 237's
+#: did not: 353 pixels changed their finite/NaN pattern, the co-add running to
+#: 1979 A rest where the stored product stopped at 1578.  Chasing the cause
+#: through the history found nothing -- the co-add is deterministic, the staged
+#: exposures predate the product, there is no exposure override and no BAL
+#: trough, and rebuilding at every commit that touched rebinning/ reproduced the
+#: stored product every time.  What resolved it was GTR rebuilding the object
+#: with fit_chosen_visit.py --index 237 and confirming the fit in the
+#: interactive fitter: the rebuilt product reproduces exactly across repeat
+#: runs, so the exact factor applied and no estimate was needed.  The likeliest
+#: explanation is that that run re-staged the exposures and the earlier staging
+#: was what differed, not the code.
+#:
+#: Cross-check that the arithmetic rescaling is sound: iter07_chosen_visit,
+#: computed from scratch against the corrected product rather than rescaled,
+#: gives log L1450 = 44.430 where the rescaled BEST gives 44.411 -- 0.019 dex
+#: apart, the residual being GTR's mask against the automatic one.
+UNCORRECTED = set()
 
 CAUSE = (
     "CAUSE: spec_morph.morph2 MULTIPLIES the flux by its morph coefficient "
