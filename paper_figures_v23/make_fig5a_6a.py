@@ -75,7 +75,7 @@ def plot_hst(ax, x, y, rm_classical, rm_other, rm_none):
             zorder=4, label="HST, SDSS-RM/SEAMBH (%d)" % rm_other.sum())
     ax.plot(x[rm_none], y[rm_none], marker="^", markersize=16.5,
             markerfacecolor=cs[4], markeredgecolor="k", linestyle="", zorder=2,
-            label="HST, not RM (%d)" % rm_none.sum())
+            label="HST, other (%d)" % rm_none.sum())
 
 
 def main():

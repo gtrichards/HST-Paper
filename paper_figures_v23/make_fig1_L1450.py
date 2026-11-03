@@ -123,7 +123,7 @@ def create_figure(hst_data, sdss_data, gnirs_data):
     m = hst_data['rm_none']
     ax.plot(z[m], L[m], marker="^", markersize=16.5, markerfacecolor=cs[4],
             markeredgecolor="k", linestyle="", zorder=2,
-            label="HST, not RM (%d)" % m.sum())
+            label="HST, other (%d)" % m.sum())
 
     # SDSS contours and GNIRS-DQS, both interpolated to 1450 A
     plot_contour(sdss_data['z'], sdss_data['logL'], c=cs[2], mark="o",
