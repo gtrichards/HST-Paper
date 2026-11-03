@@ -25,7 +25,12 @@ panels of the paper's Figs 5 and 6).  What changed:
     see ties) is kept, with a fixed random seed so the figure is reproducible.
 
 Usage:
-    PYTHONPATH=~/Work/git python make_fig5a_6a.py
+    PYTHONPATH=~/Work/git python make_fig5a_6a.py            # plain figures
+    PYTHONPATH=~/Work/git python make_fig5a_6a.py --labeled  # named objects
+
+--labeled writes ONLY the *_labeled.pdf/png files (never the plain ones), with
+the objects listed in Data/labeled_objects_v23.csv named (hst_sample.label_objects).
+
 Output: Figures/Fig5a_CIV_blue_versus_L1450.pdf
         Figures/Fig6a_CIV_dist_versus_L1450.pdf
 """
@@ -46,7 +51,7 @@ from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
-from hst_sample import load_adopted, add_logL1450, plot_hst
+from hst_sample import load_adopted, add_logL1450, plot_hst, label_objects
 from ref_samples import load_sdss, load_gnirs
 from make_fig1_L1450 import lbol_to_lognu1450   # one definition for all figures
 
@@ -61,6 +66,8 @@ plt.rcParams['ytick.right'] = True
 
 
 def main():
+    labeled = "--labeled" in sys.argv
+    suffix = "_labeled" if labeled else ""
     data_dir = os.path.join(HERE, "..", "Data")
     out_dir = os.path.join(HERE, "..", "Figures")
     os.makedirs(out_dir, exist_ok=True)
@@ -121,7 +128,9 @@ def main():
     ax.legend(frameon=True, labelspacing=0.1, loc="upper left", prop={"size": 20})
     ax.set_ylim(-1299.99, 6199)   # Trevor: -599.99; see docstring
     plt.tight_layout()
-    out = os.path.join(out_dir, "Fig5a_CIV_blue_versus_L1450.pdf")
+    if labeled:
+        label_objects(ax, logL_hst, c4blue_hst, hst, "5a", data_dir)
+    out = os.path.join(out_dir, "Fig5a_CIV_blue_versus_L1450%s.pdf" % suffix)
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
     print("saved", out)
@@ -147,7 +156,9 @@ def main():
     ax.tick_params(axis='both', which='major', labelsize=27.5)
     ax.set_ylim(-0.05, 1.25)
     plt.tight_layout()
-    out = os.path.join(out_dir, "Fig6a_CIV_dist_versus_L1450.pdf")
+    if labeled:
+        label_objects(ax, logL_hst, c4dist_hst, hst, "6a", data_dir)
+    out = os.path.join(out_dir, "Fig6a_CIV_dist_versus_L1450%s.pdf" % suffix)
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
     print("saved", out)

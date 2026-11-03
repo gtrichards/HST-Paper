@@ -110,3 +110,20 @@ def plot_hst(ax, x, y, hst):
     ax.plot(x[m], y[m], marker="^", markersize=16.5, markerfacecolor=cs[4],
             markeredgecolor="k", linestyle="", zorder=2,
             label="HST, other (%d)" % m.sum())
+
+
+def label_objects(ax, x, y, hst, figure, data_dir):
+    """Name the objects listed for this figure in Data/labeled_objects_v23.csv.
+
+    That list is every HST object inside a region GTR boxed by hand on the
+    plain figure PNGs (2026-11-02/03); it is for reference while the figures
+    are being designed, so the labels are simply put just above-right of each
+    point, with no attempt to stop them overlapping.
+    """
+    lab = pd.read_csv(os.path.join(data_dir, "labeled_objects_v23.csv"))
+    want = set(lab.loc[lab["figure"].astype(str) == figure, "row_num"])
+    m = hst["row_num"].isin(want).values
+    for xi, yi, n in zip(x[m], y[m], hst["common_name"].values[m]):
+        ax.annotate(n, (xi, yi), xytext=(4, 4), textcoords="offset points",
+                    fontsize=9, zorder=6)
+    print("  labelled %d objects (Fig %s)" % (m.sum(), figure))

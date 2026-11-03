@@ -37,13 +37,17 @@ from astropy.table import Table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
-from hst_sample import load_adopted, plot_hst
+from hst_sample import load_adopted, plot_hst, label_objects
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
 
 
 def main():
+    # --labeled writes ONLY Fig4_..._labeled.pdf/png, naming the objects in
+    # Data/labeled_objects_v23.csv; the plain figure is not touched.
+    labeled = "--labeled" in sys.argv
+    suffix = "_labeled" if labeled else ""
     data_dir = os.path.join(HERE, "..", "Data")
     out_dir = os.path.join(HERE, "..", "Figures")
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
@@ -101,7 +105,9 @@ def main():
               % (r.row_num, r.common_name, r.CIV_blue, r.CIV_EW))
 
     os.makedirs(out_dir, exist_ok=True)
-    out = os.path.join(out_dir, "Fig4_CIV_logEW_versus_blue.pdf")
+    if labeled:
+        label_objects(ax, c4blueICA_hst, c4logewICA_hst, hst, "4", data_dir)
+    out = os.path.join(out_dir, "Fig4_CIV_logEW_versus_blue%s.pdf" % suffix)
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
     print("saved", out)
