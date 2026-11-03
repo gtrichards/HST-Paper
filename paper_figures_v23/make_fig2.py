@@ -19,6 +19,9 @@ What changed:
     printed (for the text).
   * The one Sulentic R(Fe II) upper limit is drawn with a leftward arrow.
   * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
+  * --labeled writes ONLY Fig2_EV1_optical_labeled.pdf/png, naming the HST
+    objects with the 4 largest R(Fe II) and all with FWHM(Hbeta) > 10000 km/s
+    (GTR 2026-11-03); the plain figure is not touched.
 
 Data:   Data/Sulentic2007Tables1_2.fit (VizieR, Sulentic+07 Tables 1-2)
         Data/master_catalog_v22.csv    (hbeta_fwhm_rk20, rfeii_rk20 =
@@ -102,7 +105,8 @@ def hst_optical(data_dir, sulentic_first=False):
 def main():
     import sys
     sulentic_first = "--sulentic-first" in sys.argv
-    suffix = "_sulentic_first" if sulentic_first else ""
+    labeled = "--labeled" in sys.argv
+    suffix = ("_sulentic_first" if sulentic_first else "") + ("_labeled" if labeled else "")
     data_dir = os.path.join(HERE, "..", "Data")
     out_dir = os.path.join(HERE, "..", "Figures")
     cs = palettable.colorbrewer.qualitative.Dark2_5.mpl_colors
@@ -143,6 +147,12 @@ def main():
     ax.plot(RFeII_gnirs, Hb_gnirs, marker="v", markersize=11, markerfacecolor=cs[2],
             markeredgecolor="k", label="GNIRS-DQS", linestyle="", zorder=2)
 
+    if labeled:   # 4 largest R(Fe II), and every FWHM(Hbeta) > 10000 km/s
+        lab = hst["RFeII"].rank(ascending=False, method="first").le(4).values | (y > 10000)
+        for xi, yi, n in zip(x[lab], y[lab], hst["common_name"].values[lab]):
+            ax.annotate(n, (xi, yi), xytext=(6, 3), textcoords="offset points",
+                        fontsize=11, zorder=10)
+        print("  labelled %d objects" % lab.sum())
     ax.text(0.97, 0.60, "SDSS with R(Fe\\,{\\sc ii})\\,=\\,0 not shown\n(%s, %d\\%%)"
             % (format(n_zero, ","), round(100 * n_zero / (n_zero + len(Hb_sdss)))),
             transform=ax.transAxes, ha="right", va="top", fontsize=14)
