@@ -7,6 +7,7 @@ which made figures/CIV_logEW_versus_blue_ICA.pdf.  What changed:
   * HST sample = the adopted v23 sample (manmask 2 or 3), with CIV_blue and
     CIV_EW from CIV_measurements_v23.csv instead of CIV_blue_tvm / CIV_EW_tvm.
   * HST symbols mark RM-program membership, as in Fig 1 (hst_sample.plot_hst).
+  * The C IV distance curve (CIV_Distance/data/bestfit.npy) is overplotted.
   * SDSS contours use Trevor's original plot_contour (trevor_contour.py).
   * y axis extended from 2.72 to 2.92 to take in the high-EW HST objects.
     Two objects are deliberately left off the plot, each far from the rest
@@ -79,6 +80,14 @@ def main():
     fig, ax = plt.subplots(1, 1, figsize=(9, 9))
 
     plot_hst(ax, c4blueICA_hst, c4logewICA_hst, hst)
+
+    # The C IV distance curve (Trevor's best-fit curve through the SDSS quasars,
+    # CIV_Distance/data/bestfit.npy, columns blueshift and log10 EW) -- the
+    # line D_CIV is measured along.  It runs from blueshift 50 km/s,
+    # log EW 2.50 (EW 316 A, D = 0) to 6000 km/s, log EW 1.12; objects beyond
+    # its high-EW end all project onto that end and get D = 0.
+    bestfit = np.load(os.path.expanduser("~/Work/git/CIV_Distance/data/bestfit.npy"))
+    ax.plot(bestfit[:, 0], bestfit[:, 1], "-k", lw=2.0, zorder=8)   # above all points
 
     plot_contour(c4blueICA_sdss, c4logewICA_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,
