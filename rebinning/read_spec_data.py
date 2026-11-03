@@ -252,7 +252,60 @@ def read_data_flat(name, path, data_origin, z):
         return read_stis_flat(name, path, z)
     elif data_origin == "FOS":
         return read_fos_flat(name, path, z)
+    elif data_origin == "IUE":
+        return read_iue_flat(name, path, z)
     print("data_origin not recognized for flat reader")
+
+
+def read_iue_flat(name, path, z):
+    """IUE low-dispersion extracted spectra (MXLO), one FITS per exposure.
+
+    Added 2026-11-03 so the 22 manmask-1 objects can go through the SAME
+    co-addition, morphing and rebinning as the HST data, rather than a separate
+    IUE pipeline.  GTR: "That way the HST and IUE data will have been analyzed
+    in the same way.  Amogh's work will then be a double check."
+
+    MAST serves these as <camera><number>mxlo_vo.fits with a single-row binary
+    table holding WAVE, FLUX, SIGMA and QUALITY as vector columns.  QUALITY is
+    a bit mask; anything non-zero is bad, which is the convention the rest of
+    this module uses for its masks.  Only exposures from cameras that can see
+    C IV at this redshift should be in `path` -- retrieve_iue.py enforces that.
+
+    Returns the same (waves, fluxes, errs, masks) 2-D arrays as the HST
+    readers, zero-padded to the longest exposure.
+    """
+    fn_list = sorted(set(glob.glob(os.path.join(glob.escape(path), "**", "*mxlo_vo.fits"),
+                                   recursive=True)))
+    if not fn_list:
+        print("  no IUE MXLO files under %s" % path)
+        return (np.zeros((0, 0)),) * 4
+
+    recs = []
+    for fn in fn_list:
+        with fits.open(fn) as hdu:
+            d = hdu[1].data
+            wave = np.asarray(d["WAVE"][0], float)
+            flux = np.asarray(d["FLUX"][0], float)
+            errs = np.asarray(d["SIGMA"][0], float)
+            qual = np.asarray(d["QUALITY"][0], int)
+        # IUE marks bad samples in QUALITY; a non-positive error is unusable
+        # whatever the flag says.
+        mask = np.where((qual != 0) | ~np.isfinite(flux) | ~np.isfinite(errs) | (errs <= 0),
+                        1.0, 0.0)
+        flux = np.where(np.isfinite(flux), flux, 0.0)
+        errs = np.where(np.isfinite(errs) & (errs > 0), errs, 0.0)
+        recs.append((wave, flux, errs, mask))
+
+    array_len = max(len(r[0]) for r in recs)
+    waves  = np.zeros((len(recs), array_len))
+    fluxes = np.zeros((len(recs), array_len))
+    errors = np.zeros((len(recs), array_len))
+    masks  = np.ones((len(recs), array_len))      # padding is masked
+    for i, (w, f, e, m) in enumerate(recs):
+        n = len(w)
+        waves[i, :n], fluxes[i, :n], errors[i, :n], masks[i, :n] = w, f, e, m
+    print("  IUE: %d exposure(s), %d pixels each" % (len(recs), array_len))
+    return waves, fluxes, errors, masks
 
 
 def read_sdssrm(Identifier, path, z):

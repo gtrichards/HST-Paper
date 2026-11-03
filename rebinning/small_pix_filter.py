@@ -35,6 +35,17 @@ def pixel_filter(wavelength, flux, fluxerr, Identifier, Instrument, Cont_Type, P
     elif Instrument == "SDSS-RM":
        filterval = 60
        filterval2 = 61
+    elif Instrument == "IUE":
+       # Added 2026-11-03.  IUE low dispersion (MXLO) samples at about 1.5 A per
+       # pixel with a resolution element near 6 A, so 11 pixels is about 2.7
+       # resolution elements -- wide enough to define a local median, narrow
+       # enough that the window does not span the C IV line, which is 30-40 A
+       # across in these objects.  The existing values are empirical rather than
+       # derived (COS and STIS 5, FOS 30, HSLA 20, SDSS-RM 60), so this is a
+       # judgement in the same spirit; GTR should change it if the spike
+       # rejection looks wrong on the figures.
+       filterval = 11
+       filterval2 = 12
 
     indices = ~np.isnan(flux) #indices we'll look at
 
