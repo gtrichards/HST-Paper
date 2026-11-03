@@ -50,6 +50,7 @@ OVERRIDES = os.path.join(HERE, "..", "ica", "redshift_overrides.csv")
 CIVDIST_DIR = os.path.expanduser("~/Work/git/CIV_Distance/")
 sys.path.insert(0, CIVDIST_DIR)
 from CIVfunctions import CIV_distance
+from civ_distance_ext import civ_distance, EXTEND_CURVE
 
 
 def norm(name):
@@ -128,12 +129,16 @@ def main():
     meas = t["CIVgood_manmask"].isin([2, 3]).values
     data = np.array([t.loc[meas, "CIV_blue"].values,
                      np.log10(t.loc[meas, "CIV_EW"].values)]).T
-    bestfit = np.load(CIVDIST_DIR + "data/bestfit.npy")
-    d = CIV_distance(data, bestfit, path=CIVDIST_DIR)
-    # CIV_distance silently skips points it cannot place; check none was lost
-    assert len(d) == meas.sum(), "CIV_distance dropped a point"
+    # D_CIV from civ_distance_ext: Trevor's curve, extended past its high-EW
+    # end when EXTEND_CURVE is True (16 objects get D < 0 instead of all 0).
+    # CIV_dist_trevor keeps Trevor's unextended value for comparison.
     t["CIV_dist"] = np.nan
-    t.loc[meas, "CIV_dist"] = d
+    t.loc[meas, "CIV_dist"] = civ_distance(data[:, 0], data[:, 1])
+    bestfit = np.load(CIVDIST_DIR + "data/bestfit.npy")
+    d_trevor = CIV_distance(data, bestfit, path=CIVDIST_DIR)
+    assert len(d_trevor) == meas.sum(), "CIV_distance dropped a point"
+    t["CIV_dist_trevor"] = np.nan
+    t.loc[meas, "CIV_dist_trevor"] = d_trevor
     # log L_nu(1450 A), erg/s/Hz -- the same calculation as Figure 1's y axis
     # (hst_sample.add_logL1450), so the table and the figure cannot disagree.
     # F1450_est = 1 marks the four objects whose 1450 A continuum is
@@ -239,6 +244,10 @@ def main():
     # one.  The bits below are the ones the v22 notebook actually assigns
     # (CATALOG_BITS, plus 128 and 256 folded in later), checked against known
     # objects: PG 0804+761 = 9 (Kaspi + Bentz), NGC 5548 = 8 (Bentz).
+    # footnote g: say so when the curve is extended (civ_distance_ext.py)
+    EXT_NOTE = (r" Above $\log$\,EW\,=\,2.50 (EW\,=\,316\,\AA), where the curve ends, it is"
+                r" continued vertically at its end point; objects beyond the end therefore have"
+                r" $D_{\rm C\,IV}<0$ (16 objects).") if EXTEND_CURVE else ""
     foot = r"""\enddata
 \tablenotetext{a}{Systemic redshift used in the fits, quoted to five decimals so that the \civ\ velocities are reproducible to $\sim$1.5\,km\,s$^{-1}$, well inside the 69\,km\,s$^{-1}$ quantisation; four decimals would cost up to 15\,km\,s$^{-1}$ at the low-redshift end. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
 \tablenotetext{b}{Every instrument the archive holds for this object. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Where the adopted spectrum is not among those listed it is given in parentheses: SPLICE denotes two instruments joined (\S2), and \#452 is an instrument-listing error, not a splice. IUE objects are not yet measured.}
@@ -246,20 +255,20 @@ def main():
 \tablenotetext{d}{In Sulentic+2007 (DOI: 10.1086/519916); 1\,=\,yes.}
 \tablenotetext{e}{Bitmask of catalog memberships (bits as assigned by CATALOG\_BITS in the sample-construction code; Sulentic+2007 membership is the separate Sul column): K00\,=\,1 (Kaspi+2000); B15\,=\,2 (Barth+2015); D15\,=\,4 (Du+2015); Be15\,=\,8 (Bentz \& Katz 2015); S16\,=\,16 (Shen+2016 SDSS-RM); NLS1\,=\,128 (Rakshit+2017); RK20\,=\,256 (Rakshit+2020 SDSS AGN catalog). Bits 32 (Matthews+2021) and 64 (Rankine+2020) are defined but set for no object here.}
 \tablenotetext{f}{Positive values are blueshifted relative to systemic. Quantised at 69.03\,km\,s$^{-1}$ by construction.}
-\tablenotetext{g}{\civ\ distance: position along the best-fit curve through the SDSS quasars in the blueshift--$\log$\,EW plane \citep{Rivera2020,Richards2021}, computed with the code of \citet{CIVDistance}.}
+\tablenotetext{g}{\civ\ distance: position along the best-fit curve through the SDSS quasars in the blueshift--$\log$\,EW plane \citep{Rivera2020,Richards2021}, computed with the code of \citet{CIVDistance}.%s}
 \tablenotetext{h}{Specific luminosity at rest-frame 1450\,\AA, from the calibrated continuum under the adopted fit, as plotted in Figure~1. $^{\dagger}$: the continuum calibration does not reach 1450\,\AA\ and is extrapolated along the object's own power law (4 objects); tested on the measured objects, this is accurate to 0.02--0.03\,dex.}
 \tablenotetext{i}{\civ\ status: 3\,=\,measured; 2\,=\,measured, with a reservation; 1\,=\,IUE only, not yet measured; 0\,=\,excluded (see \S2).}
 \end{deluxetable*}
 \end{longrotatetable}
-""" % (n.get("", 0), n.get("S", 0), n.get("N", 0), n.get("B", 0),
-       n.get("K", 0), n.get("Z", 0), n.get("L", 0), lit_note, n.get("O", 0))
+""" % ((n.get("", 0), n.get("S", 0), n.get("N", 0), n.get("B", 0),
+       n.get("K", 0), n.get("Z", 0), n.get("L", 0), lit_note, n.get("O", 0)) + (EXT_NOTE,))
 
     os.makedirs(OUT_DIR, exist_ok=True)
     out = os.path.join(OUT_DIR, "table1_master_sample_v23.tex")
     open(out, "w").write(head + "\n".join(lines) + "\n" + foot)
     t[["row_num", "designation", "common_name", "z", "z_code", "z_src_text",
        "instrument", "spectrum", "sdss_flag", "sul_flag", "cat_flags",
-       "CIV_blue", "CIV_EW", "CIV_dist", "logLnu1450", "L_est", "CIVgood_manmask"]
+       "CIV_blue", "CIV_EW", "CIV_dist", "CIV_dist_trevor", "logLnu1450", "L_est", "CIVgood_manmask"]
       ].to_csv(out.replace(".tex", ".csv"), index=False)
     print("wrote", out)
     print("z sources:", n)

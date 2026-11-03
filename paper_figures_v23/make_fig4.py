@@ -39,6 +39,7 @@ from astropy.table import Table
 HERE = os.path.dirname(os.path.abspath(__file__))
 from trevor_contour import plot_contour   # Trevor's original, see that file
 from hst_sample import load_adopted, plot_hst, label_objects
+from civ_distance_ext import bestfit_curve, extension, EXTEND_CURVE
 
 plt.rcParams['xtick.top'] = True
 plt.rcParams['ytick.right'] = True
@@ -86,8 +87,12 @@ def main():
     # line D_CIV is measured along.  It runs from blueshift 50 km/s,
     # log EW 2.50 (EW 316 A, D = 0) to 6000 km/s, log EW 1.12; objects beyond
     # its high-EW end all project onto that end and get D = 0.
-    bestfit = np.load(os.path.expanduser("~/Work/git/CIV_Distance/data/bestfit.npy"))
+    bestfit = bestfit_curve()
     ax.plot(bestfit[:, 0], bestfit[:, 1], "-k", lw=2.0, zorder=8)   # above all points
+    if EXTEND_CURVE:   # the extension used for D_CIV < 0 (civ_distance_ext.py)
+        ext, _ = extension()
+        ext = ext[ext[:, 1] <= 2.92]   # this figure's y limit (set below)
+        ax.plot(ext[:, 0], ext[:, 1], "--k", lw=2.0, zorder=8)
 
     plot_contour(c4blueICA_sdss, c4logewICA_sdss, c=cs[2], mark="o",
                  nlevels=[0.05, 0.25, 0.50, 0.75, 0.95], ax=ax,

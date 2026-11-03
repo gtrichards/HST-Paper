@@ -57,7 +57,7 @@ from make_fig1_L1450 import lbol_to_lognu1450   # one definition for all figures
 
 CIVDIST_DIR = os.path.expanduser("~/Work/git/CIV_Distance/")
 sys.path.insert(0, CIVDIST_DIR)
-from CIVfunctions import CIV_distance
+from civ_distance_ext import civ_distance, EXTEND_CURVE
 
 C_ANG = 2.998e18           # speed of light in Angstrom/s
 
@@ -79,13 +79,9 @@ def main():
     logL_hst = hst["logLnu1450"].values
     c4blue_hst = hst["CIV_blue"].values
 
-    # C IV distance with Trevor's function (blueshift, log10 EW)
-    bestfit = np.load(CIVDIST_DIR + "data/bestfit.npy")
-    data_hst = np.array([c4blue_hst, np.log10(hst["CIV_EW"].values)]).T
-    c4dist_hst = CIV_distance(data_hst, bestfit, path=CIVDIST_DIR)
-    # CIV_distance silently skips a point it cannot place on the curve,
-    # which would shift every later value; make sure that did not happen
-    assert len(c4dist_hst) == len(hst), "CIV_distance dropped a point"
+    # C IV distance: Trevor's curve, extended past its high-EW end when
+    # civ_distance_ext.EXTEND_CURVE is True (same values as Table 1)
+    c4dist_hst = civ_distance(c4blue_hst, np.log10(hst["CIV_EW"].values))
     print("  HST with L1450: %d" % len(hst))
 
     # ---- SDSS: Rankine+20, luminosity interpolated to 1450 A (ref_samples.py) ----
@@ -154,7 +150,8 @@ def main():
     # L_bol = 3e45 erg/s, as in Trevor's figure (solid blue, behind the data)
     ax.axvline(lbol_to_lognu1450(np.log10(3e45)), color="b", ls="-", zorder=1)
     ax.tick_params(axis='both', which='major', labelsize=27.5)
-    ax.set_ylim(-0.05, 1.25)
+    # extended curve: 16 objects have D < 0, down to -0.33 (Mrk 1310)
+    ax.set_ylim(-0.40 if EXTEND_CURVE else -0.05, 1.25)
     plt.tight_layout()
     if labeled:
         label_objects(ax, logL_hst, c4dist_hst, hst, "6a", data_dir)
@@ -162,7 +159,7 @@ def main():
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.savefig(out.replace(".pdf", ".png"), dpi=100, bbox_inches='tight')
     print("saved", out)
-    off = (c4dist_hst < -0.05) | (c4dist_hst > 1.25)
+    off = (c4dist_hst < ax.get_ylim()[0]) | (c4dist_hst > 1.25)
     print("  Fig 6a HST points outside the y limits: %d" % off.sum())
 
 
