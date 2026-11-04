@@ -18,10 +18,21 @@ one.
 The columns that decide measurability:
 
   civ_px        usable pixels in 1500-1600 A.  Zero means no decision to make.
-  sn_civ        MEDIAN PER-PIXEL S/N over the C IV window.  The trap threshold.
-  peak_over_err C IV peak flux over the local error.  Catches the case where the
-                median is low because the window is mostly continuum but the line
-                itself is strong -- a real line can sit on a poor median.
+  peak_over_cont C IV peak over a TWO-POINT CONTINUUM fitted from the 1445-1465
+                and 1700-1705 A anchors, and hand_ew the equivalent width of the
+                same continuum-subtracted data.  THESE DECIDE WHETHER THERE IS A
+                LINE, and they are measured on the data alone, independent of any
+                reconstruction.  The first version of this script ranked on
+                sn_civ instead and got the order badly wrong: QSO 1629+372 came
+                top of the whole set at per-pixel S/N 11.2 and HAS NO C IV
+                EMISSION -- peak over continuum 0.77, hand EW 0.00.  With no line
+                in the window, a per-pixel S/N measures the CONTINUUM, so a
+                bright featureless spectrum ranks first.  peak_over_err does not
+                save it either, being peak over the ERROR rather than over the
+                continuum.
+  sn_civ        MEDIAN PER-PIXEL S/N over the C IV window.  Still printed, but it
+                only means something once a line is known to be there: it is the
+                hollow-residual threshold, not a detection test.
   anchor_sig    significance of the MEDIAN in the 1445-1465 A window, per-pixel
                 S/N times sqrt(n).  This is the luminosity anchor, and it fails
                 independently of C IV: index 179 on the HST side has a sound line
@@ -48,6 +59,12 @@ FITS = os.path.join(HERE, "fits")
 
 CIV = (1500.0, 1600.0)
 ANCHOR = (1445.0, 1465.0)
+RED = (1700.0, 1705.0)
+RED_ALT = (1650.0, 1690.0)
+
+#: Below these there is no line to measure, whatever the continuum S/N.
+MIN_PEAK = 1.5
+MIN_EW = 5.0
 
 #: Per-pixel S/N below which a smooth reconstruction is unconstrained by the
 #: data and the residual panel stops being informative.  1.5 is the middle of
@@ -78,21 +95,42 @@ def measure(path):
     out["anchor_px"] = int(a.sum())
     if a.sum() > 3:
         out["anchor_sig"] = float(np.nanmedian(f[a] / e[a]) * np.sqrt(a.sum()))
+
+    # Two-point continuum from the data alone: is there a line here at all?
+    out["peak_over_cont"] = np.nan
+    out["hand_ew"] = np.nan
+    def anch(lo, hi):
+        s = g & (w >= lo) & (w <= hi)
+        return ((float(np.mean(w[s])), float(np.median(f[s])), int(s.sum()))
+                if s.sum() >= 3 else (np.nan, np.nan, 0))
+    xb, yb, nb = anch(*ANCHOR)
+    xr, yr, nr = anch(*RED)
+    if nr < 3:
+        xr, yr, nr = anch(*RED_ALT)
+    if nb >= 3 and nr >= 3 and civ.sum() > 3:
+        line = (w - xb) * (yr - yb) / (xr - xb) + yb
+        cont = float(np.interp(1549.48, w[g], line[g]))
+        if np.isfinite(cont) and cont != 0:
+            d = (f - line)[civ]
+            out["peak_over_cont"] = float(np.nanmax(f[civ]) / cont)
+            out["hand_ew"] = float(np.trapezoid(np.clip(d, 0, None) / cont, w[civ]))
     return out
 
 
 def classify(r):
-    if r["civ_px"] == 0:
+    """Is there a line, and if so can it be measured?  In that order."""
+    if r["civ_px"] == 0 or not np.isfinite(r["sn_civ"]):
         return "no C IV coverage"
-    if not np.isfinite(r["sn_civ"]):
-        return "no C IV coverage"
+    p, ew = r.get("peak_over_cont", np.nan), r.get("hand_ew", np.nan)
+    if not np.isfinite(p):
+        return "no continuum anchor"
+    if p < MIN_PEAK or (np.isfinite(ew) and ew < MIN_EW):
+        return "no C IV line"
+    if r["sn_civ"] < TRAP_SN:
+        return "line present, trap risk"
     if r["sn_civ"] >= 3.0:
         return "measurable"
-    if r["sn_civ"] >= TRAP_SN:
-        return "marginal"
-    if np.isfinite(r["peak_over_err"]) and r["peak_over_err"] >= 5.0:
-        return "marginal (line over a poor median)"
-    return "trap risk"
+    return "marginal"
 
 
 def adopted(name):
@@ -130,33 +168,33 @@ def main():
         rows.append(r)
 
     d = pd.DataFrame(rows)
-    order = {"measurable": 0, "marginal (line over a poor median)": 1,
-             "marginal": 1, "trap risk": 2, "no C IV coverage": 3}
+    order = {"measurable": 0, "marginal": 1, "line present, trap risk": 2,
+             "no C IV line": 3, "no continuum anchor": 4, "no C IV coverage": 5}
     d["_o"] = d["class"].map(order)
-    d = d.sort_values(["_o", "sn_civ"], ascending=[True, False]).drop(columns="_o")
+    d = d.sort_values(["_o", "hand_ew"], ascending=[True, False]).drop(columns="_o")
 
     print("IUE objects, ordered by whether C IV can be measured")
     print("  per-pixel S/N below %.1f is the hollow-residual trap: the residual panel"
           % TRAP_SN)
     print("  stops being informative, so the figure can look fine on unconstrained data.")
     print()
-    hdr = ("%-4s %-16s %-7s %4s %5s %6s %6s %6s %7s %-6s %-5s %s"
-           % ("row", "object", "z", "nexp", "civpx", "snCIV", "peak", "anchpx",
+    hdr = ("%-4s %-16s %-7s %4s %5s %6s %6s %7s %7s %-6s %-5s %s"
+           % ("row", "object", "z", "nexp", "civpx", "snCIV", "pk/ct", "handEW",
               "anchsig", "amogh", "state", "class"))
     print(hdr)
     print("-" * len(hdr))
     for _, r in d.iterrows():
-        print("%-4d %-16s %-7.4f %4s %5d %6.2f %6.1f %6d %7s %-6s %-5s %s"
+        print("%-4d %-16s %-7.4f %4s %5d %6.2f %6s %7s %7s %-6s %-5s %s"
               % (r.row_num, r.common_name[:16], r.z,
                  ("%d" % r.n_exp) if np.isfinite(r.n_exp) else "-",
                  r.civ_px, r.sn_civ if np.isfinite(r.sn_civ) else -1,
-                 r.peak_over_err if np.isfinite(r.peak_over_err) else -1,
-                 r.anchor_px,
+                 ("%.2f" % r.peak_over_cont) if np.isfinite(r.peak_over_cont) else "--",
+                 ("%.1f" % r.hand_ew) if np.isfinite(r.hand_ew) else "--",
                  ("%.1f" % r.anchor_sig) if np.isfinite(r.anchor_sig) else "--",
                  "yes" if r.in_amogh else "no", r.state or "-", r["class"]))
     print()
-    for k in ("measurable", "marginal", "marginal (line over a poor median)",
-              "trap risk", "no C IV coverage"):
+    for k in ("measurable", "marginal", "line present, trap risk",
+              "no C IV line", "no continuum anchor", "no C IV coverage"):
         n = int((d["class"] == k).sum())
         if n:
             print("  %-34s %d" % (k, n))
