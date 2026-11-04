@@ -312,7 +312,7 @@ row_num,common_name,Hb_sul,RFe_sul,RFe_sul_upper,Hb_rk,RFe_rk,opt_source,Hb_fwhm
 430,7C 170448.10+361856.00,,,False,3008.878189,0.0,Rakshit20,3008.878189,0.0,False
 432,QSO J1715+5747,,,False,3298.303222,1.3005927413254852,Rakshit20,3298.303222,1.3005927413254852,False
 433,QSO J1716+5654,,,False,,,,,,False
-436,QSO B1725-142,,,False,,,,,,False
+436,PDS 456,,,False,,,,,,False
 437,H1821+643,6968.0,0.25,False,,,Sulentic07,6968.0,0.25,False
 439,3C390.3,12688.0,0.12,False,,,Sulentic07,12688.0,0.11999999731779099,False
 440,1RXS J185800.9+485020,,,False,,,,,,False
