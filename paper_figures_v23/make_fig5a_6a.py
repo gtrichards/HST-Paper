@@ -98,9 +98,9 @@ def main():
     print("  SDSS %d, GNIRS-DQS %d" % (len(sdss), len(gnirs)))
 
     # Trevor used 27.1-32.4 for L2500; extended down to take in the low-L
-    # HST objects (lowest is NGC 4395 at 24.83).  Explicit limits are needed
+    # HST objects (lowest is NGC 4395 at 24.27, after the 2026-11-03 morph-coefficient correction).  Explicit limits are needed
     # because Trevor's plot_contour pads its grid far beyond the data.
-    xlim = (24.5, 32.6)
+    xlim = (24.0, 32.6)
     # same label as Figure 1's y axis: the Angstrom outside the subscript (at
     # subscript size its ring sat clear of the A and read as a degree sign),
     # and L_nu written out because the axis is erg/s/Hz, not nu L_nu

@@ -134,9 +134,9 @@ def create_figure(hst_data, sdss_data, gnirs_data):
               prop={"size": 16})
     ax.set_xlim(-0.16575, 3.25)
     # Trevor used 27.1-32.5 for L2500; extended down to take in the low-L
-    # HST objects (lowest is NGC 4395 at 24.83).  Explicit limits are needed
+    # HST objects (lowest is NGC 4395 at 24.27, after the 2026-11-03 morph-coefficient correction).  Explicit limits are needed
     # because Trevor's plot_contour pads its grid far beyond the data.
-    ax.set_ylim(24.5, 32.6)
+    ax.set_ylim(24.0, 32.6)
     plt.tight_layout()
     return fig, ax
 
