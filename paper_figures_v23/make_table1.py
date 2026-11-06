@@ -294,10 +294,15 @@ def main():
     SUM_COLS = {0: "%d", 3: "%.5f", 5: "%d", 6: "%d", 7: "%d",
                 8: "%.1f", 9: "%.2f", 10: "%.2f", 11: "%d", 12: "%d", 13: "%.2f"}
     INST_COL = 4
+    FLAG_COL = 6
 
+    # GTR, 2026-11-06: the Flags checksum also carries, in parentheses, how many
+    # Flags values are ODD.  Sulentic+07 is bit 1, so that is the number of
+    # Sulentic objects in the table -- it tracks how many we recover.
     def checksum_row(data_lines):
         tot = {k: 0.0 for k in SUM_COLS}
         ninst = 0
+        nodd = 0
         nrow = 0
         for ln in data_lines:
             cells = ln.rstrip().rstrip("\\").split("&")
@@ -309,12 +314,16 @@ def main():
                 v = _val(cells[k])
                 if v is not None:
                     tot[k] += v
+            f = _val(cells[FLAG_COL])
+            if f is not None and int(f) % 2 == 1:
+                nodd += 1
         out = [""] * 14
         for k, f in SUM_COLS.items():
             out[k] = f % tot[k]
         out[1] = r"\textbf{N = %d}" % nrow
         out[2] = r"\textbf{checksums}"
         out[INST_COL] = "%d" % ninst
+        out[FLAG_COL] = "%s (%d)" % (out[FLAG_COL], nodd)
         return nrow, "  " + " & ".join(out) + r" \\"
 
     nrow, csum = checksum_row(lines)
