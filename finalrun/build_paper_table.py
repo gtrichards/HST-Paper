@@ -156,6 +156,23 @@ def main():
         r["adopted"] = None
         rows.append(r)
 
+    # cat_flags for the 26 IUE-only rows is DOUBLED in the xlsx.  The v22
+    # notebook appended those rows with every catalogue bit shifted up one
+    # place (Kaspi = 2, Barth = 4, ..., Bentz = 16), while the HST rows use
+    # its CATALOG_BITS (Kaspi = 1, Barth = 2, Du = 4, Bentz = 8, Shen = 16).
+    # Checked against the master catalogue's per-catalogue in_* columns
+    # (2026-11-06): all 448 HST rows match those columns, all 26 IUE-only rows
+    # are exactly twice them -- 3C 120 read 16 (SDSS-RM) instead of 8 (Bentz).
+    # IUE-only = an instrument list of IUE cameras only.
+    IUE_CAMERAS = {"SWP", "LWP", "LWR"}
+    for r in rows:
+        cams = set(str(r["instrument"]).split("/"))
+        if cams <= IUE_CAMERAS and isinstance(r["cat_flags"], (int, float)) and r["cat_flags"]:
+            assert int(r["cat_flags"]) % 2 == 0, "odd IUE cat_flags: %r" % r
+            print("cat_flags (IUE-only row %d): %d -> %d"
+                  % (r["row_num"], r["cat_flags"], int(r["cat_flags"]) // 2))
+            r["cat_flags"] = int(r["cat_flags"]) // 2
+
     # Applied after the xlsx is read and before anything is keyed on the name,
     # so the override is the name everywhere downstream, not a late relabel.
     _nov = _name_overrides()
