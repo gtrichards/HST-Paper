@@ -67,7 +67,15 @@ CHOSEN = os.path.join(OUTDIR, "chosen_visit", "fits")
 #: graded 3 with their adopted fits sitting in fit_iterations_v23, and the table
 #: wrote empty measurements for them without complaint.  The fallback is what
 #: keeps the file "always the current best" for objects the pass has not reached.
+#: Where to look for an adopted fit, most authoritative first.  iue/fits joined
+#: on 2026-11-06, when the IUE addendum was merged: the 22 objects the v22 sheet
+#: records as manmask 1 (IUE-only, not yet measured) were worked through in
+#: finalrun/iue/ and ten of them carry an adopted record.  Their folders were
+#: renamed from 000_ to their real work-queue order at the same time -- they had
+#: all been 000_ because object_paths.order_for has no queue entry for an "_IUE"
+#: stem, and the lookup below keys on that index prefix.
 FIT_TREES = [CHOSEN,
+             os.path.join(HERE, "iue", "fits"),
              os.path.join(OUTDIR, "fit_iterations_v23"),
              ITERDIR]
 FINAL = os.path.join(OUTDIR, "final")
