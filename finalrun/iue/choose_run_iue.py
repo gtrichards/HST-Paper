@@ -84,7 +84,12 @@ def runs(df):
 
 def main():
     tab = pd.read_csv(TABLE)
-    m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
+    # Same change as assess_iue.py: manmask 1 is empty since 2026-11-06 and the
+    # set now includes nine coverage-gap objects, so select on what has actually
+    # been retrieved.
+    man = pd.read_csv(os.path.join(HERE, "iue_products.csv"))
+    have = set(int(x) for x in man["row_num"].unique() if int(x) > 0)
+    m1 = tab[tab["row_num"].isin(have)].sort_values("row_num")
     ov = pd.read_csv(OVERRIDES) if os.path.exists(OVERRIDES) else pd.DataFrame()
     rows = []
     for _, r in m1.iterrows():

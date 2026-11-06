@@ -38,7 +38,18 @@ def _index():
                 # _SPLICE is a hand-built join of pieces of them (first used
                 # on UGC 12163: FOS for the line, STIS for the continuum).
                 # Both are object-level names, not stems on disk.
-                for suffix in ("COMBINED", "SPLICE"):
+                # IUE joined this list on 2026-11-06.  The IUE products are
+                # named "<name_mast_key>_IUE", exactly like the COMBINED and
+                # SPLICE object-level names, but the suffix was missing here --
+                # so order_for returned 0 for every IUE object and all 31 fit
+                # folders were created as 000_..., colliding with one another
+                # and invisible to anything that keys on the index prefix
+                # (build_paper_table's fit lookup, extract_f1450).  Both sets
+                # had to be renamed by hand; registering the suffix means new
+                # IUE objects land in the right folder to begin with, and the
+                # interactive fitter shows the work-queue index for them the
+                # same way it does for HST objects (GTR, 2026-11-06).
+                for suffix in ("COMBINED", "SPLICE", "IUE"):
                     _INDEX["%s_%s" % (r["name_mast_key"], suffix)] = r
                     _INDEX[safe("%s_%s" % (r["name_mast_key"], suffix))] = r
                 for st in r["stems"].split(";"):

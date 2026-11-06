@@ -59,7 +59,14 @@ def main():
         chosen = pd.read_csv(CHOSEN).set_index("common_name")
         print("using the chosen run for %d objects (%s)\n" % (len(chosen), os.path.basename(CHOSEN)))
     tab = pd.read_csv(TABLE)
-    m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
+    # Select on the chosen-run file, not on manmask: manmask 1 emptied when the
+    # IUE addendum was merged on 2026-11-06, and nine coverage-gap objects were
+    # added afterwards, so a manmask-1 selection now rebins NOTHING.  The same
+    # change was made in assess_iue.py and choose_run_iue.py.
+    if chosen is not None:
+        m1 = tab[tab["common_name"].isin(set(chosen.index))].sort_values("row_num")
+    else:
+        m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
     only = set(sys.argv[1:])
     rows = []
     for _, r in m1.iterrows():
@@ -126,6 +133,18 @@ def main():
                  q["civ_red_px"], q["civ_sn"], q["anchor_px"]), flush=True)
     pd.DataFrame(rows).to_csv(LOG, index=False)
     ok = sum(r["ok"] for r in rows)
+    # The fitter labels its object list from index_order.csv in the rebin
+    # directory; without one, every IUE object appeared unnumbered while the HST
+    # objects carried their work-queue index (GTR, 2026-11-06: "It would be
+    # helpful if the interactive fitter had work-queue indices for the IUE
+    # objects as well").  Written here so it cannot drift from the products.
+    try:
+        sys.path.insert(0, os.path.dirname(HERE))
+        from write_index_order import write as _wio
+        _wio(rebin=OUTDIR, quiet=True)
+    except Exception as exc:
+        print("  (index_order.csv not written: %s)" % exc, flush=True)
+
     print("\n%d of %d rebinned -> %s" % (ok, len(rows), OUTDIR))
     print("fit one with:")
     print('  HSTICA_REBIN=%s \\\n    python iterate_fit.py "<NAME>_IUE" --label iue' % OUTDIR)

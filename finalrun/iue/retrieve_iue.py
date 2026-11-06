@@ -18,7 +18,7 @@ so the whole retrieval is a few MB.
 Writes iue/spectra/<COMMON_NAME>/ and iue/iue_products.csv recording what was
 fetched, so the provenance of anything measured from these is on disk.
 """
-import os, sys, warnings
+import os, sys, glob, warnings
 warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
@@ -47,10 +47,58 @@ def safe(name):
     return "".join(c if (c.isalnum() or c in "+-._") else "_" for c in str(name))
 
 
+def select(tab):
+    """The objects to retrieve.
+
+    Originally this was `CIVgood_manmask == 1`, the v22 sheet's "IUE-only, not
+    yet measured".  THAT SET IS NOW EMPTY -- all 22 were measured or graded 0
+    and merged on 2026-11-06 -- so selecting on it retrieves nothing.
+
+    A second set appeared once the sample's C IV coverage was measured rather
+    than assumed (finalrun/civ_coverage_audit.py): objects whose HST spectra do
+    NOT reach C IV but which have a long IUE low-dispersion exposure that does.
+    They were never flagged manmask 1, because the v22 sheet reserved that for
+    objects with IUE data and no HST data at all, so nobody asked whether IUE
+    covered the line for an HST object whose own spectra missed it.  There are
+    nine, found by pipeline_output/final/iue_coverage_gap.csv, with exposures of
+    10,200 to 41,040 s; five of them the student Amogh already measured from the
+    same data, which is independent evidence they are measurable.
+
+        --rows 243 91 251        retrieve these v22 row numbers
+        --gap                    retrieve everything in iue_coverage_gap.csv
+                                 that is not already under spectra/
+        (no argument)            the historical manmask == 1 set
+
+    Names may still be given positionally to restrict any of these.
+    """
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("names", nargs="*")
+    ap.add_argument("--rows", type=int, nargs="+", default=None)
+    ap.add_argument("--gap", action="store_true")
+    a = ap.parse_args()
+    if a.rows:
+        sel = tab[tab["row_num"].isin(a.rows)]
+    elif a.gap:
+        gap = pd.read_csv(os.path.join(os.path.dirname(HERE), "pipeline_output",
+                                       "final", "iue_coverage_gap.csv"))
+        # the gap file is keyed on work-queue order; map to row_num through it
+        q = pd.read_csv(os.path.join(os.path.dirname(HERE), "pipeline_output",
+                                     "work_queue.csv"))
+        want = set(q[q["order"].isin(gap["order"])]["row_num"].astype(int))
+        sel = tab[tab["row_num"].isin(want)]
+    else:
+        sel = tab[tab["CIVgood_manmask"] == 1]
+    return sel.sort_values("row_num"), set(a.names)
+
+
 def main():
     tab = pd.read_csv("/Users/gtr/Work/git/HST-Paper/Data/CIV_measurements_v23.csv")
-    m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
-    only = set(sys.argv[1:])
+    m1, only = select(tab)
+    if not len(m1):
+        print("no objects selected -- manmask 1 is empty since the 2026-11-06 "
+              "merge; use --rows or --gap")
+        return
     rows = []
     for _, r in m1.iterrows():
         name = str(r["common_name"])
@@ -88,8 +136,35 @@ def main():
                              cameras=" ".join(sorted(wants)), path=p))
         print("  %-14s %2d exposures -> %s" % (name, len(got), os.path.relpath(d, HERE)),
               flush=True)
-    pd.DataFrame(rows).to_csv(MANIFEST, index=False)
-    print("\n%d files -> %s" % (len(rows), MANIFEST))
+    # The manifest is REBUILT FROM DISK, not from this run's downloads.  It used
+    # to be written from `rows` alone, which silently discarded every object a
+    # previous run had fetched: retrieving the nine coverage-gap objects on
+    # 2026-11-06 cut the manifest from 22 objects to 11.  Nothing was actually
+    # lost -- iue_chosen_run.csv carries the exact files each measurement used,
+    # and the spectra are on disk -- but a provenance record that forgets what it
+    # recorded is worse than none.  Scanning the tree makes it idempotent.
+    disk = []
+    zmap = {str(r["common_name"]): (int(r["row_num"]), float(r["z"]))
+            for _, r in tab.iterrows() if pd.notna(r.get("z"))}
+    for d in sorted(os.listdir(OUTDIR)):
+        full = os.path.join(OUTDIR, d)
+        if not os.path.isdir(full):
+            continue
+        files = sorted(glob.glob(os.path.join(glob.escape(full), "**", "*mxlo_vo.fits"),
+                                 recursive=True))
+        if not files:
+            continue
+        name = next((n for n in zmap if safe(n) == d), d)
+        rn, z = zmap.get(name, (-1, float("nan")))
+        civ_obs = CIV * (1.0 + z) if z == z else float("nan")
+        for f in files:
+            disk.append(dict(common_name=name, row_num=rn, z=z,
+                             civ_observed_A=round(civ_obs, 1) if civ_obs == civ_obs else "",
+                             cameras="", path=f))
+    pd.DataFrame(disk).to_csv(MANIFEST, index=False)
+    print("\n%d files fetched this run; manifest rebuilt from disk: %d files, "
+          "%d objects -> %s"
+          % (len(rows), len(disk), len({r["common_name"] for r in disk}), MANIFEST))
 
 
 if __name__ == "__main__":

@@ -51,7 +51,13 @@ def read_one(path, z):
 
 def main():
     tab = pd.read_csv(TABLE)
-    m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
+    # manmask 1 emptied on the 2026-11-06 merge, and nine more objects were
+    # added from the coverage gap, so select on WHAT HAS BEEN RETRIEVED rather
+    # than on a manmask that no longer marks this set.  iue_products.csv is
+    # rebuilt from disk by retrieve_iue.py and is the authority on that.
+    man = pd.read_csv(os.path.join(HERE, "iue_products.csv"))
+    have = set(int(x) for x in man["row_num"].unique() if int(x) > 0)
+    m1 = tab[tab["row_num"].isin(have)].sort_values("row_num")
     rows = []
     for _, r in m1.iterrows():
         name = str(r["common_name"]); z = float(r["z"])
