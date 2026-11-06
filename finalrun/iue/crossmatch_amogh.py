@@ -100,6 +100,36 @@ ALIASES = {
     "PG1435-0645":   "QSO-B1435-0645",
     "HS0624+690":    "QSO B0624+6907",
     "Q1512+37":      "B21512+37",
+    # --- resolved 2026-11-05 through NED and the MAST IUE archive, after GTR said
+    # --- "you can run SIMBAD": SIMBAD itself is firewalled here (simbad.cds.unistra.fr
+    # --- times out) but NED and archive.stsci.edu are reachable, so those were used.
+    "1136-135":      "Crt A",          # NED: [HB89] 1136-135, QSO z=0.5565; 0.1 arcsec from Crt A
+    "MICH_393":      "Mrk 1018",       # NED: Michigan 393 = UGC 01597; 0.1 arcsec from Mrk 1018
+    "MICH385":       "Mrk 1014",       # NED: MICH385 = Mrk 1014, QSO z=0.1631; 0.4 arcsec
+    "PKS_0637-75":   "QSO J0635-7516", # NED: [HB89] 0637-752, QSO z=0.653; 0.7 arcsec
+    "TON_256":       "1612+2611",      # NED: Ton 256 = [HB89] 1612+261, QSO z=0.1309; 0.7 arcsec
+    # these three resolve only through the IUE archive's own target names, not NED
+    "BD_1028+31":    "ICRF J103059.0+310255",  # MAST IUE target 'BD 1028+31'; 0.4 arcsec
+    "RXJ_0057-2":    "TON-S180",               # MAST IUE target 'RXJ 0057-2'; 0.6 arcsec
+    "RXJ0425-57":    "LB 1727",                # MAST IUE target 'RXJ0425-57'; 0.5 arcsec
+    #: "SKY" IS NOT AN OBJECT NAME.  It is IUE's generic label for a sky or
+    #: background pointing and the archive carries 447 exposures under it, at
+    #: scattered positions.  GTR: "'SKY' is clearly an error in the name, but the
+    #: spectrum is clearly a QSO.  We might need to explore the IUE part of the
+    #: MAST search to be sure what happened."  Doing that narrows it to one
+    #: object.  Of the 447, eleven fall within 60 arcsec of a v22 object; of those
+    #: eleven, only THREE have C IV inside the wavelength range of the camera that
+    #: took the exposure (SWP 1150-1980 A, LWP/LWR 1850-3350 A) -- 3C 273
+    #: (swp16431), NGC-7469 (swp57383) and 4C73-18 (lwp06263, 0.5 arcsec, C IV at
+    #: 2018 A observed).  3C 273 and NGC 7469 ALREADY APPEAR IN AMOGH'S LIST UNDER
+    #: THEIR OWN NAMES, so they are not it.  4C73-18 does not appear anywhere in
+    #: his list, and his SKY blueshift of +87.6 km/s sits 1.4 quanta from our
+    #: 128_4C73-18_FOS value of -9.7, inside the ensemble scatter.  RECORDED AS THE
+    #: BEST-SUPPORTED IDENTIFICATION, NOT AS CERTAIN: it rests on elimination plus
+    #: a consistent blueshift, and its EW ratio of 1.72 is higher than the sample
+    #: median of 1.14.  Confirming it needs the dataset id Amogh actually used,
+    #: which his table does not record.
+    "SKY":           "4C73-18",
 }
 
 
