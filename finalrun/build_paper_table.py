@@ -33,6 +33,7 @@ import csv
 import glob
 import json
 import os
+import shutil
 import re
 import sys
 
@@ -82,7 +83,16 @@ FINAL = os.path.join(OUTDIR, "final")
 from rebin_path import DECISIONS   # env HSTICA_DECISIONS overrides
 QUEUE = os.path.join(OUTDIR, "work_queue.csv")
 XLSX = "/Users/gtr/Dropbox/HST/Summer2026/CIV_measurements_v22.xlsx"
+#: The measurements table.  THE CANONICAL COPY LIVES IN THE PAPER REPOSITORY,
+#: because that is what make_table1.py reads and what gets committed; writing it
+#: only under pipeline_output/final left two copies, and on 2026-11-06 the
+#: Data/ one was three days stale, so Table 1 was rebuilt from pre-IUE-merge
+#: numbers and reported manmask 1 -> 22 when the ledger had none.  That is the
+#: same two-copies failure that decisions.csv hit on 2026-10-29; see
+#: rebin_path.DECISIONS.  Both paths are written here so nothing that reads the
+#: pipeline_output copy breaks, but the Data/ one is the one to trust.
 OUT = os.path.join(FINAL, "CIV_measurements_v23.csv")
+OUT_CANONICAL = "/Users/gtr/Work/git/HST-Paper/Data/CIV_measurements_v23.csv"
 
 #: Objects whose catalogue name is not the name an astronomer would look for.
 #: The xlsx `common_name` and the queue's own precedence (Sulentic, then SIMBAD,
@@ -234,7 +244,9 @@ def main():
 
     n3 = sum(1 for r in rows if r["CIVgood_manmask"] in (3, 3.0, "3"))
     n0 = sum(1 for r in rows if r["CIVgood_manmask"] in (0, 0.0, "0"))
+    shutil.copyfile(OUT, OUT_CANONICAL)
     print("wrote %d rows -> %s" % (len(rows), OUT))
+    print("            and -> %s  (canonical, read by make_table1.py)" % OUT_CANONICAL)
     print("measurements read from: this pass %d, pre-pass tree %d"
           % (from_pass, from_legacy))
     if no_record:

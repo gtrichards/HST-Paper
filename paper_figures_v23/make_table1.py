@@ -152,8 +152,14 @@ def main():
     # Spec. is the spectrum the measurement came from, which is NOT the Inst.
     # column: that lists every instrument the archive holds, and the two differ
     # for 39 per cent of measured objects because of the single-visit policy.
-    t["spectrum"] = np.where(meas, t["adopted"].astype(str),
-                             np.where(t["CIVgood_manmask"] == 1, "IUE", ""))
+    # Before the IUE addendum was merged (2026-11-06) an unmeasured manmask-1
+    # object was labelled "IUE" here to show that IUE data existed but had not
+    # been used.  manmask 1 is now empty -- every one of those 22 objects was
+    # measured or graded 0 -- and `adopted` carries "IUE" for the ten measured
+    # from it, so the fallback is gone and IUE is treated exactly as COS, FOS
+    # and STIS are (GTR, 2026-11-06: "Table 1 should treat IUE data the same
+    # way that HST data are treated").
+    t["spectrum"] = np.where(meas, t["adopted"].astype(str), "")
 
     # Inst. carries the adopted spectrum by BOLDING it in the list, instead of
     # a separate Spec. column (GTR, 2026-10-30: "we could save some space by
@@ -165,7 +171,11 @@ def main():
     # C = COS, F = FOS, S = STIS, I = IUE (any camera), in the archive's order.
     # The adopted spectrum is bold; a splice (two instruments joined) has both
     # bold; an adopted spectrum missing from the listing is added in brackets.
-    LETTER = {"COS": "C", "FOS": "F", "STIS": "S", "SWP": "I", "LWP": "I", "LWR": "I"}
+    # The camera names are what the instrument column lists; "IUE" is what the
+    # adopted column says, and both must map to I or the adopted letter cannot
+    # be matched against the list and nothing is bolded.
+    LETTER = {"COS": "C", "FOS": "F", "STIS": "S",
+              "SWP": "I", "LWP": "I", "LWR": "I", "IUE": "I"}
 
     def inst_cell(r):
         toks = []
@@ -174,15 +184,21 @@ def main():
                 toks.append(LETTER.get(x, x))
         spec = str(r["spectrum"])
         bold = set(toks) if spec == "SPLICE" else {LETTER.get(spec, "")}
-        cell = "".join(r"\textbf{%s}" % x if x in bold and spec not in ("", "IUE") else x
+        cell = "".join(r"\textbf{%s}" % x if x in bold and spec else x
                        for x in toks)
-        if spec not in ("", "IUE", "SPLICE") and LETTER.get(spec) not in toks:
+        if spec not in ("", "SPLICE") and LETTER.get(spec) not in toks:
             cell += r" (\textbf{%s})" % LETTER.get(spec, spec)
         return cell
 
     t["inst_cell"] = t.apply(inst_cell, axis=1)
-    odd = t[meas & ~t.apply(lambda r: str(r["spectrum"]) in str(r["instrument"]).split("/"),
-                            axis=1)]
+    # Compare LETTERS, not raw names.  The instrument column lists IUE by its
+    # cameras (LWP/LWR/SWP) while the adopted column says "IUE", so a raw string
+    # comparison called all ten IUE objects anomalies; they are not, their
+    # camera name simply is not spelled "IUE".  LETTER maps both to I.
+    def _listed(r):
+        toks = [LETTER.get(x, x) for x in str(r["instrument"]).split("/")]
+        return LETTER.get(str(r["spectrum"]), str(r["spectrum"])) in toks
+    odd = t[meas & ~t.apply(_listed, axis=1)]
     if len(odd):
         print("NOTE: %d measured object(s) whose adopted spectrum is not in the "
               "instrument list; shown in parentheses:" % len(odd))
@@ -286,7 +302,7 @@ def main():
                 r" $D_{\rm C\,IV}<0$ (16 objects).") if EXTEND_CURVE else ""
     foot = r"""\enddata
 \tablenotetext{a}{Systemic redshift used in the fits, quoted to five decimals so that the \civ\ velocities are reproducible to $\sim$1.5\,km\,s$^{-1}$, well inside the 69\,km\,s$^{-1}$ quantisation; four decimals would cost up to 15\,km\,s$^{-1}$ at the low-redshift end. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
-\tablenotetext{b}{Every instrument the archive holds for this object: C\,=\,COS, F\,=\,FOS, S\,=\,STIS, I\,=\,IUE. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Two bold letters denote two instruments joined (\S2). Where the adopted spectrum is not among those listed it is given in parentheses (\#452, an instrument-listing error). IUE objects are not yet measured.}
+\tablenotetext{b}{Every instrument the archive holds for this object: C\,=\,COS, F\,=\,FOS, S\,=\,STIS, I\,=\,IUE. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Two bold letters denote two instruments joined (\S2). Where the adopted spectrum is not among those listed it is given in parentheses (\#452, an instrument-listing error). IUE data are treated exactly as the HST data are: \textbf{I} marks the ten objects measured from IUE, and an unbolded I marks the other objects for which IUE data exist but the measurement came from elsewhere or could not be made.}
 \tablenotetext{c}{SDSS spectroscopic coverage: 1\,=\,SDSS spectrum available; 2\,=\,SDSS spectrum covers rest-frame Mg\,\textsc{ii}\,$\lambda2798$ [$3800\,\text{\AA}/(1+z) \leq 2798\,\text{\AA}$].}
 \tablenotetext{d}{Bitmask of catalog memberships Sul\,=\,1 (\citealt{Sulentic2007}; odd values are Sulentic objects); K00\,=\,2 (Kaspi+2000); B15\,=\,4 (Barth+2015); D15\,=\,8 (Du+2015); Be15\,=\,16 (Bentz \& Katz 2015); S16\,=\,32 (Shen+2016 SDSS-RM); NLS1\,=\,256 (Rakshit+2017); RK20\,=\,512 (Rakshit+2020 SDSS AGN catalog). Bits 64 (Matthews+2021) and 128 (Rankine+2020) are defined but set for no object here.}
 \tablenotetext{e}{Positive values are blueshifted relative to systemic. Quantised at 69.03\,km\,s$^{-1}$ by construction.}

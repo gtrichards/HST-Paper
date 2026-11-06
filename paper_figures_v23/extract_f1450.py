@@ -77,11 +77,28 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "Data")
 FINALRUN = "/Users/gtr/Work/projects/hstica/finalrun"      # GTR's working tree
 FITS = os.path.join(FINALRUN, "pipeline_output", "chosen_visit", "fits")
+#: The IUE addendum, merged 2026-11-06.  Ten of the 22 objects the v22 sheet
+#: recorded as manmask 1 now carry an adopted record, and they are in the
+#: adopted sample, so their 1450 A continuum has to be extracted here too --
+#: otherwise make_table1's "a measured object has no L1450" assertion fires on
+#: exactly those ten, which is how this was found.  Searched after the
+#: chosen-visit tree so an HST record always wins if both somehow exist.
+IUE_FITS = os.path.join(FINALRUN, "iue", "fits")
+IUE_REBIN = os.path.join(FINALRUN, "iue", "rebin")
 QUEUE = os.path.join(FINALRUN, "pipeline_output", "work_queue.csv")
 DECISIONS = os.path.join(DATA, "decisions.csv")
 TABLE = os.path.join(DATA, "CIV_measurements_v23.csv")
 OUT = os.path.join(DATA, "HST_F1450_v23.csv")
 REBIN = os.path.join(FINALRUN, "pipeline_output", "chosen_visit", "rebin")
+
+
+def rebin_path_for(name):
+    """The rebinned product for a record, from whichever tree holds it."""
+    for tree in (REBIN, IUE_REBIN):
+        p = os.path.join(tree, name + ".fits")
+        if os.path.exists(p):
+            return p
+    return os.path.join(REBIN, name + ".fits")
 
 
 def estimate_f1450(rec):
@@ -90,7 +107,7 @@ def estimate_f1450(rec):
 
     Returns (value, slope, fit_range) or (None, ...) if it cannot be done.
     """
-    path = os.path.join(REBIN, rec["name"] + ".fits")
+    path = rebin_path_for(rec["name"])
     if not os.path.exists(path):
         return None, float("nan"), None
     d = fits.open(path)[1].data
@@ -127,9 +144,10 @@ for q in csv.DictReader(open(QUEUE)):
 
 # ---- 2. find the BEST record for each fit index ----------------------------
 best_by_index = {}
-for path in glob.glob(os.path.join(FITS, "*", "records", "BEST_*.json")):
-    index = int(os.path.basename(os.path.dirname(os.path.dirname(path)))[:3])
-    best_by_index[index] = path
+for tree in (FITS, IUE_FITS):
+    for path in glob.glob(os.path.join(tree, "*", "records", "BEST_*.json")):
+        index = int(os.path.basename(os.path.dirname(os.path.dirname(path)))[:3])
+        best_by_index.setdefault(index, path)
 
 # ---- 3. read z from the paper table, for the check -------------------------
 z_table = {int(r["row_num"]): float(r["z"]) for r in csv.DictReader(open(TABLE))}
