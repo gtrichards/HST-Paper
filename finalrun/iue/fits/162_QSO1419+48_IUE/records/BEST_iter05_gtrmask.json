@@ -1,0 +1,160 @@
+{
+ "name": "QSO1419+48_IUE",
+ "iteration": 5,
+ "label": "gtrmask",
+ "when_utc": "2026-11-03T22:30:59+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1297.994,
+    1300.58
+   ],
+   [
+    1307.667,
+    1310.449
+   ],
+   [
+    1341.378,
+    1345.245
+   ],
+   [
+    1360.348,
+    1362.952
+   ],
+   [
+    1380.858,
+    1384.358
+   ],
+   [
+    1398.435,
+    1401.823
+   ],
+   [
+    1409.224,
+    1412.307
+   ],
+   [
+    1451.392,
+    1454.553
+   ],
+   [
+    1443.119,
+    1446.391
+   ],
+   [
+    1540.472,
+    1551.798
+   ],
+   [
+    1512.993,
+    1516.31
+   ],
+   [
+    1570.258,
+    1574.61
+   ],
+   [
+    1654.742,
+    1658.406
+   ],
+   [
+    1667.158,
+    1672.157
+   ],
+   [
+    1678.157,
+    1681.303
+   ],
+   [
+    1687.697,
+    1692.216
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "mod"
+ },
+ "result": {
+  "civ_blue": 266.5087642305957,
+  "civ_ew": 83.95846681385017,
+  "f2500": 0.484844521382058,
+  "z": 0.0726
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 1.0120246016459223e+27,
+   "z": 0.0726,
+   "cont_wave_min": 1120.1139535192517,
+   "cont_wave_max": 1844.854871560696,
+   "cont_at_min": 3.4417737655903267e-15,
+   "cont_at_max": 4.071301781985966e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.0642841528818217,
+   "f_lambda_cgs": 9.465336204795522e-15,
+   "logL": 44.277533843501864,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 3.0889224799514098e-15,
+   "nearest_cont_wave": 1449.9806525437778,
+   "nearest_cont": 3.1313742856754273e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.549905751151377,
+   "f_lambda_cgs": 9.040391730645513e-15,
+   "logL": 44.326665967478505,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 3.545382697601055e-15,
+   "nearest_cont_wave": 1700.052007423748,
+   "nearest_cont": 3.5394506197794126e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7103231231883904,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1844.854871560696,
+   "nearest_cont": 4.071301781985966e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_QSO1419+48_IUE/iter05_gtrmask.png",
+ "windows": "SiIV: med +0.01 rms 0.09 (n=209)  |  CIV: med +0.04 rms 0.11 (n=226)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 226,
+  "civ_span": [
+   1500.2,
+   1599.8
+  ],
+  "n_civ_core_px": 53
+ },
+ "logL_morph_applied": true,
+ "logL_morph_note": "No correction needed: fitted on 2026-11-03 against an IUE product rebinned after the morph coefficient was divided out of the Continuum Normalisation column. Flagged so a later pass does not rescale it."
+}

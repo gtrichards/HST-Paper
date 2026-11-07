@@ -1,0 +1,109 @@
+{
+ "name": "2MASS J16595894+6202181_COS",
+ "iteration": 6,
+ "label": "gtrmask",
+ "when_utc": "2026-10-11T19:46:51+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1542.9333135616564,
+   1540.8031442209463,
+   1536.1978608401296,
+   1555.7763167059986,
+   1556.8513801834865,
+   1558.285953839667,
+   1558.6448037529985,
+   1576.6930599655232,
+   1463.0095330429597,
+   1575.2415405430863,
+   1565.1182517071866,
+   1551.4834813825273
+  ],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -9.680667062489581,
+  "civ_ew": 75.33268118285606,
+  "f2500": 0.40302732533991015,
+  "z": 0.2326870796856196
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 3.5847540792301157e+27,
+   "z": 0.2326870796856196,
+   "cont_wave_min": 1120.07513437588,
+   "cont_wave_max": 1959.9597649007658,
+   "cont_at_min": 1.4870411787300045e-15,
+   "cont_at_max": 1.4506766331676954e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.6942646725997785,
+   "f_lambda_cgs": 8.926766463281074e-16,
+   "logL": 44.411043618648314,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.4506766331676954e-15,
+   "nearest_cont_wave": 1449.9304014004358,
+   "nearest_cont": 1.3003343500338228e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.4026822210839818,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1684.7953531801923,
+   "nearest_cont": 1.4506766331676954e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7097407600939591,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1959.9597649007658,
+   "nearest_cont": 1.4506766331676954e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/237_2MASS_J16595894+6202181_COS/iter06_gtrmask.png",
+ "windows": "SiIV: med +0.06 rms 0.23 (n=249)  |  CIV: med -0.01 rms 0.19 (n=210)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 210,
+  "civ_span": [
+   1500.2,
+   1578.1
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0909 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03, the same morph-coefficient correction as the rest of the sample (sweeps/fix_luminosity_morph.py). This object was skipped by that run because the product on disk then did not regenerate bit-identically; it was rebuilt by fit_chosen_visit.py --index 237 the same day, GTR confirmed the fit in the interactive fitter, and the rebuilt product reproduces exactly, so the EXACT factor applies here and no estimate was needed."
+}

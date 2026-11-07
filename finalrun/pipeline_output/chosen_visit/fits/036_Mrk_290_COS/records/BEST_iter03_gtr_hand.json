@@ -1,0 +1,196 @@
+{
+ "name": "Mrk 290_COS",
+ "iteration": 3,
+ "label": "gtr_hand",
+ "when_utc": "2026-10-02T02:29:49+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1260.372,
+    1261.737
+   ],
+   [
+    1262.698,
+    1264.579
+   ],
+   [
+    1265.334,
+    1266.415
+   ],
+   [
+    1270.051,
+    1270.72
+   ],
+   [
+    1278.841,
+    1280.05
+   ],
+   [
+    1293.858,
+    1296.7
+   ],
+   [
+    1350.625,
+    1353.452
+   ],
+   [
+    1396.246,
+    1398.954
+   ],
+   [
+    1405.478,
+    1408.751
+   ],
+   [
+    1415.706,
+    1416.759
+   ],
+   [
+    1741.749,
+    1746.978
+   ],
+   [
+    1618.714,
+    1622.91
+   ],
+   [
+    1574.342,
+    1578.187
+   ],
+   [
+    1559.41,
+    1566.523
+   ],
+   [
+    1544.065,
+    1546.7
+   ],
+   [
+    1548.847,
+    1553.827
+   ],
+   [
+    1558.12,
+    1558.561
+   ],
+   [
+    1730.123,
+    1733.55
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1542.6892544002822,
+   1542.3340779650184,
+   1554.4560748836025,
+   1555.5302260552855,
+   1556.9635823230035,
+   1702.0740656415906,
+   1538.4325300545872,
+   1538.7868080218088,
+   1536.662363334844,
+   1555.8884413662101
+  ],
+  "unmask_pixels": [
+   1545.177780673394,
+   1543.7552745327157,
+   1543.399852665503,
+   1534.5408516501668,
+   1534.1875512379802,
+   1525.381428151561,
+   1557.6807556730187,
+   1559.4751346462192,
+   1559.1160935641437,
+   1559.8342584100776,
+   1561.2715806642152,
+   1562.3504414469567,
+   1563.070096108151,
+   1563.7900822588865,
+   1564.5104000518554
+  ],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -147.88187004671502,
+  "civ_ew": 179.60279897825728,
+  "f2500": 0.5200544764557009,
+  "z": 0.0302
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 4.083399236662631e+26,
+   "z": 0.0302,
+   "cont_wave_min": 1119.8979623652044,
+   "cont_wave_max": 1744.1284024220947,
+   "cont_at_min": 3.833162351821227e-15,
+   "cont_at_max": 3.9666930167014704e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.815970927693037,
+   "f_lambda_cgs": 1.1844469887909924e-14,
+   "logL": 43.56905872649417,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.410266777102229e-14,
+   "nearest_cont_wave": 1450.0348977549836,
+   "nearest_cont": 1.410266777102229e-14,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.628201695608594,
+   "f_lambda_cgs": 1.0571663304407743e-14,
+   "logL": 43.58876734035296,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.1864820841590062e-14,
+   "nearest_cont_wave": 1700.1156080518267,
+   "nearest_cont": 1.1864820841590062e-14,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 2.005668160785787,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1744.1284024220947,
+   "nearest_cont": 1.1356098211066258e-14,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/036_Mrk_290_COS/iter03_gtr_hand.png",
+ "windows": "SiIV: med +0.08 rms 0.57 (n=208)  |  CIV: med -0.01 rms 0.69 (n=194)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 194,
+  "civ_span": [
+   1500.3,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0129 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

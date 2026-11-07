@@ -1,0 +1,161 @@
+{
+ "name": "Mrk 231 cos24_COS",
+ "iteration": 1,
+ "label": "gtr_masks",
+ "when_utc": "2026-10-02T19:13:24+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1785.826,
+    2342.036
+   ],
+   [
+    1250.0,
+    1285.951
+   ],
+   [
+    1368.584,
+    1370.011
+   ],
+   [
+    1331.836,
+    1343.713
+   ],
+   [
+    1285.297,
+    1315.868
+   ],
+   [
+    1546.157,
+    1554.711
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1407.8397900147427,
+   1408.8126272562838,
+   1547.5804527576176,
+   1546.8679296985601,
+   1564.0593743015497,
+   1603.0727640313432,
+   1668.6038280036894,
+   1414.3380832310445,
+   1409.1370557014902,
+   1411.7351743052532,
+   1412.3854520992797,
+   1402.6626590360304,
+   1464.715358951609,
+   1465.7274980171132,
+   1465.0526609585484,
+   1465.3900406410871,
+   1362.8662461527922,
+   1363.1800938346696,
+   1365.0646982714165,
+   1380.553481719598,
+   1380.2356341278494,
+   1397.826390589711,
+   1398.470261677043
+  ],
+  "unmask_pixels": [
+   1548.6498527770277,
+   1550.0768690675484,
+   1549.363196630969,
+   1552.2198593869905
+  ],
+  "comps_use": "low"
+ },
+ "result": {
+  "civ_blue": 2603.886465136709,
+  "civ_ew": 13.766460653250435,
+  "f2500": 0.46580049840850685,
+  "z": 0.04147
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 5.653894892529675e+26,
+   "z": 0.04147,
+   "cont_wave_min": 1120.090814087003,
+   "cont_wave_max": 2396.9183243373623,
+   "cont_at_min": 1.0264134935796017e-15,
+   "cont_at_max": 6.1728268453545e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.8816392503731008,
+   "f_lambda_cgs": 4.2641346695920186e-15,
+   "logL": 43.412751003917926,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.4797600598478518e-15,
+   "nearest_cont_wave": 1449.9506986904526,
+   "nearest_cont": 1.4504920879754635e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.3167501322647945,
+   "f_lambda_cgs": 2.868017683880664e-15,
+   "logL": 43.309582835785164,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.2379486436359733e-15,
+   "nearest_cont_wave": 1700.0168875699856,
+   "nearest_cont": 1.2355430162828754e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.4433537499036035,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2396.9183243373623,
+   "nearest_cont": 6.1728268453545e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/private/tmp/claude-502/-Users-gtr-Work-projects-hstica/d417042d-a1d6-4929-8903-4ecb7e5424bd/scratchpad/x_fits/000_Mrk_231_cos24_COS/iter01_gtr_masks.png",
+ "windows": "SiIV: med +0.00 rms 0.11 (n=231)  |  CIV: med -0.00 rms 0.10 (n=260)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 45,
+  "worst_frac": -0.0416,
+  "ranges": [
+   [
+    1549.17,
+    1550.96
+   ],
+   [
+    1585.62,
+    1585.62
+   ],
+   [
+    1586.35,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 260,
+  "civ_span": [
+   1500.2,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0176 on 2026-10-30; see sweeps/fix_luminosity_1pz.py"
+}

@@ -1,0 +1,177 @@
+{
+ "name": "2MASS J08333293+1644110_STIS",
+ "iteration": 14,
+ "label": "gtrbest",
+ "when_utc": "2026-10-15T20:42:06+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1819.474,
+    1821.088
+   ],
+   [
+    1919.582,
+    1921.517
+   ],
+   [
+    1526.958,
+    1528.902
+   ],
+   [
+    1531.46,
+    1534.221
+   ],
+   [
+    1535.599,
+    1536.286
+   ],
+   [
+    1546.867,
+    1546.882
+   ],
+   [
+    1625.823,
+    1627.235
+   ],
+   [
+    1631.361,
+    1632.327
+   ],
+   [
+    1406.534,
+    1408.767
+   ],
+   [
+    1412.732,
+    1413.936
+   ],
+   [
+    1415.204,
+    1417.119
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1490.9234930618868,
+   1474.8754890547934,
+   1475.2151307875051,
+   1477.9350818812213,
+   1559.3922020616749,
+   1559.751306727401,
+   1560.1104940895534,
+   1295.553518563706,
+   1297.0459386144128,
+   1296.4487644007731,
+   1309.9519271912195,
+   1311.1589932924103,
+   1312.0650227336173,
+   1313.8789602862034,
+   1310.5553212731968,
+   1311.762943376884,
+   1295.8518651327086,
+   1289.0072443693164,
+   1281.3133708362311,
+   1275.7199822206169,
+   1276.6015228030642,
+   1279.5443932437408,
+   1275.1326267118206,
+   1558.674240743345,
+   1559.0331800733343,
+   1546.5193496218433,
+   1546.8754898624777,
+   1547.2317121168749,
+   1553.3000568652499,
+   1553.6577586011929,
+   1554.0155427104878
+  ],
+  "unmask_pixels": [],
+  "comps_use": "mod"
+ },
+ "result": {
+  "civ_blue": 266.5087642305957,
+  "civ_ew": 30.97326387260505,
+  "f2500": 0.6046062768423498,
+  "z": 0.4606448838511962
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 7.924890325571951e+27,
+   "z": 0.4606448838511962,
+   "cont_wave_min": 1138.034316739833,
+   "cont_wave_max": 2098.240947719784,
+   "cont_at_min": 8.631519858078966e-16,
+   "cont_at_max": 3.886455671850673e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.2449959117464178,
+   "f_lambda_cgs": 1.1662398855042963e-15,
+   "logL": 45.28989691961452,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.1404919509058618e-15,
+   "nearest_cont_wave": 1449.9577851809652,
+   "nearest_cont": 1.1404919509058618e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.6489184665003864,
+   "f_lambda_cgs": 1.0255252640531961e-15,
+   "logL": 45.30313631229186,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.0362612601185486e-15,
+   "nearest_cont_wave": 1700.0251962342431,
+   "nearest_cont": 1.0401572955390748e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7244553540336316,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2098.240947719784,
+   "nearest_cont": 7.704406356410976e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/323_2MASS_J08333293+1644110_STIS/iter14_gtrbest.png",
+ "windows": "SiIV: med -0.09 rms 0.21 (n=233)  |  CIV: med -0.09 rms 0.22 (n=253)  |  CIII]: med +0.12 rms 0.30 (n=224)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 2016.0,
+  "ciii_xcorr_dv": -620.0,
+  "ciii_xcorr_snr": 2.5,
+  "ciii_xcorr_npx": 224,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 253,
+  "civ_span": [
+   1500.2,
+   1599.8
+  ],
+  "n_civ_core_px": 71
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.1645 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

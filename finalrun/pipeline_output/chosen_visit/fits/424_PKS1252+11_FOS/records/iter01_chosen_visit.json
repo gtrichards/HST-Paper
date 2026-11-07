@@ -1,0 +1,78 @@
+{
+ "name": "PKS1252+11_FOS",
+ "iteration": 1,
+ "label": "chosen_visit",
+ "when_utc": "2026-09-27T20:39:00+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 1231.1678756744097,
+  "civ_ew": 25.277306559615646,
+  "f2500": 0.46674129466728054,
+  "z": 0.8750498488432586
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 3.2111058978269775,
+   "f_lambda_cgs": 2.98077092980561e-15,
+   "logL": 46.483559744371185,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.6223501802289557,
+   "f_lambda_cgs": 2.462312274109407e-15,
+   "logL": 46.46965519139257,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7056908319208683,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/424_PKS1252+11_FOS/iter01_chosen_visit.png",
+ "windows": "SiIV: med +0.28 rms 0.59 (n=248)  |  CIV: med +0.12 rms 0.50 (n=280)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.3,
+   1599.9
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.2730 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

@@ -1,0 +1,83 @@
+{
+ "name": "Mrk 352_COS",
+ "iteration": 1,
+ "label": "chosen_visit",
+ "when_utc": "2026-09-27T19:55:34+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 542.4464981800312,
+  "civ_ew": 321.1787003703159,
+  "f2500": 0.3759488998010377,
+  "z": 0.01486
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 2.4780987504543766,
+   "f_lambda_cgs": 1.3432541653511594e-15,
+   "logL": 41.99122029308685,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 1.7949016946520846,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.3652294900984723,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/015_Mrk_352_COS/iter01_chosen_visit.png",
+ "windows": "SiIV: med +0.17 rms 0.37 (n=248)  |  CIV: med +0.23 rms 0.57 (n=247)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 58,
+  "worst_frac": -0.4153,
+  "ranges": [
+   [
+    1579.07,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 247,
+  "civ_span": [
+   1500.0,
+   1599.9
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0064 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

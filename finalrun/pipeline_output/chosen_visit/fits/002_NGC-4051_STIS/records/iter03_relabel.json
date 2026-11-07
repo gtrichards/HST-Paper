@@ -1,0 +1,87 @@
+{
+ "name": "NGC-4051_STIS",
+ "iteration": 3,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:21:24+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 197.48560807496355,
+  "civ_ew": 30.627941244001104,
+  "f2500": 0.6812164837092429,
+  "z": 0.002336
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 2.7097598184363507,
+   "f_lambda_cgs": 7.661642374688598e-15,
+   "logL": 41.12657494128314,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.263442011024359,
+   "f_lambda_cgs": 5.86277288417041e-15,
+   "logL": 41.07943705456469,
+   "measured": false,
+   "covered": false,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.5285290753960943,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/002_NGC-4051_STIS/iter03_relabel.png",
+ "windows": "SiIV: med +0.28 rms 1.07 (n=173)  |  CIV: med +0.39 rms 0.98 (n=151)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 198,
+  "worst_frac": -0.1636,
+  "ranges": [
+   [
+    1500.03,
+    1535.32
+   ],
+   [
+    1562.79,
+    1597.35
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 151,
+  "civ_span": [
+   1500.3,
+   1599.5
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0010 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

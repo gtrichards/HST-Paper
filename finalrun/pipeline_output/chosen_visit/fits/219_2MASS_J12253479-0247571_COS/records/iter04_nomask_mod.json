@@ -1,0 +1,96 @@
+{
+ "name": "2MASS J12253479-0247571_COS",
+ "iteration": 4,
+ "label": "nomask_mod",
+ "when_utc": "2026-10-11T18:32:59+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "mod"
+ },
+ "result": {
+  "civ_blue": 680.3185584841262,
+  "civ_ew": 57.44315008411089,
+  "f2500": 0.3945206251431727,
+  "z": 0.1954394957730914
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 2.947330460693847e+27,
+   "z": 0.1954394957730914,
+   "cont_wave_min": 1119.8823494145315,
+   "cont_wave_max": 1959.1712529817398,
+   "cont_at_min": 2.790591655895152e-16,
+   "cont_at_max": 4.1321889913108183e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.5406493428596533,
+   "f_lambda_cgs": 7.408308718991042e-16,
+   "logL": 44.14668220361037,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 9.859486063954102e-16,
+   "nearest_cont_wave": 1450.0146822317006,
+   "nearest_cont": 9.859486063954102e-16,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.014846099227126,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1684.5053697700846,
+   "nearest_cont": 9.662316609694103e-16,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.426841854328599,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1959.1712529817398,
+   "nearest_cont": 9.662316609694103e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/219_2MASS_J12253479-0247571_COS/iter04_nomask_mod.png",
+ "windows": "SiIV: med +0.12 rms 0.35 (n=248)  |  CIV: med +0.05 rms 0.34 (n=280)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.3,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0775 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

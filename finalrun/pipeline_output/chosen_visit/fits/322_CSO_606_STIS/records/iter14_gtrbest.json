@@ -1,0 +1,183 @@
+{
+ "name": "CSO 606_STIS",
+ "iteration": 14,
+ "label": "gtrbest",
+ "when_utc": "2026-10-15T20:30:29+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1281.553,
+    1284.356
+   ],
+   [
+    1412.834,
+    1416.496
+   ],
+   [
+    1475.607,
+    1486.931
+   ],
+   [
+    1511.625,
+    1513.051
+   ],
+   [
+    1514.456,
+    1516.288
+   ],
+   [
+    1842.219,
+    1843.577
+   ],
+   [
+    1386.736,
+    1389.635
+   ],
+   [
+    1407.838,
+    1411.32
+   ],
+   [
+    1417.208,
+    1419.554
+   ],
+   [
+    1340.732,
+    1342.04
+   ],
+   [
+    1310.41,
+    1316.617
+   ],
+   [
+    1326.463,
+    1330.619
+   ],
+   [
+    1529.035,
+    1530.861
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1319.0828621555563,
+   1321.8192670198757,
+   1347.944707655063,
+   1351.363168169485,
+   1541.2464096699048,
+   1591.006954163367,
+   1590.6406534473626,
+   1591.7398086755056,
+   1591.3733392329398,
+   1605.7283602574846,
+   1606.098135446366,
+   1606.4679957889348,
+   1607.2079720135764,
+   1607.5780879348818,
+   1618.3486054515777,
+   1618.7212868938866,
+   1664.8383749471802,
+   1664.4550758753696,
+   1668.2920410952393,
+   1668.6762237626651,
+   1671.7528717885425,
+   1672.137851433437,
+   1738.4895236556906,
+   1738.8898717518503,
+   1739.2903120421795,
+   1548.0039977314304,
+   1548.3604798642855,
+   1548.7170440896361,
+   1549.0736904263865
+  ],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 128.44309058521125,
+  "civ_ew": 76.17838425174334,
+  "f2500": 0.6193232605749125,
+  "z": 0.4592440194679221
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 7.896153279148765e+27,
+   "z": 0.4592440194679221,
+   "cont_wave_min": 1139.3891458261933,
+   "cont_wave_max": 2100.73890215257,
+   "cont_at_min": 5.258686089355072e-16,
+   "cont_at_max": 3.89545743127763e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.971175757056247,
+   "f_lambda_cgs": 1.091804546084303e-15,
+   "logL": 45.25768182706896,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.1664973597507413e-15,
+   "nearest_cont_wave": 1450.0136077402208,
+   "nearest_cont": 1.1664973597507413e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.4841082707267144,
+   "f_lambda_cgs": 9.321392699999007e-16,
+   "logL": 45.258098652619665,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.007295351983401e-15,
+   "nearest_cont_wave": 1700.0906462481832,
+   "nearest_cont": 1.005684134971445e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.8237468434403608,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2100.73890215257,
+   "nearest_cont": 7.737062662616414e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/322_CSO_606_STIS/iter14_gtrbest.png",
+ "windows": "SiIV: med +0.06 rms 0.21 (n=210)  |  CIV: med +0.04 rms 0.30 (n=256)  |  CIII]: med +0.02 rms 0.45 (n=227)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 88.0,
+  "ciii_xcorr_dv": 100.0,
+  "ciii_xcorr_snr": 2.8,
+  "ciii_xcorr_npx": 227,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 256,
+  "civ_span": [
+   1500.3,
+   1599.8
+  ],
+  "n_civ_core_px": 79
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.1641 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

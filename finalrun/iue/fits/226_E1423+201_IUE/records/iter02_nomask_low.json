@@ -1,0 +1,102 @@
+{
+ "name": "E1423+201_IUE",
+ "iteration": 2,
+ "label": "nomask_low",
+ "when_utc": "2026-11-06T16:39:00+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "low"
+ },
+ "result": {
+  "civ_blue": 818.1325347858609,
+  "civ_ew": 22.699413428038575,
+  "f2500": 0.4132788313041654,
+  "z": 0.2135
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 3.253624663306959e+27,
+   "z": 0.2135,
+   "cont_wave_min": 1120.1088260602894,
+   "cont_wave_max": 1630.6479894816666,
+   "cont_at_min": 2.0525626014754356e-15,
+   "cont_at_max": 2.3690581850146068e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.0698706959803186,
+   "f_lambda_cgs": 6.480388815098215e-15,
+   "logL": 45.18095361363914,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.110964746360041e-15,
+   "nearest_cont_wave": 1449.9740150795549,
+   "nearest_cont": 2.1040235739596407e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.188888425920506,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1630.6479894816666,
+   "nearest_cont": 2.3690581850146068e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.3583141510556809,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1630.6479894816666,
+   "nearest_cont": 2.3690581850146068e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_E1423+201_IUE/iter02_nomask_low.png",
+ "windows": "SiIV: med -0.02 rms 0.13 (n=249)  |  CIV: med -0.04 rms 0.12 (n=280)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 87,
+  "worst_frac": -0.2401,
+  "ranges": [
+   [
+    1500.03,
+    1500.38
+   ],
+   [
+    1569.28,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.2,
+   1599.8
+  ],
+  "n_civ_core_px": 84
+ }
+}

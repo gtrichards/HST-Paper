@@ -1,0 +1,93 @@
+{
+ "name": "US 1329_IUE",
+ "iteration": 2,
+ "label": "nomask_low",
+ "when_utc": "2026-11-06T16:36:29+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "low"
+ },
+ "result": {
+  "civ_blue": -147.88187004671502,
+  "civ_ew": 78.66422632420485,
+  "f2500": 0.49391953098291075,
+  "z": 0.2542
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 3.962876802475919e+27,
+   "z": 0.2542,
+   "cont_wave_min": 1120.0391506119197,
+   "cont_wave_max": 1577.731889041622,
+   "cont_at_min": 2.721778044375608e-15,
+   "cont_at_max": 2.298285144731e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.9009359656778475,
+   "f_lambda_cgs": 6.160059642657601e-15,
+   "logL": 45.34455072226791,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.1234731533338792e-15,
+   "nearest_cont_wave": 1449.8838206383764,
+   "nearest_cont": 2.1162160860207172e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.4431277637647555,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1577.731889041622,
+   "nearest_cont": 2.298285144731e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.905264340341054,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1577.731889041622,
+   "nearest_cont": 2.298285144731e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_US_1329_IUE/iter02_nomask_low.png",
+ "windows": "SiIV: med +0.03 rms 0.16 (n=248)  |  CIV: med -0.06 rms 0.22 (n=220)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 220,
+  "civ_span": [
+   1500.1,
+   1577.7
+  ],
+  "n_civ_core_px": 84
+ }
+}

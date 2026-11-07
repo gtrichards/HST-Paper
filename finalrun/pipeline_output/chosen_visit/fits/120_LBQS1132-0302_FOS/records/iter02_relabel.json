@@ -1,0 +1,109 @@
+{
+ "name": "LBQS1132-0302_FOS",
+ "iteration": 2,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:14:55+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 1643.661099207463,
+  "civ_ew": 24.55013669425869,
+  "f2500": 0.542217239384773,
+  "z": 0.236
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 3.0815011879710505,
+   "f_lambda_cgs": 1.4902126036775961e-15,
+   "logL": 44.64864752325152,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.548439697070567,
+   "f_lambda_cgs": 1.4867552884160438e-15,
+   "logL": 44.71671970218011,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.644728475661178,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/120_LBQS1132-0302_FOS/iter02_relabel.png",
+ "windows": "SiIV: med +0.24 rms 0.76 (n=241)  |  CIV: med +0.23 rms 0.70 (n=280)  |  CIII]: med -0.16 rms 0.68 (n=23)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "ciii_xcorr_snr": 6.3,
+  "ciii_xcorr_npx": 23,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 86,
+  "worst_frac": -0.0474,
+  "ranges": [
+   [
+    1500.03,
+    1500.72
+   ],
+   [
+    1503.49,
+    1505.57
+   ],
+   [
+    1508.0,
+    1508.34
+   ],
+   [
+    1509.04,
+    1513.21
+   ],
+   [
+    1570.36,
+    1570.36
+   ],
+   [
+    1571.45,
+    1574.35
+   ],
+   [
+    1576.16,
+    1594.41
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.3,
+   1599.9
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0920 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

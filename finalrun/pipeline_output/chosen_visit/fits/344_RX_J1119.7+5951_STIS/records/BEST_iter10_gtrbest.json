@@ -1,0 +1,203 @@
+{
+ "name": "RX J1119.7+5951_STIS",
+ "iteration": 10,
+ "label": "gtrbest",
+ "when_utc": "2026-10-16T14:43:43+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1545.867,
+    1546.912
+   ],
+   [
+    1509.44,
+    1512.303
+   ],
+   [
+    1935.844,
+    1938.068
+   ],
+   [
+    1878.988,
+    1880.842
+   ],
+   [
+    1883.648,
+    1885.997
+   ],
+   [
+    1604.987,
+    1607.234
+   ],
+   [
+    1600.795,
+    1602.648
+   ],
+   [
+    1562.654,
+    1563.763
+   ],
+   [
+    1500.522,
+    1501.862
+   ],
+   [
+    1487.788,
+    1492.736
+   ],
+   [
+    1390.428,
+    1392.175
+   ],
+   [
+    1394.716,
+    1395.254
+   ],
+   [
+    1413.167,
+    1414.01
+   ],
+   [
+    1272.251,
+    1274.82
+   ],
+   [
+    1365.128,
+    1365.959
+   ],
+   [
+    1367.879,
+    1368.497
+   ],
+   [
+    1337.395,
+    1337.963
+   ],
+   [
+    1578.535,
+    1579.597
+   ],
+   [
+    1597.861,
+    1598.25
+   ],
+   [
+    1558.894,
+    1559.956
+   ],
+   [
+    1585.362,
+    1586.712
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1576.050778891533,
+   1530.629946406493,
+   1530.9824275555768,
+   1533.452069437851,
+   1533.805200479596,
+   1536.2793958029233,
+   1536.633177935579,
+   1567.726162339581,
+   1568.0871861915236,
+   1555.8588908114125
+  ],
+  "unmask_pixels": [
+   1545.860164562639
+  ],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 680.3185584841262,
+  "civ_ew": 36.119732905944076,
+  "f2500": 0.5546760717758118,
+  "z": 0.4874069076444123
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 8.478283470937187e+27,
+   "z": 0.4874069076444123,
+   "cont_wave_min": 1119.8766924558558,
+   "cont_wave_max": 2060.963051653784,
+   "cont_at_min": 5.84083956535276e-16,
+   "cont_at_max": 4.4304822465571787e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.2326896602868778,
+   "f_lambda_cgs": 1.4686276631433214e-15,
+   "logL": 45.456535230828685,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.4409164398780835e-15,
+   "nearest_cont_wave": 1450.0073576469879,
+   "nearest_cont": 1.4409164398780835e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.592831660370654,
+   "f_lambda_cgs": 1.1818365125541379e-15,
+   "logL": 45.43126184890503,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.2078848616808237e-15,
+   "nearest_cont_wave": 1700.0833182307174,
+   "nearest_cont": 1.2094158979790865e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7242986002645104,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2060.963051653784,
+   "nearest_cont": 9.128512745972467e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/344_RX_J1119.7+5951_STIS/iter10_gtrbest.png",
+ "windows": "SiIV: med +0.05 rms 0.22 (n=235)  |  CIV: med +0.05 rms 0.24 (n=241)  |  CIII]: med +0.06 rms 0.26 (n=214)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 18.0,
+  "ciii_xcorr_dv": 50.0,
+  "ciii_xcorr_snr": 3.2,
+  "ciii_xcorr_npx": 214,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 61,
+  "worst_frac": -0.0469,
+  "ranges": [
+   [
+    1577.97,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 241,
+  "civ_span": [
+   1500.3,
+   1599.8
+  ],
+  "n_civ_core_px": 72
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.1724 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

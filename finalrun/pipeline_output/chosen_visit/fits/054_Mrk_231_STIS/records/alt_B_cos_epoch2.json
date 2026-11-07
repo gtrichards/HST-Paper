@@ -1,0 +1,109 @@
+{
+ "name": "Mrk 231 cosep2_COS",
+ "iteration": 1,
+ "label": "alt",
+ "when_utc": "2026-10-02T18:28:09+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 3151.212019516248,
+  "civ_ew": 10.07143041313181,
+  "f2500": 0.43110628926752115,
+  "z": 0.04147
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 5.653894892529675e+26,
+   "z": 0.04147,
+   "cont_wave_min": 1120.090814087003,
+   "cont_wave_max": 2396.9183243373623,
+   "cont_at_min": 1.045875016045529e-15,
+   "cont_at_max": 6.612735364081885e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.8804840930066193,
+   "f_lambda_cgs": 4.2656917606272326e-15,
+   "logL": 43.412909561904414,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.4808940521434186e-15,
+   "nearest_cont_wave": 1449.9506986904526,
+   "nearest_cont": 1.4486289787938508e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.294866552297597,
+   "f_lambda_cgs": 2.8271802544304565e-15,
+   "logL": 43.30335450994654,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.2319584559720532e-15,
+   "nearest_cont_wave": 1700.0168875699856,
+   "nearest_cont": 1.2292115874387736e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.3553491027904352,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2396.9183243373623,
+   "nearest_cont": 6.612735364081885e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/000_Mrk_231_cosep2_COS/iter01_alt.png",
+ "windows": "SiIV: med +0.03 rms 0.12 (n=249)  |  CIV: med +0.01 rms 0.11 (n=280)  |  CIII]: med -0.02 rms 0.17 (n=33)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "ciii_xcorr_snr": -0.0,
+  "ciii_xcorr_npx": 33,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 111,
+  "worst_frac": -0.3302,
+  "ranges": [
+   [
+    1500.03,
+    1500.38
+   ],
+   [
+    1545.97,
+    1555.97
+   ],
+   [
+    1571.09,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.2,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0176 on 2026-10-30; see sweeps/fix_luminosity_1pz.py"
+}

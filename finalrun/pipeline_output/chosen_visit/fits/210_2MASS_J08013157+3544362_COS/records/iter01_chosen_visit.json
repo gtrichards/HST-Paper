@@ -1,0 +1,74 @@
+{
+ "name": "2MASS J08013157+3544362_COS",
+ "iteration": 1,
+ "label": "chosen_visit",
+ "when_utc": "2026-09-27T20:19:55+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 473.48142602680343,
+  "civ_ew": 312.8219161990821,
+  "f2500": 7.968193373346063,
+  "z": 0.1788997738249112
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 43.00981160734169,
+   "f_lambda_cgs": -2.18424786811506e-15,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 47.706601709690815,
+   "f_lambda_cgs": -1.2143133152099627e-13,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 39.159324732220846,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/210_2MASS_J08013157+3544362_COS/iter01_chosen_visit.png",
+ "windows": "SiIV: med -0.01 rms 0.10 (n=207)  |  CIV: --  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": false,
+  "n_civ_px": 0,
+  "civ_span": null,
+  "no_civ_data": true
+ },
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

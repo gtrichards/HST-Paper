@@ -1,0 +1,217 @@
+{
+ "name": "PB 3456_STIS",
+ "iteration": 6,
+ "label": "gtrbest",
+ "when_utc": "2026-10-15T21:07:27+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1540.451,
+    1544.028
+   ],
+   [
+    1534.992,
+    1539.41
+   ],
+   [
+    1545.453,
+    1546.657
+   ],
+   [
+    1548.185,
+    1548.979
+   ],
+   [
+    1522.931,
+    1523.818
+   ],
+   [
+    1524.642,
+    1525.742
+   ],
+   [
+    1600.156,
+    1602.156
+   ],
+   [
+    1908.272,
+    1911.766
+   ],
+   [
+    1918.558,
+    1919.601
+   ],
+   [
+    1835.824,
+    1837.491
+   ],
+   [
+    1807.843,
+    1809.731
+   ],
+   [
+    1821.976,
+    1824.01
+   ],
+   [
+    1781.124,
+    1782.15
+   ],
+   [
+    1672.082,
+    1672.936
+   ],
+   [
+    1684.848,
+    1686.054
+   ],
+   [
+    1623.084,
+    1624.202
+   ],
+   [
+    1627.132,
+    1628.642
+   ],
+   [
+    1486.547,
+    1499.207
+   ],
+   [
+    1412.334,
+    1414.352
+   ],
+   [
+    1403.477,
+    1405.575
+   ],
+   [
+    1396.722,
+    1398.43
+   ],
+   [
+    1382.699,
+    1385.084
+   ],
+   [
+    1565.97,
+    1567.152
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1435.9864128039935,
+   1457.6401783161152,
+   1471.8051921226677,
+   1471.466335466961,
+   1472.1441268119866,
+   1474.5188560883525,
+   1432.683735702857,
+   1432.0241123558405,
+   1432.353886058377,
+   1316.8925193903049
+  ],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 818.1325347858609,
+  "civ_ew": 58.743203408257294,
+  "f2500": 0.5980678523740157,
+  "z": 0.463691899536254
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 7.987476129437825e+27,
+   "z": 0.463691899536254,
+   "cont_wave_min": 1153.586939998594,
+   "cont_wave_max": 2093.8729703600316,
+   "cont_at_min": 5.626533635469673e-16,
+   "cont_at_max": 3.2269994589770986e-16,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.083786512077734,
+   "f_lambda_cgs": 8.161191802794257e-16,
+   "logL": 45.142600266836304,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 8.395579951605247e-16,
+   "nearest_cont_wave": 1449.9410002707639,
+   "nearest_cont": 8.395579951605247e-16,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.4759223143969646,
+   "f_lambda_cgs": 7.677925715001549e-16,
+   "logL": 45.18517150723877,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 8.24518040568703e-16,
+   "nearest_cont_wave": 1700.0055165093913,
+   "nearest_cont": 8.260625804967175e-16,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.705137442226468,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2093.8729703600316,
+   "nearest_cont": 6.412522867682683e-16,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/327_PB_3456_STIS/iter06_gtrbest.png",
+ "windows": "SiIV: med +0.11 rms 0.23 (n=218)  |  CIV: med -0.06 rms 0.24 (n=243)  |  CIII]: med +0.05 rms 0.28 (n=218)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": -272.0,
+  "ciii_xcorr_dv": -270.0,
+  "ciii_xcorr_snr": 2.3,
+  "ciii_xcorr_npx": 218,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 23,
+  "worst_frac": -0.0292,
+  "ranges": [
+   [
+    1500.03,
+    1505.57
+   ],
+   [
+    1506.61,
+    1506.61
+   ],
+   [
+    1507.65,
+    1509.04
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 243,
+  "civ_span": [
+   1500.2,
+   1599.7
+  ],
+  "n_civ_core_px": 55
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.1654 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

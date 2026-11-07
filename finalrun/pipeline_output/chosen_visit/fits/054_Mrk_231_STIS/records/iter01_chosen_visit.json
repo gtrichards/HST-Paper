@@ -1,0 +1,90 @@
+{
+ "name": "Mrk 231_STIS",
+ "iteration": 1,
+ "label": "chosen_visit",
+ "when_utc": "2026-09-27T20:00:48+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 1918.3209851047052,
+  "civ_ew": 68.067888579964,
+  "f2500": 0.6980120930842896,
+  "z": 0.04147
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 2.2948581281124047,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 1.758152705849057,
+   "f_lambda_cgs": 2.0772618964655346e-15,
+   "logL": 43.169492265818995,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.2106057250338744,
+   "f_lambda_cgs": 2.39997677780472e-15,
+   "logL": 43.399699137757956,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/054_Mrk_231_STIS/iter01_chosen_visit.png",
+ "windows": "SiIV: --  |  CIV: med -0.01 rms 0.16 (n=233)  |  CIII]: med +0.15 rms 0.44 (n=228)  |  MgII: med +0.48 rms 0.86 (n=176)",
+ "redshift_check_kms": {
+  "ciii_peak_dv": -1509.0,
+  "ciii_xcorr_dv": -2000.0,
+  "ciii_xcorr_snr": 1.4,
+  "ciii_xcorr_npx": 228,
+  "mgii_xcorr_dv": -520.0,
+  "mgii_xcorr_snr": 4.4,
+  "mgii_xcorr_npx": 176
+ },
+ "civ_subcontinuum": {
+  "n_px": 82,
+  "worst_frac": -0.9568,
+  "ranges": [
+   [
+    1500.03,
+    1521.25
+   ],
+   [
+    1547.75,
+    1554.53
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 233,
+  "civ_span": [
+   1516.5,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0176 on 2026-10-30; see sweeps/fix_luminosity_1pz.py"
+}

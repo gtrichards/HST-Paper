@@ -1,0 +1,99 @@
+{
+ "name": "Mrk 1044 cosonly_COS",
+ "iteration": 1,
+ "label": "alt",
+ "when_utc": "2026-09-30T02:47:41+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 404.4969925394556,
+  "civ_ew": 73.7074775970491,
+  "f2500": 0.5242215576398476,
+  "z": 0.016451
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 2.2015867640744395e+26,
+   "z": 0.016451,
+   "cont_wave_min": 1119.9884720425716,
+   "cont_wave_max": 1767.7203133011253,
+   "cont_at_min": 3.1623447790772435e-14,
+   "cont_at_max": 2.323351582912136e-14,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.9983589447515113,
+   "f_lambda_cgs": 7.802122179659411e-14,
+   "logL": 43.84534867189268,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.602130806692329e-14,
+   "nearest_cont_wave": 1450.1520889591625,
+   "nearest_cont": 2.602130806692329e-14,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.735086271745982,
+   "f_lambda_cgs": 6.35456701886228e-14,
+   "logL": 43.82530280841766,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.323351582912136e-14,
+   "nearest_cont_wave": 1699.8615580184403,
+   "nearest_cont": 2.323351582912136e-14,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.9192102229414387,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1767.7203133011253,
+   "nearest_cont": 2.323351582912136e-14,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/000_Mrk_1044_cosonly_COS/iter01_alt.png",
+ "windows": "SiIV: med +0.16 rms 0.78 (n=213)  |  CIV: med +0.38 rms 0.92 (n=204)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 4,
+  "worst_frac": -0.003,
+  "ranges": [
+   [
+    1514.26,
+    1515.3
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 204,
+  "civ_span": [
+   1500.1,
+   1600.0
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0071 on 2026-10-30; see sweeps/fix_luminosity_1pz.py"
+}

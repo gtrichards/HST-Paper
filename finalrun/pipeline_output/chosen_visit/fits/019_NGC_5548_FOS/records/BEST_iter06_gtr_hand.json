@@ -1,0 +1,142 @@
+{
+ "name": "NGC 5548_FOS",
+ "iteration": 6,
+ "label": "gtr_hand",
+ "when_utc": "2026-10-01T02:47:20+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1309.949,
+    1315.302
+   ],
+   [
+    1435.252,
+    1447.28
+   ],
+   [
+    1499.923,
+    1503.876
+   ],
+   [
+    1520.768,
+    1527.929
+   ],
+   [
+    1542.895,
+    1548.061
+   ],
+   [
+    1548.782,
+    1550.406
+   ],
+   [
+    1367.448,
+    1372.216
+   ],
+   [
+    1377.998,
+    1380.718
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1562.6598811172057,
+   1563.0197382804718,
+   1574.5790270146347,
+   1575.3043144444896,
+   1575.6670834313477,
+   1574.2165085331837,
+   1580.7546297344193,
+   1581.4827617893757,
+   1581.1186538472475
+  ],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -9.680667062489581,
+  "civ_ew": 269.139754863456,
+  "f2500": 0.5579734987278503,
+  "z": 0.0168
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 2.2488858101575434e+26,
+   "z": 0.0168,
+   "cont_wave_min": 1121.410097916178,
+   "cont_wave_max": 2291.207712148475,
+   "cont_at_min": 1.2009923048959602e-14,
+   "cont_at_max": 1.1432536116529909e-14,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.6518562313703384,
+   "f_lambda_cgs": 2.6334328703591586e-14,
+   "logL": 43.392270464261294,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 3.3176982121802135e-14,
+   "nearest_cont_wave": 1449.9881816111,
+   "nearest_cont": 3.397056882427039e-14,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.4601987665196723,
+   "f_lambda_cgs": 2.6288097020182135e-14,
+   "logL": 43.4605882802263,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.870442054014243e-14,
+   "nearest_cont_wave": 1700.0608349939594,
+   "nearest_cont": 2.8789317727417084e-14,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.9211421427839126,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 2291.207712148475,
+   "nearest_cont": 2.0234470239923697e-14,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/019_NGC_5548_FOS/iter06_gtr_hand.png",
+ "windows": "SiIV: med +0.19 rms 0.37 (n=210)  |  CIV: med +0.27 rms 0.49 (n=220)  |  CIII]: med +0.07 rms 0.55 (n=227)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": -193.0,
+  "ciii_xcorr_dv": -220.0,
+  "ciii_xcorr_snr": 8.2,
+  "ciii_xcorr_npx": 227,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 220,
+  "civ_span": [
+   1504.1,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0072 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

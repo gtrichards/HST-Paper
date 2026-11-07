@@ -1,0 +1,190 @@
+{
+ "name": "Mrk 1502_FOS",
+ "iteration": 9,
+ "label": "gtr_high",
+ "when_utc": "2026-10-03T22:06:25+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1574.306,
+    1576.11
+   ],
+   [
+    1535.341,
+    1540.136
+   ],
+   [
+    1541.043,
+    1543.057
+   ],
+   [
+    1497.476,
+    1500.058
+   ],
+   [
+    1513.17,
+    1518.756
+   ],
+   [
+    1522.977,
+    1526.539
+   ],
+   [
+    1439.567,
+    1441.233
+   ],
+   [
+    1457.418,
+    1463.786
+   ]
+  ],
+  "unmask_ranges": [
+   [
+    1540.955,
+    1543.144
+   ]
+  ],
+  "mask_pixels": [
+   1568.8958561167553,
+   1556.6612545472958,
+   1557.0197303167172,
+   1555.586322358594,
+   1543.810946201456,
+   1544.1664627373525,
+   1544.8777414383972,
+   1545.5893477708225,
+   1547.3697979797257,
+   1547.726134065878,
+   1548.082552210893,
+   1519.8268612581128,
+   1519.476948477389,
+   1527.1936721655125,
+   1527.8971328076093,
+   1528.2489846306567,
+   1528.9529313740238,
+   1530.0094595122066,
+   1531.7719623825462,
+   1532.8304385110966,
+   1540.9697589780858,
+   1578.3165697206925,
+   1414.1455652432035,
+   1382.910633161497,
+   1383.2290967654537,
+   1381.955682205185,
+   1380.6834399631143
+  ],
+  "unmask_pixels": [
+   1535.303061436897,
+   1536.010257450799,
+   1537.0716623012906,
+   1537.4256268810536,
+   1539.9056623476192,
+   1540.260279555142,
+   1556.3028613104686,
+   1557.3782886377383,
+   1557.7369295293702
+  ],
+  "comps_use": "high"
+ },
+ "result": {
+  "civ_blue": 266.5087642305957,
+  "civ_ew": 17.357176246365754,
+  "f2500": 0.7498616177971281,
+  "z": 0.059756
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 8.25487728087163e+26,
+   "z": 0.059756,
+   "cont_wave_min": 1119.9259996959709,
+   "cont_wave_max": 3088.79671794039,
+   "cont_at_min": 3.295928790984349e-15,
+   "cont_at_max": 9.990999266566737e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.2643594887438567,
+   "f_lambda_cgs": 1.3243536221536226e-14,
+   "logL": 44.24120895665487,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.2987636144895876e-14,
+   "nearest_cont_wave": 1450.0712002659418,
+   "nearest_cont": 1.2987636144895876e-14,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.632052290204097,
+   "f_lambda_cgs": 1.665394384665462e-14,
+   "logL": 44.40980300809259,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.6804969414067154e-14,
+   "nearest_cont_wave": 1700.1581714863946,
+   "nearest_cont": 1.681754973196291e-14,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.871982078661755,
+   "f_lambda_cgs": 1.5253201459001765e-14,
+   "logL": 44.53913800571421,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.2999177325730056e-14,
+   "nearest_cont_wave": 2500.2839160904714,
+   "nearest_cont": 1.3000459125891293e-14,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/070_Mrk_1502_FOS/iter09_gtr_high.png",
+ "windows": "SiIV: med +0.73 rms 1.20 (n=242)  |  CIV: med +3.12 rms 4.19 (n=207)  |  CIII]: med +0.94 rms 4.22 (n=169)  |  MgII: med +0.88 rms 5.33 (n=133)",
+ "redshift_check_kms": {
+  "ciii_peak_dv": -2715.0,
+  "ciii_xcorr_dv": -220.0,
+  "ciii_xcorr_snr": 32.6,
+  "ciii_xcorr_npx": 169,
+  "mgii_xcorr_dv": 180.0,
+  "mgii_xcorr_snr": 65.0,
+  "mgii_xcorr_npx": 133
+ },
+ "civ_subcontinuum": {
+  "n_px": 169,
+  "worst_frac": -0.4248,
+  "ranges": [
+   [
+    1504.53,
+    1506.26
+   ],
+   [
+    1508.69,
+    1524.4
+   ],
+   [
+    1557.76,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 207,
+  "civ_span": [
+   1500.7,
+   1599.9
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0252 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

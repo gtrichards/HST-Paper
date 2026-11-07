@@ -1,0 +1,81 @@
+{
+ "name": "NGC-7469_FOS",
+ "iteration": 2,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:21:29+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -493.63657485092835,
+  "civ_ew": 99.21187931516673,
+  "f2500": 0.7594170674500563,
+  "z": 0.016268
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 2.9877519622287183,
+   "f_lambda_cgs": 1.1223016420215135e-13,
+   "logL": 43.99333079992926,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.5455273910134344,
+   "f_lambda_cgs": 8.697586592100578e-14,
+   "logL": 43.951700881968456,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.8437566336143156,
+   "f_lambda_cgs": 4.035608096391272e-14,
+   "logL": 43.78570219270004,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/018_NGC-7469_FOS/iter02_relabel.png",
+ "windows": "SiIV: med -0.05 rms 0.60 (n=248)  |  CIV: med -0.01 rms 0.80 (n=281)  |  CIII]: med -0.02 rms 0.67 (n=227)  |  MgII: med -0.56 rms 1.13 (n=172)",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 585.0,
+  "ciii_xcorr_dv": 360.0,
+  "ciii_xcorr_snr": 8.7,
+  "ciii_xcorr_npx": 227,
+  "mgii_xcorr_dv": -60.0,
+  "mgii_xcorr_snr": 12.5,
+  "mgii_xcorr_npx": 172
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 281,
+  "civ_span": [
+   1500.0,
+   1599.9
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0070 on 2026-10-30; see sweeps/fix_luminosity_1pz.py"
+}

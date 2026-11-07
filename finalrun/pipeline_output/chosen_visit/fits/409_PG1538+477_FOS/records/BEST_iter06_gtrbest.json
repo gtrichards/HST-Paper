@@ -1,0 +1,153 @@
+{
+ "name": "PG1538+477_FOS",
+ "iteration": 6,
+ "label": "gtrbest",
+ "when_utc": "2026-10-23T03:20:22+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1545.6743805216734,
+   1546.030326178581,
+   1546.3863538044411,
+   1581.6777619358008,
+   1581.3136090983985,
+   1582.0419986321472,
+   1576.9503090238761,
+   1577.6766887209367,
+   1577.3134570586299,
+   1574.7731759160608,
+   1574.4106127353195,
+   1590.0764613982221,
+   1557.463969973592,
+   1556.0301530439913,
+   1553.5241489029897,
+   1561.413782643024,
+   1539.6358273340386,
+   1533.620865224227,
+   1520.2604892656507,
+   1519.9104766498829,
+   1519.5605446182203,
+   1511.1863029157678,
+   1510.8383794680883,
+   1505.9758536418676,
+   1504.2430325497662,
+   1507.0165042937924,
+   1680.8076210976528,
+   1678.4871028804207,
+   1627.8635864361286,
+   1603.3118726852738,
+   1493.2000939348889,
+   1466.9591102771042,
+   1462.5745382204882,
+   1480.532715803681,
+   1329.8970068664717,
+   1330.203262226393,
+   1332.349025384222,
+   1333.2696974378302,
+   1345.606290057744,
+   1377.900978589546,
+   1361.1876765453326,
+   1382.3499736236722,
+   1409.347237592264,
+   1430.599301216173,
+   1513.275526800497,
+   1434.8880164620698,
+   1435.2184496788225,
+   1439.852512543081,
+   1444.1689674841234,
+   1455.184327148746,
+   1468.6489819484584,
+   1544.251417206201,
+   1543.8958811110676,
+   1543.540426871721,
+   1552.0939590121263
+  ],
+  "unmask_pixels": [],
+  "comps_use": "high"
+ },
+ "result": {
+  "civ_blue": 266.5087642305957,
+  "civ_ew": 80.03569266926696,
+  "f2500": 0.48623855804027893,
+  "z": 0.7720745622785224
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 1.4821788730271286e+28,
+   "z": 0.7720745622785224,
+   "cont_wave_min": 1254.636761893746,
+   "cont_wave_max": 1849.7711793742028,
+   "cont_at_min": 1.6901256485205469e-15,
+   "cont_at_max": 1.5424549020433727e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.4975692050855,
+   "f_lambda_cgs": 4.033276846070343e-15,
+   "logL": 46.45651912798133,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 5.125146020410068e-15,
+   "nearest_cont_wave": 1449.833093355489,
+   "nearest_cont": 5.125146020410068e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.2463081303141017,
+   "f_lambda_cgs": 3.609596527903557e-15,
+   "logL": 46.477400674127416,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 4.2639945593620064e-15,
+   "nearest_cont_wave": 1699.8789993951073,
+   "nearest_cont": 4.2913600465628695e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.5217534065276355,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1849.7711793742028,
+   "nearest_cont": 3.800102867786818e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/409_PG1538+477_FOS/iter06_gtrbest.png",
+ "windows": "SiIV: med +0.16 rms 0.30 (n=240)  |  CIV: med +0.06 rms 0.27 (n=250)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 250,
+  "civ_span": [
+   1500.1,
+   1600.0
+  ],
+  "n_civ_core_px": 72
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.2485 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

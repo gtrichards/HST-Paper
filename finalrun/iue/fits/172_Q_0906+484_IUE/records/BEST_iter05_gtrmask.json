@@ -1,0 +1,116 @@
+{
+ "name": "Q 0906+484_IUE",
+ "iteration": 5,
+ "label": "gtrmask",
+ "when_utc": "2026-11-04T03:16:20+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1403.569,
+    1407.091
+   ],
+   [
+    1549.349,
+    1552.937
+   ],
+   [
+    1589.289,
+    1593.013
+   ],
+   [
+    1431.677,
+    1435.22
+   ],
+   [
+    1476.192,
+    1477.203
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -147.88187004671502,
+  "civ_ew": 75.08688001906854,
+  "f2500": 0.48360042797083724,
+  "z": 0.1173
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 1.6852595988839907e+27,
+   "z": 0.1173,
+   "cont_wave_min": 1120.0314076815641,
+   "cont_wave_max": 1771.047467319433,
+   "cont_at_min": 2.4136061032839993e-15,
+   "cont_at_max": 2.0422541137178076e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.7205876461200145,
+   "f_lambda_cgs": 5.388978336797252e-15,
+   "logL": 44.49358772173399,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.98081408789854e-15,
+   "nearest_cont_wave": 1449.873797462454,
+   "nearest_cont": 1.97404456451268e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.6152189312639647,
+   "f_lambda_cgs": 5.079849390759625e-15,
+   "logL": 44.537013039454564,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.942418407129103e-15,
+   "nearest_cont_wave": 1699.9267235482773,
+   "nearest_cont": 1.9388990834037066e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7939066085269424,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1771.047467319433,
+   "nearest_cont": 2.0422541137178076e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_Q_0906+484_IUE/iter05_gtrmask.png",
+ "windows": "SiIV: med +0.07 rms 0.15 (n=228)  |  CIV: med -0.10 rms 0.18 (n=260)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 260,
+  "civ_span": [
+   1500.1,
+   1599.7
+  ],
+  "n_civ_core_px": 74
+ },
+ "logL_morph_applied": true,
+ "logL_morph_note": "No correction needed: fitted 2026-11-03 against an IUE product rebinned after the morph coefficient was divided out of the Continuum Normalisation column."
+}

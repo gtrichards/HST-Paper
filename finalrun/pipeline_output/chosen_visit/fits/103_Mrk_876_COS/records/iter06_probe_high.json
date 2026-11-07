@@ -1,0 +1,111 @@
+{
+ "name": "Mrk 876_COS",
+ "iteration": 6,
+ "label": "probe_high",
+ "when_utc": "2026-10-06T22:39:37+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1588.409,
+    1594.075
+   ]
+  ],
+  "unmask_ranges": [],
+  "mask_pixels": [
+   1543.1425911646063,
+   1543.497953788349,
+   1544.2089245587472,
+   1544.5645327430977,
+   1547.0560840445896
+  ],
+  "unmask_pixels": [
+   1540.6573425880301,
+   1541.0121328962525,
+   1541.3670049073685
+  ],
+  "comps_use": "high"
+ },
+ "result": {
+  "civ_blue": 473.48142602680343,
+  "civ_ew": 49.222135512212375,
+  "f2500": 0.48184995507356715,
+  "z": 0.129
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 1.867483578175006e+27,
+   "z": 0.129,
+   "cont_wave_min": 1119.9691449870386,
+   "cont_wave_max": 1603.267754891544,
+   "cont_at_min": 1.0082402576981594e-14,
+   "cont_at_max": 1.0167661796064317e-14,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.943263486823615,
+   "f_lambda_cgs": 2.7466983832558807e-14,
+   "logL": 45.29459636308113,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 3.096723940828814e-14,
+   "nearest_cont_wave": 1450.1270644427016,
+   "nearest_cont": 3.096723940828814e-14,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.5978744298982046,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1603.267754891544,
+   "nearest_cont": 3.0572044335542605e-14,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7398141754380865,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1603.267754891544,
+   "nearest_cont": 3.0572044335542605e-14,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "pipeline_output/chosen_visit/fits/103_Mrk_876_COS/iter06_probe_high.png",
+ "windows": "SiIV: med +0.01 rms 0.91 (n=168)  |  CIV: med +0.09 rms 0.99 (n=226)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 226,
+  "civ_span": [
+   1500.1,
+   1588.2
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0527 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

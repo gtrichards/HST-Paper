@@ -1,0 +1,81 @@
+{
+ "name": "PHL1093_FOS",
+ "iteration": 2,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:23:59+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -978.3669360043486,
+  "civ_ew": 252.1964714082284,
+  "f2500": 0.660279063925598,
+  "z": 0.26
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 2.4379324073269477,
+   "f_lambda_cgs": 5.030940539636683e-16,
+   "logL": 44.280940363646806,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.391192478502374,
+   "f_lambda_cgs": 5.2508689516498985e-16,
+   "logL": 44.36860327786792,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7753331216921824,
+   "f_lambda_cgs": 4.991872175224113e-16,
+   "logL": 44.5141266416466,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/122_PHL1093_FOS/iter02_relabel.png",
+ "windows": "SiIV: med +0.24 rms 0.40 (n=248)  |  CIV: med +0.19 rms 0.48 (n=280)  |  CIII]: med +0.20 rms 0.41 (n=228)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 1512.0,
+  "ciii_xcorr_dv": 1490.0,
+  "ciii_xcorr_snr": 1.6,
+  "ciii_xcorr_npx": 228,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.1,
+   1599.7
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.1004 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

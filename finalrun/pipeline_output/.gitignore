@@ -23,3 +23,32 @@ final/*
 # for "BAL" does not reproduce it -- five hits are boilerplate about an
 # unreliable test and three are cross-references to other objects.
 !final/bal_status.csv
+
+# EXCEPTIONS ADDED 2026-11-07, so that work which cannot be recreated in under a
+# day is not held only on one disk.  GTR: "let's just make sure that we don't
+# lose any work that can't be recreated in <1 day."
+#
+# work_queue.csv is the order -> object mapping that every folder prefix, every
+# index in Table 1 and every ledger row key on.  build_work_queue.py regenerates
+# it, but a rerun that produced even a slightly different ordering would shift
+# every index in the paper, so in practice it is an input and not an output.
+!work_queue.csv
+#
+# The fit RECORDS, 8.6 MB of JSON, are kept while the figures beside them (755
+# MB of PNG) are not.  Each record carries the override that produced the fit,
+# and FORTY-NINE ADOPTED FITS HAVE AN OVERRIDE THAT EXISTS NOWHERE ELSE -- 45
+# HST and 4 IUE, measured on 2026-11-07 by comparing every BEST_ record against
+# ica/manual_fix_overrides.json and finalrun/iue/iue_overrides.json.  Those 45
+# were made with iterate_fit's command-line --mask flags rather than through the
+# GUI, so nothing wrote them to a store and the record is the only copy.  Losing
+# them would mean remasking 45 objects by hand.  The figures, the rebinned
+# products and the staged exposures are all regenerable without human judgement
+# and stay ignored.
+!chosen_visit/
+chosen_visit/*
+!chosen_visit/fits/
+chosen_visit/fits/*
+!chosen_visit/fits/*/
+chosen_visit/fits/*/*
+!chosen_visit/fits/*/records/
+!chosen_visit/fits/*/records/*.json

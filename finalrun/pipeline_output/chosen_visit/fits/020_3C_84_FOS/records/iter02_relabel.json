@@ -1,0 +1,89 @@
+{
+ "name": "3C 84_FOS",
+ "iteration": 2,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:08:01+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -8983.484781991394,
+  "civ_ew": 3.2847849641511866,
+  "f2500": -0.3953257904447259,
+  "z": 0.0175
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": -2.0791508563127126,
+   "f_lambda_cgs": -4.577401296436384e-16,
+   "logL": NaN,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": -2.706129275380806,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": -1.6141530437854479,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/020_3C_84_FOS/iter02_relabel.png",
+ "windows": "SiIV: med +0.26 rms 0.36 (n=241)  |  CIV: med +0.35 rms 0.42 (n=211)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 47,
+  "worst_frac": 0.0059,
+  "ranges": [
+   [
+    1500.03,
+    1500.72
+   ],
+   [
+    1501.41,
+    1501.76
+   ],
+   [
+    1584.89,
+    1599.93
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 211,
+  "civ_span": [
+   1500.3,
+   1577.1
+  ]
+ },
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

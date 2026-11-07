@@ -1,0 +1,130 @@
+{
+ "name": "MCG8-11-11_IUE",
+ "iteration": 8,
+ "label": "deepestonly",
+ "when_utc": "2026-11-04T03:42:40+00:00",
+ "override": {
+  "mask_ranges": [
+   [
+    1540.263,
+    1550.87
+   ],
+   [
+    1374.236,
+    1381.786
+   ],
+   [
+    1259.26,
+    1261.71
+   ],
+   [
+    1271.713,
+    1274.577
+   ],
+   [
+    1397.701,
+    1401.924
+   ],
+   [
+    1559.436,
+    1563.463
+   ],
+   [
+    1542.5,
+    1545.5
+   ]
+  ],
+  "unmask_ranges": [
+   [
+    1540.0,
+    1551.0
+   ]
+  ],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": 266.5087642305957,
+  "civ_ew": 51.26564928685164,
+  "f2500": 0.5320762839856042,
+  "z": 0.0205
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 2.7518422731461188e+26,
+   "z": 0.0205,
+   "cont_wave_min": 1127.4232610163324,
+   "cont_wave_max": 1939.0409948417466,
+   "cont_at_min": 1.3070251066639023e-15,
+   "cont_at_max": 2.6455383449915283e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.081254228848361,
+   "f_lambda_cgs": 6.7751776017911176e-15,
+   "logL": 42.97955863522093,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.198837583201755e-15,
+   "nearest_cont_wave": 1450.0633999214267,
+   "nearest_cont": 2.16584476797429e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.7695859287949123,
+   "f_lambda_cgs": 6.237652322772176e-15,
+   "logL": 43.01274003443065,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.2521967121223317e-15,
+   "nearest_cont_wave": 1700.1490258530869,
+   "nearest_cont": 2.2578885452304207e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.7955091707091786,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1939.0409948417466,
+   "nearest_cont": 2.6455383449915283e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_MCG8-11-11_IUE/iter08_deepestonly.png",
+ "windows": "SiIV: med +0.04 rms 0.12 (n=211)  |  CIV: med -0.01 rms 0.21 (n=268)  |  CIII]: med -0.03 rms 0.24 (n=181)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": -40.0,
+  "ciii_xcorr_dv": -110.0,
+  "ciii_xcorr_snr": 1.4,
+  "ciii_xcorr_npx": 181,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 268,
+  "civ_span": [
+   1500.3,
+   1599.9
+  ],
+  "n_civ_core_px": 72
+ }
+}

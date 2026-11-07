@@ -1,0 +1,101 @@
+{
+ "name": "IR1249-13_IUE",
+ "iteration": 2,
+ "label": "nomask_low",
+ "when_utc": "2026-11-04T03:01:47+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "low"
+ },
+ "result": {
+  "civ_blue": 59.38121176138286,
+  "civ_ew": 43.143546880782246,
+  "f2500": 0.4947475933739168,
+  "z": 0.0146
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 1.9511356585922215e+26,
+   "z": 0.0146,
+   "cont_wave_min": 1133.9793395103168,
+   "cont_wave_max": 1950.3167112517274,
+   "cont_at_min": 2.4271364305729553e-15,
+   "cont_at_max": 3.418060363130457e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.3890901550214583,
+   "f_lambda_cgs": 9.01086341272894e-15,
+   "logL": 42.80221406306959,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.658785396835183e-15,
+   "nearest_cont_wave": 1450.1240056956474,
+   "nearest_cont": 2.5640034391076985e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.5749471323171944,
+   "f_lambda_cgs": 7.292467463327261e-15,
+   "logL": 42.779403075652226,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.8320843452676136e-15,
+   "nearest_cont_wave": 1699.8286389470986,
+   "nearest_cont": 2.8250745020165276e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.8398264305805638,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1950.3167112517274,
+   "nearest_cont": 3.418060363130457e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_IR1249-13_IUE/iter02_nomask_low.png",
+ "windows": "SiIV: med -0.00 rms 0.11 (n=248)  |  CIV: med -0.01 rms 0.13 (n=281)  |  CIII]: med -0.01 rms 0.16 (n=206)  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 111.0,
+  "ciii_xcorr_dv": 240.0,
+  "ciii_xcorr_snr": 1.3,
+  "ciii_xcorr_npx": 206,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 66,
+  "worst_frac": -0.1005,
+  "ranges": [
+   [
+    1500.03,
+    1522.65
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 281,
+  "civ_span": [
+   1500.0,
+   1599.9
+  ],
+  "n_civ_core_px": 84
+ }
+}

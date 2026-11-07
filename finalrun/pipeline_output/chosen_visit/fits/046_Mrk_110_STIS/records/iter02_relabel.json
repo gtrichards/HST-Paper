@@ -1,0 +1,86 @@
+{
+ "name": "Mrk 110_STIS",
+ "iteration": 2,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:18:28+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -147.88187004671502,
+  "civ_ew": 221.12965291320538,
+  "f2500": 2.217199357496042,
+  "z": 0.03529
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 2.7632654440522186,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.4726088247279643,
+   "f_lambda_cgs": 5.580593268374066e-14,
+   "logL": 44.451999657459915,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.8689285810631882,
+   "f_lambda_cgs": 2.5805867513873538e-14,
+   "logL": 44.28452883716108,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/046_Mrk_110_STIS/iter02_relabel.png",
+ "windows": "SiIV: --  |  CIV: med +0.88 rms 1.17 (n=207)  |  CIII]: med +0.05 rms 1.30 (n=228)  |  MgII: med -0.36 rms 1.56 (n=186)",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 203.0,
+  "ciii_xcorr_dv": 240.0,
+  "ciii_xcorr_snr": 13.0,
+  "ciii_xcorr_npx": 228,
+  "mgii_xcorr_dv": 120.0,
+  "mgii_xcorr_snr": 19.9,
+  "mgii_xcorr_npx": 186
+ },
+ "civ_subcontinuum": {
+  "n_px": 1,
+  "worst_frac": -0.0021,
+  "ranges": [
+   [
+    1500.03,
+    1500.03
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 207,
+  "civ_span": [
+   1525.6,
+   1599.7
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.0151 on 2026-10-30; see sweeps/fix_luminosity_1pz.py"
+}

@@ -1,0 +1,88 @@
+{
+ "name": "3C 196_STIS",
+ "iteration": 2,
+ "label": "relabel",
+ "when_utc": "2026-09-28T23:07:32+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": null
+ },
+ "result": {
+  "civ_blue": -1672.19970570772,
+  "civ_ew": 61.60406015982813,
+  "f2500": 1.0985861662325551,
+  "z": 0.870798811921011
+ },
+ "monochromatic": {
+  "1450": {
+   "f_lambda": 3.0983706603014562,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.469806033719655,
+   "f_lambda_cgs": 3.35819969527445e-16,
+   "logL": 45.59821760734388,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.9921062670226843,
+   "f_lambda_cgs": 4.3967119440916023e-16,
+   "logL": 45.882730189978204,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/pipeline_output/chosen_visit/fits/423_3C_196_STIS/iter02_relabel.png",
+ "windows": "SiIV: --  |  CIV: med -0.10 rms 0.40 (n=160)  |  CIII]: med -0.95 rms 1.74 (n=227)  |  MgII: med -0.40 rms 1.12 (n=186)",
+ "redshift_check_kms": {
+  "ciii_peak_dv": 572.0,
+  "ciii_xcorr_dv": 180.0,
+  "ciii_xcorr_snr": 2.7,
+  "ciii_xcorr_npx": 227,
+  "mgii_xcorr_dv": -960.0,
+  "mgii_xcorr_snr": 7.9,
+  "mgii_xcorr_npx": 186
+ },
+ "civ_subcontinuum": {
+  "n_px": 77,
+  "worst_frac": -0.4808,
+  "ranges": [
+   [
+    1500.03,
+    1526.51
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 160,
+  "civ_span": [
+   1542.3,
+   1599.8
+  ]
+ },
+ "logL_1pz_applied": true,
+ "logL_1pz_note": "logL corrected by +log10(1+z) = +0.2720 on 2026-10-30; see sweeps/fix_luminosity_1pz.py",
+ "logL_morph_applied": true,
+ "logL_morph_note": "logL corrected by log10(cn_new/cn_old) on 2026-11-03: spec_morph.morph2 multiplied the flux by its morph coefficient and the Continuum Normalisation column never divided it out, so f_lambda_cgs over-counted the continuum once; see sweeps/fix_luminosity_morph.py"
+}

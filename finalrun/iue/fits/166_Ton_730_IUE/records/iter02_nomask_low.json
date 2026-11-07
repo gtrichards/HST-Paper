@@ -1,0 +1,98 @@
+{
+ "name": "Ton 730_IUE",
+ "iteration": 2,
+ "label": "nomask_low",
+ "when_utc": "2026-11-06T16:33:01+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "low"
+ },
+ "result": {
+  "civ_blue": -9.680667062489581,
+  "civ_ew": 72.76181847296978,
+  "f2500": 0.5191941794676767,
+  "z": 0.086539683507218
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 1.2180050023850633e+27,
+   "z": 0.086539683507218,
+   "cont_wave_min": 1124.7458706528635,
+   "cont_wave_max": 1821.1864373408841,
+   "cont_at_min": 1.7585955056863546e-15,
+   "cont_at_max": 1.268239165670178e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 2.8565233328991946,
+   "f_lambda_cgs": 5.594579995567668e-15,
+   "logL": 44.21568909089366,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.9585276728300045e-15,
+   "nearest_cont_wave": 1449.9546109414518,
+   "nearest_cont": 2.0157227902302293e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.329279074534308,
+   "f_lambda_cgs": 2.7944317365724972e-15,
+   "logL": 43.98329602690758,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 1.1996981242495328e-15,
+   "nearest_cont_wave": 1700.0214745485453,
+   "nearest_cont": 1.1976908084693939e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 1.721655989562752,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1821.1864373408841,
+   "nearest_cont": 1.268239165670178e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_Ton_730_IUE/iter02_nomask_low.png",
+ "windows": "SiIV: med -0.03 rms 0.13 (n=249)  |  CIV: med -0.04 rms 0.17 (n=280)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 52,
+  "worst_frac": -0.132,
+  "ranges": [
+   [
+    1500.03,
+    1517.75
+   ]
+  ],
+  "ok": false,
+  "n_civ_px": 280,
+  "civ_span": [
+   1500.2,
+   1599.8
+  ],
+  "n_civ_core_px": 84
+ }
+}

@@ -1,0 +1,93 @@
+{
+ "name": "Mrk 1014_IUE",
+ "iteration": 4,
+ "label": "nomask_high",
+ "when_utc": "2026-11-06T16:35:26+00:00",
+ "override": {
+  "mask_ranges": [],
+  "unmask_ranges": [],
+  "mask_pixels": [],
+  "unmask_pixels": [],
+  "comps_use": "high"
+ },
+ "result": {
+  "civ_blue": 1643.661099207463,
+  "civ_ew": 54.91573898163445,
+  "f2500": 0.5390903920122015,
+  "z": 0.1627878673997119
+ },
+ "monochromatic": {
+  "_calibration": {
+   "dl_cm": 2.4072331708327842e+27,
+   "z": 0.1627878673997119,
+   "cont_wave_min": 1119.9522544817412,
+   "cont_wave_max": 1701.764690459904,
+   "cont_at_min": 3.4501256084883563e-15,
+   "cont_at_max": 2.874663024407847e-15,
+   "cosmology": "FlatLambdaCDM H0=70 Om0=0.3"
+  },
+  "1450": {
+   "f_lambda": 3.3177129942378203,
+   "f_lambda_cgs": 1.056175577515706e-14,
+   "logL": 45.11285079717964,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 3.1834446781565013e-15,
+   "nearest_cont_wave": 1450.1051947519395,
+   "nearest_cont": 3.1763724934593317e-15,
+   "window": [
+    1445.0,
+    1465.0
+   ]
+  },
+  "1700": {
+   "f_lambda": 2.8427486172678984,
+   "f_lambda_cgs": 8.167384073513592e-15,
+   "logL": 45.07027857435406,
+   "measured": true,
+   "covered": true,
+   "calibrated": true,
+   "continuum_scale": 2.8730588501219926e-15,
+   "nearest_cont_wave": 1699.8065888460626,
+   "nearest_cont": 2.8706573244995e-15,
+   "window": [
+    1700.0,
+    1705.0
+   ]
+  },
+  "2500": {
+   "f_lambda": 2.009701721807884,
+   "f_lambda_cgs": NaN,
+   "logL": NaN,
+   "measured": false,
+   "covered": false,
+   "calibrated": false,
+   "continuum_scale": NaN,
+   "nearest_cont_wave": 1701.764690459904,
+   "nearest_cont": 2.874663024407847e-15,
+   "window": [
+    2490.0,
+    2510.0
+   ]
+  }
+ },
+ "plot": "/Users/gtr/Work/projects/hstica/finalrun/iue/fits/000_Mrk_1014_IUE/iter04_nomask_high.png",
+ "windows": "SiIV: med +0.02 rms 0.13 (n=248)  |  CIV: med +0.03 rms 0.15 (n=281)  |  CIII]: --  |  MgII: --",
+ "redshift_check_kms": {
+  "ciii_xcorr_dv": null,
+  "mgii_xcorr_dv": null
+ },
+ "civ_subcontinuum": {
+  "n_px": 0,
+  "worst_frac": 0.0,
+  "ranges": [],
+  "ok": true,
+  "n_civ_px": 281,
+  "civ_span": [
+   1500.0,
+   1599.9
+  ],
+  "n_civ_core_px": 84
+ }
+}
