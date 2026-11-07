@@ -108,6 +108,59 @@ def main():
             rows.append(dict(common_name=name, row_num=int(r["row_num"]), z=z,
                              ok=0, note="no output file"))
             continue
+        # --- mask rebinned pixels that have NO native data behind them -------
+        # The rebin interpolates across a flagged stretch instead of leaving a
+        # hole, so swp26578's five bad pixels at 1538.8-1544.5 A rest became the
+        # HIGHEST point of Mrk 1014's C IV line -- 2.801e-14, above the real peak
+        # -- drawn as data with a spike-and-notch the model cannot follow.  GTR:
+        # "Amogh's fit is fine.  Because he simply ignores the missing pixels.
+        # As should we."  Masking them does not change the blueshift (+1643.7
+        # either way; the inflated errors were already discounting them) but it
+        # is the difference between a fit that looks broken and one that is
+        # visibly right, and between plotting invented flux as data and not.
+        # The affected pixels are those with no QUALITY==0 native pixel within
+        # half a native dispersion.
+        try:
+            from astropy.io import fits as _F
+            import numpy as _np
+            nat_w, nat_disp = [], []
+            for _p in files:
+                _d = _F.getdata(_p, 1)
+                _w = _np.asarray(_d["WAVE"][0], float)
+                _q = _np.asarray(_d["QUALITY"][0], float)
+                _f = _np.asarray(_d["FLUX"][0], float)
+                _s = _np.asarray(_d["SIGMA"][0], float)
+                _g = (_q == 0) & _np.isfinite(_f) & _np.isfinite(_s) & (_s > 0)
+                nat_w.append(_w[_g] / (1.0 + z))
+                # the DISPERSION OF THIS EXPOSURE, not of the merged array.
+                # Concatenating several exposures interleaves their samplings,
+                # so the merged spacing is far smaller than either exposure's
+                # and a tolerance built from it rejects almost everything -- on
+                # 3C 120, whose chosen run has five exposures, that masked 2295
+                # of 2332 pixels instead of none.
+                if _w[_g].size > 2:
+                    nat_disp.append(float(_np.median(_np.diff(_np.sort(_w[_g] / (1.0 + z))))))
+            nat_w = _np.sort(_np.concatenate(nat_w)) if nat_w else _np.array([])
+            if nat_w.size:
+                _h = _F.open(out, mode="update")
+                _t = _h[1].data
+                _rw = _np.asarray(_t["Rest-frame Wavelength"], float)
+                _rm = _np.asarray(_t["Bad Pixel Mask"], float)
+                _half = 0.5 * (float(_np.median(nat_disp)) if nat_disp else 1.0)
+                _j = _np.clip(_np.searchsorted(nat_w, _rw), 1, nat_w.size - 1)
+                _near = _np.minimum(_np.abs(_rw - nat_w[_j - 1]),
+                                    _np.abs(_rw - nat_w[_np.minimum(_j, nat_w.size - 1)]))
+                _orphan = (_near > _half) & (_rm == 0)
+                if _orphan.any():
+                    _rm[_orphan] = 1.0
+                    _t["Bad Pixel Mask"] = _rm
+                    _h.flush()
+                    print("  %-14s masked %d rebinned px with no native data behind them"
+                          % (name, int(_orphan.sum())), flush=True)
+                _h.close()
+        except Exception as _exc:
+            print("  %-14s gap-mask step failed: %s" % (name, _exc), flush=True)
+
         d = fits.open(out)[1].data
         w = np.asarray(d["Rest-frame Wavelength"], float)
         f = np.asarray(d["Coadded Flux (Arbitrary Units)"], float)
