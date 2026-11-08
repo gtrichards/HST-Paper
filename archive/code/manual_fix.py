@@ -1,0 +1,832 @@
+# Originally: Trevor Code/ica_manual_fix_refactored.py
+# Copied: 2026-04-29 (Phase 2 migration)
+# Changes from source:
+#   - Removed sys.path.append hacks
+#   - from Small_Pix_Filter_TVM import -> from rebinning.small_pix_filter import
+#   - import MorphingEdges_* -> from ica import morphing_edges (all 5 files merged)
+#   - import CIV_BAL_regions -> from ica import civ_bal_regions as CIV_BAL_regions
+#   - import run_ICA_r20_components -> from ica import run_ica as run_ICA_r20_components
+#   - import spec_morph -> from ica import spec_morph
+#   - import components -> removed (dead import, never used in function bodies)
+#   - from manual_fix_config import -> from ica.manual_fix_config import
+#   - get_folder(): replaced os.listdir scan with JSON lookup (quality_classification.json)
+#   - __init__: added json load for quality_map; catalog path -> Data/ relative
+#   - REBIN_PATH: kept as-is (caller must set or pass via env)
+"""
+Refactored Manual ICA Fix System
+
+This module provides a systematic approach to applying manual fixes to ICA analysis
+based on configuration settings. It replaces the ad-hoc approach in Manual Object Fix.ipynb.
+"""
+
+from pathlib import Path
+import json
+import glob
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+import matplotlib
+from astropy.io import fits
+
+# Import existing modules
+from rebinning.small_pix_filter import SDSS_pixel_filter
+from ica import morphing_edges
+from ica import morphing_edges as MorphingEdges         # MorphingEdges.MorphingEdges dict
+from ica import civ_bal_regions as CIV_BAL_regions
+from lmfit import minimize, Parameters
+from ica import run_ica as run_ICA_r20_components
+from ica import spec_morph
+import warnings
+
+# Import our manual fix configuration
+from ica.manual_fix_config import MANUAL_FIX_CONFIG
+from ica import manual_fix_store
+
+_DATA_DIR = Path(__file__).resolve().parent.parent / "Data"
+_QUALITY_JSON = Path(__file__).resolve().parent / "quality_classification.json"
+
+warnings.filterwarnings('ignore')
+
+OUTPUT_PATH = "ICA_Plots_Rebin_AP"
+# REBIN_PATH = "RebinnedSpec_2022Aug11"
+# REBIN_PATH = "RebinnedSpec_2026AP"   ← old default; now a constructor arg
+_DEFAULT_REBIN_PATH = os.environ.get("HST_PAPER_REBIN_DIR", "RebinnedSpec_2026AP")
+
+class ICAManualFixProcessor:
+    """
+    Main class for processing objects with manual ICA fixes
+    """
+    
+    # Plot subfolder used for every object in master mode (the Good/Bad/Fixable/
+    # "Probably Good" quality classification only exists for the 207 Sulentic objects).
+    _MASTER_FOLDER = "All"
+
+    def __init__(self, catalog_file=None, rebin_path=None, master_mode=False,
+                 output_path=None, overrides_path=None):
+        """
+        Initialize the processor with catalog data
+
+        Parameters:
+        -----------
+        catalog_file : str or None
+            Path to the CSV file containing object information.
+            Defaults to Data/HST_CIV_Sulentic2007_HSLA2018_finalprops.csv in repo root.
+        rebin_path : str or None
+            Directory containing rebinned FITS files to run ICA on.
+            Defaults to HST_PAPER_REBIN_DIR env var, then "RebinnedSpec_2026AP".
+            Use "RebinnedSpec_master" for spectra rebinned from master_catalog_v21.csv.
+        master_mode : bool
+            If True, drive object selection from the FITS files in rebin_path
+            (named {common_name}_{inst}.fits, e.g. from master_catalog_v21.csv)
+            instead of the Sulentic catalog. The object name is the FITS filename
+            stem; redshift is read from each FITS file; and morphing-edges /
+            CIV-BAL / manual-fix overrides (all keyed on old Sulentic Spec_Names)
+            are skipped for objects not present in those dicts. Diagnostic plots
+            are saved into a single "All" subfolder rather than quality folders.
+        output_path : str or None
+            Directory to write diagnostic plots into. Defaults to the module-level
+            OUTPUT_PATH ("ICA_Plots_Rebin_AP"). run_all_objects passes a separate
+            directory in master mode to avoid clobbering Sulentic-run plots.
+        """
+        if catalog_file is None:
+            catalog_file = str(_DATA_DIR / "HST_CIV_Sulentic2007_HSLA2018_finalprops.csv")
+        self.dat = pd.read_csv(catalog_file)
+        self.names = self.dat["Final_Name"].values
+        self.names_spec = self.dat["Spec_Name"].values
+        self.inst_final = self.dat["Inst_final"].values
+
+        self.rebin_path = rebin_path if rebin_path is not None else _DEFAULT_REBIN_PATH
+        self.master_mode = master_mode
+        self.output_path = output_path if output_path is not None else OUTPUT_PATH
+
+        # Clean up names (remove spaces)
+        for i in range(len(self.names)):
+            self.names[i] = "".join(self.names[i].split(" "))
+
+        # Load quality classification map (replaces runtime os.listdir of ICA_full/).
+        # Unused in master mode (objects are not classified), but cheap to load.
+        with open(_QUALITY_JSON) as f:
+            self.quality_map = json.load(f)
+
+        # GUI-authored overrides, read once per run rather than per object. The
+        # GUI replaces this with its live in-memory copy so an unsaved edit is
+        # never silently picked up from disk mid-session.
+        self.overrides_path = overrides_path if overrides_path is not None \
+            else manual_fix_store.DEFAULT_OVERRIDES_JSON
+        self._overrides = manual_fix_store.load_overrides(self.overrides_path)
+
+        # Systemic-redshift corrections, read once per run. Sparse: only the
+        # objects deliberately changed appear here.
+        self._redshift_overrides = manual_fix_store.load_redshift_overrides()
+        if self._redshift_overrides:
+            print("Loaded %d redshift override(s)" % len(self._redshift_overrides))
+        conflicts = sorted(set(self._overrides) & set(MANUAL_FIX_CONFIG))
+        if conflicts:
+            print("WARNING: defined in both manual_fix_overrides.json and "
+                  "MANUAL_FIX_CONFIG; the JSON wins: %s" % ", ".join(conflicts))
+
+    def list_master_objects(self):
+        """
+        Return the list of object identifiers to process in master mode: the
+        FITS filename stems ({common_name}_{inst}) of every .fits file in
+        rebin_path. One entry per spectrum, so multi-instrument objects yield
+        one identifier per instrument (each fit independently).
+        """
+        files = sorted(glob.glob(os.path.join(glob.escape(self.rebin_path), "*.fits")))
+        stems = [os.path.splitext(os.path.basename(f))[0] for f in files]
+
+        # Alphabetical order makes an object hard to find when you are working
+        # from a numbered list: GTR walks the sample by index, so if the rebin
+        # directory carries an index_order.csv (stem,index) use it to order the
+        # list, keeping anything unlisted at the end in alphabetical order.
+        order_file = os.path.join(self.rebin_path, "index_order.csv")
+        if os.path.exists(order_file):
+            try:
+                import csv as _csv
+                rank = {}
+                with open(order_file) as _fh:
+                    for _r in _csv.DictReader(_fh):
+                        try:
+                            rank[_r["stem"]] = int(_r["index"])
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                if rank:
+                    stems.sort(key=lambda s: (rank.get(s, 10 ** 6), s))
+            except Exception:
+                pass
+        return stems
+
+    def _ensure_output_dirs(self):
+        """Create the plot output directory and its subfolders for the active mode."""
+        os.makedirs(self.output_path, exist_ok=True)
+        if self.master_mode:
+            os.makedirs(os.path.join(self.output_path, self._MASTER_FOLDER), exist_ok=True)
+        else:
+            for sub in ("Probably Good", "Good", "Fixable", "Bad"):
+                os.makedirs(os.path.join(self.output_path, sub), exist_ok=True)
+
+    def get_folder(self, name):
+        """
+        Get the quality folder for a specific object from quality_classification.json.
+        Replaces the original os.listdir scan of ICA_full/ subdirectories.
+
+        Parameters:
+        -----------
+        name : str
+            Object name (Final_Name / Spec_Name prefix)
+
+        Returns:
+        --------
+        str
+            Folder name ('Good', 'Bad', 'Fixable', 'Probably Good'), or the
+            single "All" folder in master mode (objects are unclassified).
+        """
+        if self.master_mode:
+            return self._MASTER_FOLDER
+        folder = self.quality_map.get(name)
+        if folder is None:
+            raise Exception(f'Object "{name}" not found in quality_classification.json')
+        return folder
+    
+    def plot_HST(self, wave, flux, mask, ax):
+        iplot_start = 0
+        #iplot_end   = 0
+        mask_curr   = mask[0]
+        for i in range(len(wave)):
+            #go until mask is a different value
+            if mask[i]!=mask_curr or i==len(wave)-1:
+                if mask_curr==3:
+                    #plot BAL region
+                    ax.plot(wave[iplot_start:i], flux[iplot_start:i], "-m", zorder=2)
+                elif mask_curr==2:
+                    #plot NAL region
+                    ax.plot(wave[iplot_start:i], flux[iplot_start:i], "-y", zorder=2)
+                elif mask_curr==1:
+                    #plot badpix region
+                    ax.plot(wave[iplot_start:i], flux[iplot_start:i], "-m", zorder=2)
+                else:
+                    #plot BAL region
+                    ax.plot(wave[iplot_start:i], flux[iplot_start:i], "-k", zorder=1)
+
+                mask_curr = mask[i]
+                iplot_start = i-1
+        ax.plot([1e7,1e7], [1e7,1e8], "-m", zorder=1, alpha=0.1, label="Input Bad Pixels")
+        ax.legend()                                     
+
+    def custom_pix_filter(self, wave_orig, mask_orig, filter_wavelengths):
+        """
+        Apply custom pixel filtering based on wavelength array
+        
+        Parameters:
+        -----------
+        wave_orig : array
+            Original wavelength array
+        mask_orig : array
+            Original mask array
+        filter_wavelengths : array
+            Wavelengths to mask
+            
+        Returns:
+        --------
+        mask_orig : array
+            Updated mask with custom pixels flagged
+        indices : array
+            Indices of masked pixels
+        """
+        indices = []
+        for wavelength in filter_wavelengths:
+            index = np.argmin(np.abs(wave_orig - wavelength))
+            indices.append(index)
+        
+        indices = np.unique(np.array(indices))
+        mask_orig[indices] = 1
+        return mask_orig, indices
+    
+    def setup_object(self, name):
+        """
+        Set up an object for analysis - loads data and applies morphing/BAL regions
+        
+        Parameters:
+        -----------
+        name : str
+            Object name
+            
+        Returns:
+        --------
+        wave_orig, flux_orig, z, errs_orig, mask_orig, spec_name : tuple
+            Processed spectral data
+        """
+        name_final = name
+        if self.master_mode:
+            # Master mode: the identifier IS the FITS filename stem
+            # ({common_name}_{inst}). No Sulentic catalog lookup; redshift is
+            # read from the FITS below. spec_name = stem, so the morphing-edges
+            # and CIV-BAL dicts (keyed on old Sulentic Spec_Names) simply do not
+            # match new master objects and are skipped.
+            spec_name = name
+            fn = os.path.join(self.rebin_path, name + ".fits")
+            if not os.path.exists(fn):
+                raise FileNotFoundError(
+                    f'No rebinned FITS for "{name}" in {self.rebin_path}')
+        else:
+            index = np.where(self.names == name_final)[0][0]
+            spec_name = self.names_spec[index]
+            inst = self.inst_final[index]
+
+            fn_list = glob.glob("%s/%s*%s.fits" % (glob.escape(self.rebin_path),
+                                                  glob.escape(spec_name), glob.escape(inst)))
+            fn = fn_list[0]
+
+        spec = fits.open(fn)
+        # Print the column names for debugging
+        print(f'File column names: {spec[1].data.columns}') # Debugging line
+        
+        wave_orig = spec[1].data["Rest-Frame Wavelength"]
+        flux_orig = spec[1].data["Coadded Flux (Arbitrary Units)"]
+        z         = spec[1].data["Redshift"][0]
+
+        # Systemic-redshift override. The FITS carries the redshift used at
+        # rebin time *and* a rest-frame grid already divided by (1+z), so the
+        # two must be changed together: rescaling the grid by
+        # (1+z_old)/(1+z_new) reproduces exactly what the rebin would have
+        # produced for the new redshift, without needing the raw data again.
+        # Objects with no override are untouched (z_src == "catalog").
+        z_new, z_src = manual_fix_store.resolve_redshift(
+            name, z, overrides=self._redshift_overrides)
+        if z_src != "catalog" and z_new != z:
+            dv = 299792.458 * (z_new - z) / (1.0 + z)
+            print("Redshift override for %s: %.6f -> %.6f (%+.0f km/s, %s)"
+                  % (name, z, z_new, dv, z_src))
+            wave_orig = np.asarray(wave_orig, dtype=float) * (1.0 + z) / (1.0 + z_new)
+            z = z_new
+
+        #: KNOWN DEFECT -- DELIBERATELY LEFT IN PLACE.  Do not "fix" these two
+        #: lines without reading this note and re-running the sample.
+        #:
+        #: flux_orig is a view into the FITS data and the "/=" below is in
+        #: place, so by the time the second line runs np.nanmedian(flux_orig)
+        #: is 1.0, not the spectrum's median.  The errors are therefore divided
+        #: by 1 and left un-normalised while the flux is normalised: every error
+        #: bar handed to the fit is too large by that object's own flux median
+        #: (2.59x on 4C 13.41, so S/N reads 6.0 where the data give 15.6).  The
+        #: median across the 428 rebinned spectra is 3.18 and the worst is 17.2;
+        #: 420 of 428 have a median above 1.1.
+        #:
+        #: The ICA weights are unaffected -- a uniform scale on the errors
+        #: cancels in the weighted least squares and in the redchi comparison
+        #: that chooses low/mod/high.  What it changes is every test that
+        #: compares a flux difference to an error, above all maskNAL's
+        #: "flux_median_61p - flux > 3*errs": that 3 sigma is really ~9.5 sigma
+        #: at the sample median, so automatic narrow-absorption detection is
+        #: effectively off.  4C 13.41's 6.8-sigma C IV absorber tested as 2.4
+        #: sigma and went unflagged, 0 of 85 px in 1530-1560 A.
+        #:
+        #: Correcting it alone is a NET LOSS, which is why it stands.  Re-running
+        #: all 190 adopted fits with the normalisation corrected: blueshift
+        #: moves >2 quanta on 41 objects and flips sign on 6; EW drifts down
+        #: ~2%; 44 objects lose more than 80 of ~280 C IV pixels.  The cause is
+        #: maskNAL's +/-3 px padding: with correct errors many isolated 1-2 px
+        #: noise dips clear 3 sigma and each is widened to 7 px, so e.g. Mrk 110
+        #: takes 50 separate 1-4 px detections at S/N 21 and loses 189 of 246
+        #: C IV pixels.  Classifying the newly flagged pixels by structure, only
+        #: 8 of 190 objects have coherent absorbers (<=6 runs, longest >=6 px)
+        #: and those do not move at all -- deep troughs already cleared the
+        #: inflated threshold -- while 73 are scattered noise and lose a median
+        #: 94 C IV pixels.  The padding is Rankine's prescription and is not
+        #: ours to change, so the fix buys nothing where it is right and costs a
+        #: great deal where it is not.
+        #:
+        #: Operational consequence: narrow absorption is masked BY HAND in this
+        #: project, and only the strongest, coherent troughs are masked at all.
+        #: A patch implementing the correction is kept out of tree; reapplying it
+        #: requires re-deriving every recorded measurement.
+        flux_orig /= np.nanmedian(flux_orig)
+        errs_orig = spec[1].data["Coadded Flux Errors"] / np.nanmedian(flux_orig)
+        
+        # Apply morphing if specified
+        if spec_name in MorphingEdges.MorphingEdges:
+            try: 
+                print(f"Applying morphing for {spec_name}: {MorphingEdges.MorphingEdges[spec_name]}")
+                flux_orig, morph_coeff, unique_markers = spec_morph.morph(
+                    wave_orig*(1+z), flux_orig, z, np.nanmedian(flux_orig), 
+                    unique_markers=MorphingEdges.MorphingEdges[spec_name], 
+                    return_markers=True)
+                errs_orig *= morph_coeff
+            except:
+                print(f"Morphing failed for: {spec_name}, final name: {name_final}")
+                pass
+        
+        mask_orig = spec[1].data["Bad Pixel Mask"]
+        
+        # Apply manual BAL regions if specified
+        if spec_name in CIV_BAL_regions.BAL_regions:
+            print(f"{spec_name} is in CIV_BAL_regions")
+            for window in CIV_BAL_regions.BAL_regions[spec_name]:
+                mask_orig[((wave_orig>=window[0])&(wave_orig<=window[1]))] = 1
+        
+        return wave_orig, flux_orig, z, errs_orig, mask_orig, spec_name
+    
+    def fit_with_overrides(self, name, mask_ranges=None, mask_pixels=None,
+                           comps_use=None, unmask_ranges=None, unmask_pixels=None):
+        """Run the full ICA fit for `name` under an explicit manual override and
+        return the arrays plus CIV parameters.
+
+        This is the single numerical path for the project: both process_object()
+        (batch) and the manual-fix GUI call it, so a batch fit reproduces a GUI
+        fit bit-for-bit given the same override. Touches no matplotlib, so it is
+        safe to call from a worker thread.
+
+        Masks are applied on the input grid *before* main_ICA. Unmasking has to
+        happen after, because the NAL/BAL masks being overridden are computed
+        inside main_ICA; honouring an unmask therefore means re-running the
+        reconstruction with those flags cleared. With nothing unmasked that whole
+        branch is skipped, leaving the original single-pass behaviour untouched.
+        """
+        mask_ranges = mask_ranges or []
+        mask_pixels = mask_pixels or []
+        unmask_ranges = unmask_ranges or []
+        unmask_pixels = unmask_pixels or []
+
+        # Reload from disk every fit -> guaranteed-clean mask state, no cross-fit
+        # mutation bugs. Cheap next to the ~5-10 s fit itself.
+        wave, flux, z, errs, mask, spec_name = self.setup_object(name)
+        mask = np.asarray(mask, dtype=float).copy()
+
+        for lo, hi in mask_ranges:
+            mask[(wave >= lo) & (wave <= hi)] = 1
+        for wl in mask_pixels:
+            mask[np.argmin(np.abs(wave - wl))] = 1
+
+        cu = None if comps_use in (None, "", "auto") else comps_use
+
+        (wave_arb, flux_arb, errs_arb, mask_arb,
+         wave_ica, flux_ica, f2500) = run_ICA_r20_components.main_ICA(
+            wave, flux, errs, mask, z, name="", ica_path=None, comps_use=cu)
+
+        if unmask_ranges or unmask_pixels:
+            # flux_arb carries the *real* (not median-replaced) flux at NAL
+            # pixels, which is exactly what is wanted at an unmasked pixel;
+            # still-masked pixels are ignored by get_ICA either way.
+            mask_ref = np.asarray(mask_arb, dtype=float).copy()
+            for lo, hi in unmask_ranges:
+                mask_ref[(wave_arb >= lo) & (wave_arb <= hi)] = 0
+            for wl in unmask_pixels:
+                mask_ref[np.argmin(np.abs(wave_arb - wl))] = 0
+
+            wave_ica2, flux_ica2 = run_ICA_r20_components.get_ICA(
+                wave_arb, flux_arb, errs_arb, mask_ref, z,
+                ica_path=None, use_priors=False, comps_use=cu)
+
+            # Rescale f2500 by the original fit's real-unit factor at 2500 A
+            # (norm/morph scaling is fixed by the data, not by the fit).
+            i0 = np.argmin(np.abs(wave_ica - 2500.))
+            i2 = np.argmin(np.abs(wave_ica2 - 2500.))
+            if flux_ica[i0]:
+                f2500 = float(flux_ica2[i2] * (f2500 / flux_ica[i0]))
+            wave_ica, flux_ica = wave_ica2, flux_ica2
+            # Report the mask actually used so unmasked pixels no longer render
+            # as NAL/BAL (they were set to 0 in mask_ref).
+            mask_arb = mask_ref
+
+        civ_blue, civ_ew = self.get_CIV_parameters(
+            wave_arb, flux_arb, wave_ica, flux_ica, name)
+
+        return dict(
+            name=name, spec_name=spec_name, z=float(z),
+            wave_arb=wave_arb, flux_arb=flux_arb, errs_arb=errs_arb,
+            mask_arb=mask_arb, wave_ica=wave_ica, flux_ica=flux_ica,
+            f2500=float(f2500), civ_blue=float(civ_blue), civ_ew=float(civ_ew),
+        )
+
+    def apply_manual_fix(self, name, wave_orig, mask_orig):
+        """
+        Apply manual fix based on configuration
+
+        LEGACY. process_object() no longer calls this -- it resolves overrides
+        through ica.manual_fix_store (which covers MANUAL_FIX_CONFIG *and* the
+        GUI's JSON, including ranges and unmasking) and fits via
+        fit_with_overrides(). Kept because it reads MANUAL_FIX_CONFIG directly
+        and is handy for inspecting the old behaviour in isolation.
+
+        Parameters:
+        -----------
+        name : str
+            Object name
+        wave_orig : array
+            Wavelength array
+        mask_orig : array
+            Original mask
+            
+        Returns:
+        --------
+        mask_orig : array
+            Updated mask
+        comps_use : str or None
+            Component set to force
+        """
+        comps_use = None
+        
+        if name in MANUAL_FIX_CONFIG:
+            config = MANUAL_FIX_CONFIG[name]
+            
+            # Apply custom pixel masking
+            if config['custom_mask_pixels'] is not None:
+                print(f"Applying custom pixel masking for {name}")
+                mask_orig, indices = self.custom_pix_filter(
+                    wave_orig, mask_orig, config['custom_mask_pixels'])
+                print(f"Masked {len(indices)} pixels")
+            
+            # Set forced components
+            if config['forced_components'] is not None:
+                comps_use = config['forced_components']
+                print(f"Forcing components to: {comps_use}")
+        else:
+            print(f"No manual fix configuration found for {name}")
+        
+        return mask_orig, comps_use
+    
+    def get_CIV_parameters(self, wave, flux, wave_r, flux_r, name, 
+                          EW_region=[1500,1600], cont_region=[[1445,1465],[1700,1705]]):
+        """
+        Extract CIV parameters from ICA fit
+        
+        Parameters:
+        -----------
+        wave : array
+            Original wavelength
+        flux : array
+            Original flux
+        wave_r : array
+            Reconstructed wavelength
+        flux_r : array
+            Reconstructed flux
+        name : str
+            Object name
+        EW_region : list
+            Wavelength region for EW calculation
+        cont_region : list
+            Continuum fitting regions
+            
+        Returns:
+        --------
+        CIV_blue : float
+            CIV blueshift in km/s
+        CIV_EW : float
+            CIV equivalent width in Angstroms
+        """
+        # Fit continuum
+        cont1 = ((wave_r>=cont_region[0][0])&(wave_r<=cont_region[0][1]))
+        cont2 = ((wave_r>=cont_region[1][0])&(wave_r<=cont_region[1][1]))
+        
+        m, b = np.polyfit(np.concatenate((wave_r[cont1], wave_r[cont2])), 
+                         np.concatenate((flux_r[cont1], flux_r[cont2])), 1)
+        continuum = wave_r * m + b
+        
+        # Calculate EW
+        EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
+
+        # Index the continuum with the same mask as the flux. Previously this
+        # read continuum[i] while stepping flux_r[EW][i], so the continuum was
+        # taken from the start of the reconstruction instead of from the C IV
+        # window -- on the component grid that is index 757, about 240 A
+        # blueward. The continuum falls redward, so too much was subtracted and
+        # the EW came out low by 13-36% (median 23%) across the objects fit so
+        # far. The blueshift moved with it, by up to one 69 km/s grid pixel,
+        # since it is the half-flux point of the cumulative sum below.
+        continuum_EW = continuum[EW]
+
+        CIV_EW = 0
+        ew_list = [0.]
+        for i in range(len(wave_r[EW])):
+            try:
+                CIV_EW += max(((flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i]) * 
+                             (wave_r[EW][i+1] - wave_r[EW][i]), 0)
+            except IndexError:
+                CIV_EW += max(((flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i]) * 
+                             (wave_r[EW][i] - wave_r[EW][i-1]), 0)
+            ew_list.append(CIV_EW)
+        
+        # Calculate blueshift
+        ind_half_flux = abs((CIV_EW / 2) - np.array(ew_list)).argmin()
+        CIV_blue = ((1549.48 - wave_r[EW][ind_half_flux]) / 1549.48) * 3e5
+        
+        return CIV_blue, CIV_EW
+    
+    
+    def create_diagnostic_plot(self, wave_arb, flux_arb, errs_arb, mask_arb, 
+                              wave_ica, flux_ica, name, spec_name, CIV_blue, CIV_EW, show=False, save=False):
+        """
+        Create diagnostic plots for the ICA fit
+        """
+        c4mask = wave_arb > 1400
+        # Scale the panels from the object, not from blocks of garbage. Some
+        # rebinned spectra carry unflagged junk -- NGC 985_COS reaches 3.6e6 at
+        # 2000-2060 A with NEGATIVE errors, Mrk 231_COS 1.7e5 at 2030-2070 A
+        # (errors -661), 2MASX-J00391586-5117013_COS 9.3e4 at 2000-2360 A --
+        # which a percentile cannot survive: the overview panel topped out at
+        # 160,000 and the spectrum was a line along the axis. Pixels with a
+        # non-positive error, an error above 100x the median error, or a flux
+        # above 40x the median are left out of the percentiles only; nothing
+        # about the fit or the data drawn changes. A real sharp line survives
+        # (Mrk 1310's C IV is ~33x continuum with errors within 12x the median).
+        _f = np.asarray(flux_arb, dtype=float).copy()
+        _e = np.asarray(errs_arb, dtype=float)
+        _ok = np.isfinite(_e) & (_e > 0)
+        if _ok.any():
+            _med_e = float(np.nanmedian(_e[_ok]))
+            _junk = ~_ok | (_e > 100.0 * _med_e)
+            _f[_junk] = np.nan
+        if np.isfinite(_f).any():
+            _med_f = float(np.nanmedian(_f))
+            if _med_f > 0:
+                _f[_f > 40.0 * _med_f] = np.nan
+        _fc = _f[c4mask] if np.isfinite(_f[c4mask]).any() else _f
+        ylow, yhigh = max(0, np.nanpercentile(_f, 1)), \
+                      np.nanpercentile(_fc, 99) + np.nanmedian(_fc)
+        _ec = _e[_ok] if _ok.any() else _e
+        ylow_err, yhigh_err = max(0, np.nanpercentile(_ec, 1)), np.nanpercentile(_ec, 99)
+        
+        xlow, xhigh = 1500, 1600
+        xlow0, xhigh0 = max(min(wave_arb), 1250), min(max(wave_arb), max(wave_ica))
+        
+        fig = plt.figure(figsize=(18, 10.5), constrained_layout=True)
+        gs = GridSpec(7, 12, figure=fig)
+        
+        ax0 = fig.add_subplot(gs[:3, :8])  # Full spectrum
+        ax1 = fig.add_subplot(gs[3:6, :8])  # CIV region
+        ax2 = fig.add_subplot(gs[3:, 8:])   # CIV fit
+        ax3 = fig.add_subplot(gs[6, :8], sharex=ax1)  # Errors
+        plt.subplots_adjust(hspace=0)
+
+        # Plot full spectrum
+        ax0.plot(wave_arb, flux_arb, "-k", alpha=0.6)#, label="Data")
+        ax0.plot(wave_ica, flux_ica, "-r")#, label="ICA fit")
+        ax0.set_xlim(xlow0, xhigh0)
+        ax0.set_ylim(ylow, yhigh + 5)
+        ax0.set_ylabel("Flux Density (Arb. Units)", fontsize=20)
+        ax0.set_title(f"{name} - ICA Fit", fontsize=18)
+        ax0.legend()
+
+        if spec_name in CIV_BAL_regions.BAL_regions:
+            for window in CIV_BAL_regions.BAL_regions[spec_name]:
+                ax1.axvspan(window[0], window[1], color="r", alpha=0.3)
+
+        self.plot_HST(wave_arb, flux_arb, mask_arb, ax0)
+        
+
+        # Plot CIV region
+        ax1.plot(wave_arb, flux_arb, "-k", alpha=0.6)
+        ax1.plot(wave_ica, flux_ica, "-r")
+        ax1.set_xlim(xlow, xhigh)
+        ax1.set_ylim(ylow, yhigh + 5)
+        ax1.set_ylabel("Flux Density (Arb. Units)", fontsize=20)
+        self.plot_HST(wave_arb, flux_arb, mask_arb, ax1)
+
+        # Plot errors
+        ax3.plot(wave_arb, errs_arb, "-k", alpha=0.6)
+        ax3.set_xlim(xlow, xhigh)
+        ax3.set_ylim(ylow_err, yhigh_err)
+        ax3.set_xlabel("Wavelength (Å)", fontsize=20)
+        ax3.set_ylabel("Error", fontsize=17.5)
+        
+        # Plot CIV analysis
+        self.plot_CIV_analysis(ax2, wave_arb, flux_arb, wave_ica, flux_ica, name, CIV_blue, CIV_EW)
+        
+        plt.tight_layout()
+        
+        if save:
+            config_type = "nomask"
+            if name in MANUAL_FIX_CONFIG:
+                if MANUAL_FIX_CONFIG[name]['custom_mask_pixels'] is not None:
+                    config_type = "mask"
+                if MANUAL_FIX_CONFIG[name]['forced_components'] is not None:
+                    config_type += f"_comps{MANUAL_FIX_CONFIG[name]['forced_components']}"
+            
+            # plt.savefig(f'ICA_Plots_Refactored/{spec_name}_{config_type}.png', dpi=150)
+            print(f'Spec_name is {spec_name}')
+            plt.savefig(f'{self.output_path}/{self.get_folder(spec_name)}/{spec_name}_{config_type}.png', dpi=150)
+        if show:
+            plt.show()
+    
+    def plot_CIV_analysis(self, ax, wave, flux, wave_r, flux_r, name, CIV_blue, CIV_EW,
+                        EW_region=[1500,1600], cont_region=[[1445,1465],[1700,1705]]):
+        """
+        Plot CIV analysis on given axis
+        """
+        # ylow, yup = max(0, np.percentile(flux_r, 1) - np.nanmedian(flux_r)/5), \
+                    # np.percentile(flux_r, 99) + np.nanmedian(flux_r)
+        ylow, yup = max(0, np.percentile(flux_r, 1)-np.nanmedian(flux_r)/5), \
+                        np.percentile(flux_r, 99)+np.nanpercentile(flux_r, 99)
+
+        ax.plot(wave, flux, "-k", alpha=0.5)#, label="Data")
+        ax.plot(wave_r, flux_r, "-r", lw=1.8)#, label="ICA fit")
+        ax.plot([1549.48, 1549.48], [ylow, yup], "--k", label="CIV Rest")
+        
+        # Fit and plot continuum
+        cont1 = ((wave_r>=cont_region[0][0])&(wave_r<=cont_region[0][1]))
+        cont2 = ((wave_r>=cont_region[1][0])&(wave_r<=cont_region[1][1]))
+        ax.axvspan(cont_region[0][0], cont_region[0][1], alpha=0.5, color='grey')
+        ax.axvspan(cont_region[1][0], cont_region[1][1], alpha=0.5, color='grey')
+        
+        m, b = np.polyfit(np.concatenate((wave_r[cont1], wave_r[cont2])), 
+                         np.concatenate((flux_r[cont1], flux_r[cont2])), 1)
+        continuum = wave_r * m + b
+        ax.plot(wave_r, continuum, "-m")#, label="Continuum")
+        
+        # Show EW region and blueshift
+        EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
+        continuum_EW = continuum[EW]   # same alignment fix as get_CIV_parameters
+        CIV_EW = 0
+        ew_list = [0.]
+        for i in range(len(wave_r[EW])):
+            try:
+                CIV_EW += max(( (flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i] ) * ( wave_r[EW][i+1] - wave_r[EW][i] ), 0) #no absorption
+            except IndexError:
+                CIV_EW += max(( (flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i] ) * ( wave_r[EW][i] - wave_r[EW][i-1] ), 0)
+
+            ew_list.append(CIV_EW)
+
+        ind_half_flux = abs((CIV_EW / 2) - np.array(ew_list)).argmin()
+
+        ax.fill_between(wave_r[EW], continuum[EW], flux_r[EW], color="blue", alpha=0.2, 
+                       label=f"EW = {CIV_EW:.1f} Å")
+        ax.plot([EW_region[0], EW_region[0]], [ylow, yup], "-b", alpha=0.7)
+        ax.plot([EW_region[1], EW_region[1]], [ylow, yup], "-b", alpha=0.7)
+        ax.plot([wave_r[EW][ind_half_flux],wave_r[EW][ind_half_flux]], [ylow,yup], "--b", label="%.1f km/s" % (CIV_blue))
+
+        ax.set_xlim(1435, 1710)
+        ax.set_ylim(ylow, yup)
+        ax.set_xlabel("Wavelength (Å)", fontsize=20)
+        ax.set_title(name, fontsize=20)
+        ax.tick_params(axis='both', which='major', labelsize=17.5)
+        ax.tick_params(axis='both', which='minor', labelsize=17.5)
+        ax.tick_params(labelleft=False)
+        ax.legend(loc="best", prop={"size":12.5})
+
+    def process_object(self, name, plot=False, save_plot=False):
+        """
+        Process a single object with manual fixes
+        
+        Parameters:
+        -----------
+        name : str
+            Object name
+        plot : bool
+            Whether to create diagnostic plots
+        save_plot : bool
+            Whether to save plots
+            
+        Returns:
+        --------
+        results : dict
+            Dictionary containing all fit results
+        """
+        print(f"\n=== Processing {name} ===")
+
+        # Resolve the manual fix from the one shared store: the GUI's JSON if it
+        # has an entry, else MANUAL_FIX_CONFIG. Objects with no entry either way
+        # resolve to an empty override, i.e. the untouched automatic fit.
+        ov = manual_fix_store.resolve_override(name, overrides=self._overrides)
+        print(f"Manual fix for {name}: {manual_fix_store.describe(ov)}")
+
+        # One shared numerical path with the GUI -> a batch run reproduces it.
+        fit = self.fit_with_overrides(
+            name, mask_ranges=ov['mask_ranges'], mask_pixels=ov['mask_pixels'],
+            comps_use=ov['comps_use'], unmask_ranges=ov['unmask_ranges'],
+            unmask_pixels=ov['unmask_pixels'])
+
+        wave_arb, flux_arb, errs_arb = fit['wave_arb'], fit['flux_arb'], fit['errs_arb']
+        mask_arb, wave_ica, flux_ica = fit['mask_arb'], fit['wave_ica'], fit['flux_ica']
+        z, spec_name, f2500_ica = fit['z'], fit['spec_name'], fit['f2500']
+        CIV_blue, CIV_EW = fit['civ_blue'], fit['civ_ew']
+        comps_use = ov['comps_use']
+
+        # Compile results
+        results = {
+            'object_name': name,
+            'spec_name': spec_name,
+            'redshift': z,
+            'CIV_blueshift': CIV_blue,
+            'CIV_EW': CIV_EW,
+            'f2500': f2500_ica,
+            'components_used': comps_use,
+            'manual_masking_applied': bool(ov['mask_ranges'] or ov['mask_pixels']),
+            'manual_unmasking_applied': bool(ov['unmask_ranges'] or ov['unmask_pixels']),
+            'forced_components': comps_use is not None,
+            # provenance: which store this object's fix came from, and what it was
+            'override_source': ov['source'],
+            'override_summary': manual_fix_store.describe(ov),
+        }
+
+        print(f"Results: CIV_blue={CIV_blue:.1f} km/s, CIV_EW={CIV_EW:.2f} Å, F2500={f2500_ica:.3e}")
+        
+        # Create diagnostic plots if requested
+        if save_plot:
+            self._ensure_output_dirs()
+
+        if plot or save_plot:
+            self.create_diagnostic_plot(wave_arb, flux_arb, errs_arb, mask_arb, 
+                                       wave_ica, flux_ica, name, spec_name, CIV_blue, CIV_EW, 
+                                       show=plot, save=save_plot)
+        
+        return results
+    
+    def batch_process(self, object_list=None, output_file="manual_fix_results.csv", 
+                     plot=False, save_plots=False):
+        """
+        Process multiple objects and save results
+        
+        Parameters:
+        -----------
+        object_list : list or None
+            List of object names to process. If None, process all in config
+        output_file : str
+            Output CSV filename
+        plot : bool
+            Whether to show plots
+        save_plots : bool
+            Whether to save plots
+            
+        Returns:
+        --------
+        results_df : pandas.DataFrame
+            DataFrame with all results
+        """
+        if object_list is None:
+            object_list = list(MANUAL_FIX_CONFIG.keys())
+        
+        # Create output directory for plots if needed
+        if save_plots:
+            self._ensure_output_dirs()
+        all_results = []
+        
+        for obj_name in object_list:
+            try:
+                result = self.process_object(obj_name, plot=plot, save_plot=save_plots)
+                all_results.append(result)
+            except Exception as e:
+                print(f"ERROR processing {obj_name}: {str(e)}")
+                continue
+        
+        # Convert to DataFrame and save
+        results_df = pd.DataFrame(all_results)
+        results_df.to_csv(output_file, index=False)
+        print(f"\nResults saved to {output_file}")
+        print(f"Successfully processed {len(all_results)}/{len(object_list)} objects")
+        
+        return results_df
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize processor
+    processor = ICAManualFixProcessor()
+    
+    # Process a single object for testing
+    result = processor.process_object('RBS1763', plot=False, save_plot=False)
+    
+    # Batch process all objects
+    # results = processor.batch_process(plot=False, save_plots=True)
+
+

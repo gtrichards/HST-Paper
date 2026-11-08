@@ -1,0 +1,627 @@
+"""
+rebinning/coadd.py
+Migrated from: Trevor Code/HST_coadd2_2026AP.py
+Migration date: 2026-04-30
+
+Import/path changes:
+  - `import Small_Pix_Filter_TVM`
+      → `from rebinning import small_pix_filter as Small_Pix_Filter_TVM`
+  - `import LowerResHSTRebin_TVM`
+      → `from rebinning import lower_res_rebin as LowerResHSTRebin_TVM`
+  - `import Read_spec_data_2026AP as Read_spec_data`
+      → `from rebinning import read_spec_data`
+  - `import spec_morph`
+      → `from rebinning import spec_morph`
+  - `import Large_pix_filter_TVM` — commented out (unused; not called anywhere in this file)
+  - `import Plot_HST` — commented out (unused; not called anywhere in this file)
+  - `import Cut_Edge_Pix_TVM_NoDQ as Cut_Edge_Pix_TVM` — commented out (not used
+      directly in this file; used internally by read_spec_data)
+  - Instrument-specific imports inside rebin() (`SpecCuts_*`, `MorphingEdges_*`)
+      updated to use package-relative imports. MorphingEdges imports are commented
+      out — they are vestigial (imported but never called in this file); they will
+      be re-added when needed in Phase 2.
+
+Path changes:
+  - `fits.open('spec-0266-51630-0080.fits')` → path via _SDSS_REF_SPEC (Data/)
+  - `fits.open("SDSS_spec/lite/%s" % fn_sdss)` → `fits.open(os.path.join(sdss_spec_dir, fn_sdss))`
+  - `t.write("RebinnedSpec_2026AP/...")` → `t.write(os.path.join(output_dir, ...))`
+
+Signature change:
+  - `rebin(Identifier, z, data_origin, fn_sdss, data_path=None)` gains two new
+    keyword arguments:
+      output_dir  (str): directory to write output FITS files. Default "RebinnedSpec".
+      sdss_spec_dir (str|None): root directory containing SDSS spec files
+        (e.g. the folder that holds plate subdirectories). Required when fn_sdss
+        is not None. Default None.
+
+Original file header (HST_coadd2_2026AP.py):
+  AP: 2026-03-08 — DQ==0 quality cut removed entirely (uses Cut_Edge_Pix_TVM_NoDQ
+  via Read_spec_data_2026AP). All other settings identical to 2026E:
+    - FOS multi-row error formula: sqrt(sum(e**2)) / (N-1)
+    - SpecCuts wavelength edge cuts still applied
+  Output goes to RebinnedSpec_2026AP/.
+  Purpose: quantify the effect of DQ flagging on rebinned spectra.
+"""
+
+import os
+import matplotlib
+import weightedstats as ws
+import decimal
+import time
+import math
+import scipy
+import sys
+import glob
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from pathlib import Path
+from astropy.io import fits
+from astropy.table import Table
+
+from rebinning import small_pix_filter as Small_Pix_Filter_TVM
+from rebinning import lower_res_rebin as LowerResHSTRebin_TVM
+from rebinning import read_spec_data
+from rebinning import spec_morph
+# import Large_pix_filter_TVM  # unused in this file
+# import Plot_HST               # unused in this file
+# import Cut_Edge_Pix_TVM_NoDQ  # not used directly here; used inside read_spec_data
+
+# Path to the reference SDSS spectrum (ships with the repo in Data/)
+_SDSS_REF_SPEC = Path(__file__).parent.parent / "Data" / "spec-0266-51630-0080.fits"
+
+
+def _descale(cont, *factors):
+    """Divide `factors` out of a continuum so that arb flux x continuum = f_lambda.
+
+    The invariant the "Continuum Normalisation" column is supposed to satisfy is
+
+        Coadded Flux (Arbitrary Units) x Continuum Normalisation = f_lambda
+
+    in the OBSERVED frame -- only the wavelength column is de-redshifted on the
+    way out.  Every division applied to the stored flux has to be multiplied back
+    in here, and every multiplication divided out, or the column is not that
+    number and there is no absolute scale.
+
+    It was not that number until 2026-11-03.  `spec_morph.morph2` MULTIPLIES the
+    flux by its morph coefficient -- `cont_morph / cont_spec`, the reference
+    quasar continuum over the continuum of the already-normalised spectrum, so
+    about 3, since it lifts a spectrum sitting near 1 up onto the reference
+    continuum -- and nothing divided that coefficient back out of the continuum
+    column.  So `cn x arb` over-counted the continuum once and every luminosity
+    built on it was high by the morph coefficient: a median 0.495 dex across the
+    399 chosen-visit products with 1450 A coverage, and because the coefficient
+    is the reference continuum sampled at the observed wavelength it is
+    redshift-dependent (0.497 dex at z < 0.5 against 0.432 dex at z = 1-1.5), so
+    it was a tilt in L-z and not a constant offset.  Verified against two
+    independent archives: NGC 3783's raw FOS exposures give f_lambda(1450) =
+    6.86e-14 where this column already read 6.84e-14 and the recorded
+    f_lambda_cgs read 2.05e-13, high by exactly its own f_lambda of 2.995; 3C
+    120's native IUE MXLO co-add gives 1.04e-14 against cn x arb of 2.91e-14,
+    which divided by that object's morph coefficient of 2.9345 is 9.90e-15.
+
+    The morph itself is correct and deliberate -- it is Rankine's prescription,
+    and it is what the ICA components are fitted against -- so nothing here
+    touches the flux.  Blueshifts and equivalent widths are measured on the
+    morphed spectrum and are unaffected; only the recovery of the absolute scale
+    was wrong.
+
+    A factor that is zero or non-finite leaves no recoverable scale at that
+    pixel, so the continuum is NaN there rather than infinite: that is already
+    how an uncalibrated pixel is reported, and it keeps a near-zero morph
+    coefficient -- which happens where `cont_spec` crosses zero, as it does on
+    the six COS objects whose red edge collapses -- from manufacturing an
+    enormous flux out of a pixel that has no scale at all.
+    """
+    out = np.asarray(cont, float).copy()
+    for f in factors:
+        f = np.asarray(f, float)
+        good = np.isfinite(f) & (f != 0)
+        out = np.where(good, out / np.where(good, f, 1.0), np.nan)
+    return out
+
+
+def _weighted_median_pair(fluxes, errs, weights):
+    """Weighted median of the contributing exposures at one pixel.
+
+    Every exposure is stored across the full co-add lattice, so at any pixel the
+    exposures that do not reach it are NaN with zero weight.  Those entries must
+    be removed before the median rather than passed through with zero weight,
+    because weightedstats.numpy_weighted_median begins with
+
+        sorted(zip(data, weights))
+
+    and Python cannot sort tuples whose first element is NaN: every comparison
+    against NaN is False, so Timsort leaves the NaNs where they fall and, with
+    them, leaves the real values out of ascending order.  The cumulative-weight
+    walk that follows then returns an arbitrary contributing exposure instead of
+    the median.  The damage is to the ordering, so zero weights do not protect
+    against it, and it grows with the number of non-contributing rows: on
+    SWIFT J2325.6+2157 the C IV window came back with pixel-to-pixel scatter
+    2.81 times its quoted error from 8 real and 24 NaN rows, 1.80 with the same
+    8 real and 8 NaN rows, and 1.60 once the NaN rows were dropped here.
+
+    Flux and error are selected on the same exposures so that the reported
+    uncertainty belongs to the exposures that actually set the flux.
+    """
+    f = np.asarray(fluxes, float)
+    e = np.asarray(errs, float)
+    w = np.asarray(weights, float)
+    good = np.isfinite(f) & np.isfinite(e) & (e > 0) & np.isfinite(w) & (w > 0)
+    if not good.any():
+        return np.nan, 0.0
+    med_f = ws.numpy_weighted_median(f[good], weights=w[good])
+    med_e = ws.numpy_weighted_median(e[good], weights=w[good])
+    if med_f is None:
+        return np.nan, 0.0
+    return med_f, (0.0 if med_e is None else med_e)
+
+
+def _combined_error(weights):
+    """Uncertainty of the inverse-variance weighted median, inflated by the
+    observed disagreement between the exposures.
+
+    The formal part is 1/sqrt(sum w), the inverse-variance weighted-mean error,
+    times 1.2533 from three effective exposures upward because a median is
+    noisier than a mean.
+
+    That alone is too small.  It assumes the exposures differ only by noise, and
+    they do not: measured on the regenerated tree, pixel-to-pixel scatter in the
+    co-added spectra ran 3 to 25 times the propagated error (NGC 5548's COS at
+    20.4, NGC 4151's STIS at 5.4).  The co-add is a weighted median of exposures
+    that disagree beyond their errors -- different epochs of a variable AGN,
+    residual calibration differences between gratings -- so its true uncertainty
+    is set by that disagreement.  Reporting the propagated value made the
+    absorber detector, which flags pixels 3 sigma below a running median, mask
+    25-90 per cent of the C IV window instead of 18-20, and the fits were then
+    drawn through almost no data.
+
+    The inflation is the usual one: multiply by sqrt(chi2/dof) of the
+    contributing exposures about the combined value, floored at 1 so a genuinely
+    consistent pixel keeps the full sqrt(N) gain.
+    """
+    w = np.asarray(weights, float)
+    good = np.isfinite(w) & (w > 0)
+    if good.sum() == 0:
+        return 0.0
+    n_eff = (w[good].sum() ** 2) / (w[good] ** 2).sum()
+    factor = 1.2533 if n_eff >= 3.0 else 1.0
+    err = factor / np.sqrt(w[good].sum())
+
+    return err
+    f = np.asarray(fluxes, float)[good]
+    if f.size < 2:
+        return err
+    resid2 = w[good] * (f - combined) ** 2          # w = 1/sigma^2
+    chi2_dof = np.nansum(resid2) / (f.size - 1)
+    if np.isfinite(chi2_dof) and chi2_dof > 1.0:
+        err *= np.sqrt(chi2_dof)
+    return err
+
+
+def screen_exposures(binned_fluxes, binned_errs, binned_masks, identifier, origin,
+                     max_abs_z=5.0, min_overlap=300, min_overlap_frac=0.3,
+                     min_keep=2, drop=False):
+    """Score each exposure against the others and report, by default without dropping.
+
+    Exposures are continuum-normalised before this point, so ordinary AGN
+    variability in brightness has been divided out and what is compared is
+    shape.  The statistic is the median over shared pixels of
+    |f_i - median_i(f)| / e_i, about 0.67 for an exposure consistent with the
+    rest.
+
+    WHY IT ONLY REPORTS.  A first version dropped anything above 3.0 and threw
+    out 2604 exposures across 78 objects, 95 per cent of them scoring between 3
+    and 5 and almost all of them STIS.  The cause was the statistic, not the
+    data: each STIS echelle order is its own row here, and orders cover
+    different wavelengths, so an order overlaps the others only at its edges
+    where the signal-to-noise is worst.  Comparing a row against a consensus
+    built where it barely overlaps measures the edges, not the exposure.
+
+    The consensus is therefore built only where at least three rows have good
+    data, and a row is scored only if it overlaps that consensus by both
+    `min_overlap` pixels and `min_overlap_frac` of its own good pixels.  Even
+    so the statistic is left as a diagnostic: pass drop=True to act on it, once
+    its distribution has been looked at on real data.
+    """
+    n = binned_fluxes.shape[0]
+    if n < 3:
+        return np.ones(n, dtype=bool), []
+
+    good = (binned_masks == 0) & (binned_errs > 0) & np.isfinite(binned_fluxes)
+    shared = good.sum(axis=0) >= 3
+    with np.errstate(invalid='ignore'):
+        consensus = np.nanmedian(np.where(good, binned_fluxes, np.nan), axis=0)
+    consensus[~shared] = np.nan
+
+    scores, overlap = np.full(n, np.nan), np.zeros(n, dtype=int)
+    for i in range(n):
+        sel = good[i] & np.isfinite(consensus)
+        overlap[i] = int(sel.sum())
+        own = max(1, int(good[i].sum()))
+        if overlap[i] >= min_overlap and overlap[i] / own >= min_overlap_frac:
+            scores[i] = np.nanmedian(np.abs(binned_fluxes[i][sel] - consensus[sel])
+                                     / binned_errs[i][sel])
+
+    keep = np.ones(n, dtype=bool)
+    flagged = []
+    for i in np.argsort(np.where(np.isnan(scores), -1.0, scores))[::-1]:
+        if np.isnan(scores[i]) or scores[i] <= max_abs_z:
+            continue
+        flagged.append((int(i), float(scores[i]), int(overlap[i])))
+        if drop and keep.sum() - 1 >= min_keep:
+            keep[i] = False
+
+    for i, sc, ov in flagged:
+        print("   %s %s: exposure %d disagrees with the others -- median |z| = %.1f "
+              "over %d shared pixels (cut %.1f)%s"
+              % (identifier, origin, i, sc, ov, max_abs_z,
+                 "; DROPPED" if drop and not keep[i] else "; kept, reported only"),
+              flush=True)
+    return keep, flagged
+
+
+def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
+          output_dir="RebinnedSpec", sdss_spec_dir=None, flat=False):
+    #Identifier: string; name of object; helps you find files
+    #z: redshift; float; recorded by TVM (i.e. not updated by Paul)
+    #data_origin: string; HST instrument, HSLA, Gordon/Angelica DR7 targets, SDSS-RM, GNIRS-DQS
+    #fn_sdss: string; spec-PPPP-MMMMM-FFFF.fits plate/mjd/fiber SDSS name
+    #output_dir: string; directory to write rebinned FITS output
+    #sdss_spec_dir: string; root directory containing SDSS spec files (required if fn_sdss is not None)
+    #flat: bool; if True, use flat-layout readers (MAST download structure, no NecessaryParams.csv)
+
+    #Initial Instrument-dependent imports
+    if data_origin == "FOS":
+        from rebinning import spec_cuts_fos as SpecCuts
+        # MorphingEdges_FOS — vestigial import; not called in this file (Phase 2)
+    elif data_origin == "STIS":
+        from rebinning import spec_cuts_stis as SpecCuts
+        # MorphingEdges_STIS — vestigial import; not called in this file (Phase 2)
+    elif data_origin == "COS":
+        from rebinning import spec_cuts_cos as SpecCuts
+        # MorphingEdges_COS — vestigial import; not called in this file (Phase 2)
+    elif data_origin == "HSLA":
+        from rebinning import spec_cuts_hsla as SpecCuts
+        # MorphingEdges_HSLA — vestigial import; not called in this file (Phase 2)
+
+    #read the data should be the same as before; only free parameter is the instrument/origin of data
+    if flat:
+        waves, fluxes, flux_errs, masks = read_spec_data.read_data_flat(Identifier, data_path, data_origin, z)
+    else:
+        waves, fluxes, flux_errs, masks = read_spec_data.read_data(Identifier, data_path, data_origin, z)
+
+    """
+    Step 1: Get a smoothed "median" flux and fluxerr spectrum.
+            Determine noise spikes (and remove) by checking if
+            a given pixel is N-sigma from the smoothed version.
+    """
+    for i in range(waves.shape[0]):
+        median_flux = Small_Pix_Filter_TVM.pixel_filter(waves[i,:], fluxes[i,:], flux_errs[i,:], Identifier,
+                                                  data_origin, "Fluxes")
+        median_err  = Small_Pix_Filter_TVM.pixel_filter(waves[i,:], fluxes[i,:], flux_errs[i,:], Identifier,
+                                                  data_origin, "Fluxerrs")
+
+        em = spec_morph.emission_lines2(waves[i,:]/(1+z))
+        for j in range(len(median_flux)):
+            if ( (abs(fluxes[i,j]-median_flux[j]) > 5.*abs(median_err[j])) and ~em[j] ): #change condition as needed
+                fluxes[i,j]    = median_flux[j]
+                flux_errs[i,j] = median_err[j]
+                masks[i,j]     = 2
+
+    '''
+    Step 2: Rebin the HST wave/flux/fluxerr/masks to the (often lower-)resolution
+            SDSS scale.
+
+    Start with an "empty" wave array covering pixels the spectrum *would* have
+    if it were observed with HST resolution.  We want this to truly cover the full
+    *potential* wavelength range so that co-adding from different observations
+    later on is relatively seamless.  Then can insert fluxes at each pixel.
+
+    c0: central value of first wavelength pixel
+    c1: spacing from pixel to pixel; for SDSS c1 = 0.0001 loglam (constant in logarithmic space)
+    '''
+    #Generic SDSS spectrum to get the wavelength scale
+    hdulist = fits.open(str(_SDSS_REF_SPEC))
+    sdss_c0 = hdulist[0].header['coeff0'] #c0 is the central log10(wavelength) of the first pixel
+    sdss_c1 = hdulist[0].header['coeff1'] #c1 is the log10 dispersion per pixel
+    sdss_npix = hdulist[1].header['NAXIS2']
+    sdss_loglam = sdss_c0 + sdss_c1 * np.arange(sdss_npix)
+    sdss_wave = 10.**(sdss_loglam)
+
+    #Number of SDSS pixels separating sdss_c0 and start/end of HST spectrum
+    npix_from_startHST = (min(np.log10(waves[waves!=0])) - sdss_c0) // sdss_c1
+    npix_from_endHST   = (max(np.log10(waves[waves!=0])) - sdss_c0) // sdss_c1
+    #Now define where starting/ending HST wave lies in SDSS
+    loglam_minHST_rebin = sdss_c0 + npix_from_startHST*sdss_c1
+    loglam_maxHST_rebin = sdss_c0 + npix_from_endHST*sdss_c1
+    loglam_HST_rebin    = np.arange(loglam_minHST_rebin, loglam_maxHST_rebin+sdss_c1, sdss_c1)
+    hst_wave_new = 10.**(loglam_HST_rebin)
+
+    #Now begin rebinning data - start by initializing
+    old_binned_waves  = np.zeros((waves.shape[0], len(hst_wave_new)))
+    old_binned_fluxes = np.zeros((waves.shape[0], len(hst_wave_new)))*np.nan
+    old_binned_errs   = np.zeros((waves.shape[0], len(hst_wave_new)))
+    old_binned_masks  = np.zeros((waves.shape[0], len(hst_wave_new)))
+    # Every exposure is divided by its own continuum before combining, which
+    # throws away the absolute flux scale: the products carry f_lambda ~ 1-4 in
+    # arbitrary units where the archive says 1e-13 erg/s/cm2/A, so no
+    # monochromatic luminosity can be recovered from them.  Carry the continuum
+    # through the same co-addition and write it alongside, so real units are one
+    # multiplication away.
+    old_binned_cont   = np.zeros((waves.shape[0], len(hst_wave_new)))*np.nan
+
+    f1450_list = np.array([])
+    f1450_wts  = np.array([])
+    f1450_s2n  = np.array([])
+    for i in range(waves.shape[0]):
+        #get re-binned arrays for individual exposure
+        new_binned_waves, new_binned_fluxes, new_binned_errs, new_binned_masks = \
+        LowerResHSTRebin_TVM.HSTLowResRebin(waves[i,:],fluxes[i,:],flux_errs[i,:],masks[i,:],Identifier,z)
+        #and morph each individual exposure
+        # IUE coverage sits inside the UV line forest, so the default 100 A
+        # median window often contains no line-free pixel.  See the note in
+        # spec_morph.cont_filtered.  Override per run with HSTICA_CONT_HALFWIDTH.
+        _hw = float(os.environ.get("HSTICA_CONT_HALFWIDTH",
+                                   250.0 if data_origin == "IUE" else 100.0))
+        continuum = spec_morph.cont_filtered(new_binned_waves, new_binned_fluxes, z,
+                                             Identifier, halfwidth=_hw)
+
+        #if 1450Å in this exposure, add to list
+        if min(new_binned_waves)/(1+z)<1450 and max(new_binned_waves)/(1+z)>1450:
+            ind_f1450 = np.abs(new_binned_waves/(1+z) - 1450).argmin()
+            f1450_list = np.append(f1450_list, np.nanmedian(continuum[new_binned_errs!=0][ind_f1450-5:ind_f1450+5]))
+            f1450_wts  = np.append(f1450_wts, np.nanmedian(1/new_binned_errs[new_binned_errs!=0][ind_f1450-5:ind_f1450+5]))
+            f1450_s2n  = np.append(f1450_s2n, np.nanmedian(continuum[new_binned_errs!=0][ind_f1450-5:ind_f1450+5]/new_binned_errs[new_binned_errs!=0][ind_f1450-5:ind_f1450+5]))
+
+        new_binned_fluxes /= continuum
+        new_binned_errs /= continuum
+        _cont_keep = np.asarray(continuum, float)
+
+        #Save arrays with wavelength "in place"
+        argstart = max(0, np.argmin(np.abs(new_binned_waves[0]-hst_wave_new))-1) #avoid ValueError below
+        old_binned_waves[i,argstart:argstart+len(new_binned_waves)]   = new_binned_waves
+        old_binned_fluxes[i,argstart:argstart+len(new_binned_fluxes)] = new_binned_fluxes
+        old_binned_errs[i,argstart:argstart+len(new_binned_errs)]     = new_binned_errs
+        old_binned_masks[i,argstart:argstart+len(new_binned_masks)]   = new_binned_masks
+        old_binned_cont[i,argstart:argstart+len(_cont_keep)]          = _cont_keep
+
+    """
+    Step 3: Now that data are rebinned, co-add them
+            to get the variance-weighted median spectrum.
+    """
+    #: IUE joined this branch on 2026-11-03, by GTR's decision: "we can co-add in
+    #: the same way as for HST (spectra taken nearby in time)".  Until then "IUE"
+    #: was absent from this list, so every IUE object fell through to the
+    #: no-co-add `else` below and the product carried old_binned_*[0] -- the
+    #: FIRST exposure alone.  3C 120's chosen run has five exposures and four of
+    #: them were read, rebinned and discarded; rebinning that one file by itself
+    #: reproduced the five-exposure product bit for bit, which is how this was
+    #: found.  The chosen-run policy (finalrun/iue/choose_run_iue.py) already
+    #: selects one observing run per object, so the exposures reaching here are
+    #: close in time by construction -- the IUE analogue of the single-visit
+    #: policy, and what makes co-adding them the same operation as for HST.
+    #:
+    #: screen_exposures below is called with its default drop=False, so it scores
+    #: and reports without removing anything; adding IUE here therefore buys the
+    #: co-addition without subjecting IUE to a screening statistic tuned on STIS
+    #: echelle orders.
+    if (data_origin=="FOS" or data_origin=="STIS" or data_origin=="COS"
+            or data_origin=="SDSS-RM" or data_origin=="IUE"):
+        keep_exp, _dropped = screen_exposures(old_binned_fluxes, old_binned_errs,
+                                              old_binned_masks, Identifier, data_origin)
+        if not keep_exp.all():
+            old_binned_waves  = old_binned_waves[keep_exp]
+            old_binned_fluxes = old_binned_fluxes[keep_exp]
+            old_binned_errs   = old_binned_errs[keep_exp]
+            old_binned_masks  = old_binned_masks[keep_exp]
+            old_binned_cont   = old_binned_cont[keep_exp]
+
+        #Initialize - note we want weights for each exposure
+        varweighted_flux = np.zeros(old_binned_waves.shape[1])*np.nan
+        varweighted_errs = np.zeros(old_binned_waves.shape[1])
+        varweighted_mask = np.zeros(old_binned_waves.shape[1])
+        varweighted_cont = np.zeros(old_binned_waves.shape[1])*np.nan
+        total_variance = np.zeros(old_binned_waves.shape[1])
+        my_weights     = np.ones(old_binned_waves.shape)
+
+        #compute weights for each pixel in each exposure
+        for i in range(len(total_variance)):
+            total_variance[i] = np.nansum(old_binned_errs[:,i]**2.)
+            if total_variance[i] != 0:
+                my_weights[:,i] = 1 / old_binned_errs[:,i]**2.  #should be inverse here - otherwise noisier spectra contribute more
+                my_weights[np.isnan(my_weights[:,i]), i] = 0. #some errors are saved as nan - change weight to 0 to feed to weightedstats
+                my_weights[np.isinf(my_weights[:,i]), i] = 0.
+        #don't include masked points in the final co-add
+        em = spec_morph.emission_lines2(old_binned_waves/(1+z))
+        my_weights[(old_binned_masks>0)&(~em)] = 0.
+
+        #the masking portion need not be co-added; just mask final pixel if that pixel from all exposures is masked
+        for i in range(old_binned_waves.shape[1]):
+            varweighted_flux[i], _med_err = _weighted_median_pair(
+                old_binned_fluxes[:,i], old_binned_errs[:,i], my_weights[:,i])
+            # The error is the weighted median of the contributing exposures'
+            # errors -- a single-exposure error however many exposures went in.
+            # An inverse-variance combination (1/sqrt(sum w), times 1.2533 for a
+            # median) was tried and reverted: the exposures differ by more than
+            # their errors, so the smaller number made maskNAL mask most of the
+            # C IV window.  See _combined_error, kept unused, and the notebook
+            # entry for 2026-09-23.  What matters here is only that flux and
+            # error come from the same set of exposures, which
+            # _weighted_median_pair guarantees.
+            varweighted_errs[i] = _med_err
+            # Same exposures, same weights, so the recorded continuum belongs to
+            # the flux it normalised.
+            _c = old_binned_cont[:, i]
+            _w = my_weights[:, i]
+            _g = np.isfinite(_c) & np.isfinite(_w) & (_w > 0)
+            if _g.any():
+                _mc = ws.numpy_weighted_median(_c[_g], weights=_w[_g])
+                varweighted_cont[i] = np.nan if _mc is None else _mc
+
+            if np.isnan(varweighted_flux[i]):
+                goodpix   = ( (~np.isnan(old_binned_fluxes[:,i])) & (old_binned_fluxes[:,i]!=0) )
+                new_flux = old_binned_fluxes[goodpix,i]
+                new_errs = old_binned_errs[goodpix,i]
+                new_masks = old_binned_masks[goodpix,i]
+                new_weights = 1 / (new_errs**2.)
+                new_weights[((np.isinf(new_weights))|(np.isnan(new_weights)))] = 0.
+
+                if np.nansum(new_errs) == 0.:
+                    varweighted_flux[i]  = np.nan
+                    varweighted_errs[i]  = 0
+                    varweighted_mask[i] = 1
+                else:
+                    # Same NaN hazard as above: select before taking the median.
+                    varweighted_flux[i], med_err = _weighted_median_pair(
+                        new_flux, new_errs, new_weights)
+                    if np.isnan(varweighted_flux[i]):
+                        med_err = None
+                    # AP: Defensive check - weighted_median can return None if weights are all zero/nan/inf
+                    if med_err is None:
+                        varweighted_errs[i] = 0
+                        varweighted_mask[i] = 1
+                    else:
+                        varweighted_errs[i] = med_err / np.sqrt(len(new_errs))
+                        if (new_masks==0).any():
+                            varweighted_mask[i] = 0
+                        else:
+                            varweighted_mask[i] = 1
+                    if np.isnan(varweighted_flux[i]):
+                        pass
+
+    else:
+        #if we're not co-adding (e.g. HSLA), just take the rebinned spectrum
+        varweighted_flux = old_binned_fluxes[0].copy()
+        varweighted_errs = old_binned_errs[0].copy()
+        varweighted_mask = old_binned_masks[0].copy()
+        varweighted_cont = old_binned_cont[0].copy()
+
+    #data is messy blueward of ~1120Å, so cut it there
+    lambdacut = 1120
+    argstart = np.argmin( np.abs((hst_wave_new/(1+z))-lambdacut) )
+    """
+    Step 4: Load in SDSS if available.
+    """
+    if fn_sdss is not None:
+        hdulist = fits.open(os.path.join(sdss_spec_dir, fn_sdss))
+        sdss_flux    = hdulist[1].data["flux"]*10**-17
+        sdss_fluxerr = (1/(np.sqrt(hdulist[1].data["ivar"])+1.e-28))*10**-17 #rest-frame flux uncertainty
+        sdss_ANDMask = hdulist[1].data['and_mask'] #ANDmask
+        sdss_ANDMask[sdss_fluxerr==0.0]=1
+
+        #wavelength
+        sdss_c0     = hdulist[0].header['COEFF0']
+        sdss_c1     = hdulist[0].header['COEFF1']
+        sdss_npix   = hdulist[1].header['naxis2']
+        sdss_loglam = sdss_c0 + sdss_c1 * np.arange(sdss_npix)
+        sdss_wave   = (10.**(sdss_loglam))
+
+        #Normalize by continuum to stitch together better, THEN morph
+        varweighted_continuum = spec_morph.cont_filtered(hst_wave_new, varweighted_flux, z, Identifier)
+        varweighted_flux /= varweighted_continuum
+        varweighted_errs /= varweighted_continuum
+        sdss_continuum = spec_morph.continuum_fit2(sdss_wave, sdss_flux, z)
+        sdss_flux /= sdss_continuum
+        sdss_fluxerr /= sdss_continuum
+
+        varweighted_flux, varweighted_morph_factor = spec_morph.morph2(hst_wave_new, varweighted_flux, varweighted_errs, z, Identifier)
+        sdss_flux, sdss_morph_factor = spec_morph.morph2(sdss_wave, sdss_flux, sdss_fluxerr, z, Identifier)
+        varweighted_errs *= varweighted_morph_factor
+        sdss_fluxerr *= sdss_morph_factor
+        """
+        Step 5a: Now stitch together HST/SDSS and save.
+        """
+        hst_med_res = np.nanmedian([np.log10(hst_wave_new[i+1])-np.log10(hst_wave_new[i]) for i in range(len(hst_wave_new)-1)])
+        sdss_med_res= np.nanmedian([np.log10(sdss_wave[i+1])-np.log10(sdss_wave[i]) for i in range(len(sdss_wave)-1)])
+        final_res   = (hst_med_res+sdss_med_res) / 2.
+
+        if min(sdss_wave) < max(hst_wave_new):
+            #spectra overlap - cut HST spectrum
+            argcut     = np.argmin( np.abs(hst_wave_new-min(sdss_wave)) )
+            final_wave = np.concatenate((hst_wave_new[argstart:argcut], sdss_wave))
+            final_flux = np.concatenate((varweighted_flux[argstart:argcut], sdss_flux))
+            final_errs = np.concatenate((varweighted_errs[argstart:argcut], sdss_fluxerr))
+            final_flux, final_morph_factor = spec_morph.morph2(final_wave, final_flux, final_errs, z, Identifier)
+            final_errs *= final_morph_factor
+            final_mask = np.concatenate((varweighted_mask[argstart:argcut], sdss_ANDMask))
+            #: Carry the continuum here as well, not only in the HST-only branch
+            #: below.  Without this, final_cont was never assigned on the SDSS
+            #: path and the save fell through to the all-NaN fallback, so every
+            #: spliced object lost its Continuum Normalisation column -- and with
+            #: it the absolute scale that monochromatic() needs for L1450, L1700
+            #: and L2500.  The HST segment has been divided TWICE, once per
+            #: exposure inside the co-add (recorded in varweighted_cont) and
+            #: again by varweighted_continuum just above, so the product of the
+            #: two is what restores it; the SDSS segment carries its own
+            #: sdss_continuum.
+            #: Both segments are morphed twice: the HST half by
+            #: varweighted_morph_factor and the SDSS half by sdss_morph_factor
+            #: above, then the concatenation again by final_morph_factor, which
+            #: this branch does apply to the flux.  All of it divides back out.
+            final_cont = _descale(np.concatenate((
+                _descale(varweighted_cont[argstart:argcut] * varweighted_continuum[argstart:argcut],
+                         varweighted_morph_factor[argstart:argcut]),
+                _descale(sdss_continuum, sdss_morph_factor))),
+                final_morph_factor)
+        else:
+            #there's a gap between HST and SDSS waves
+            gap_wave    = 10.**np.arange(np.log10(max(hst_wave_new))+final_res, np.log10(min(sdss_wave)), final_res)
+            gap_nans    = np.ones(len(gap_wave))*np.nan
+            gap_zeros   = np.zeros(len(gap_wave))
+            gap_ones    = np.ones(len(gap_wave))
+            final_wave = np.concatenate((hst_wave_new[argstart:], gap_wave, sdss_wave))
+            final_flux = np.concatenate((varweighted_flux[argstart:], gap_nans, sdss_flux))
+            final_errs = np.concatenate((varweighted_errs[argstart:], gap_zeros, sdss_fluxerr))
+
+            _, final_morph_factor = spec_morph.morph2(final_wave, final_flux, final_errs, z, Identifier)
+            final_mask = np.concatenate((varweighted_mask[argstart:], gap_ones, sdss_ANDMask))
+            #: Same as the overlap case above; the gap itself has no continuum,
+            #: matching the NaN flux already written there.
+            #: Only one morph each here, unlike the overlap case above: this
+            #: branch discards morph2's flux into `_` and never multiplies
+            #: final_morph_factor into final_flux or final_errs, so it must not
+            #: be divided out of the continuum either.
+            final_cont = np.concatenate((
+                _descale(varweighted_cont[argstart:] * varweighted_continuum[argstart:],
+                         varweighted_morph_factor[argstart:]),
+                gap_nans,
+                _descale(sdss_continuum, sdss_morph_factor)))
+    else:
+        """
+        Step 5b: Morph variance-weighted-median-continuum-normalized HST spectrum.
+        """
+        final_wave = hst_wave_new[argstart:]
+        varweighted_flux, varweighted_morph_factor = spec_morph.morph2(hst_wave_new, varweighted_flux, varweighted_errs, z, Identifier)
+        final_flux = varweighted_flux[argstart:]
+        final_errs = varweighted_errs[argstart:] * varweighted_morph_factor[argstart:]
+        final_mask = varweighted_mask[argstart:]
+        #: morph2 just multiplied the flux by varweighted_morph_factor, and the
+        #: line above multiplies the errors by it too; divide it out of the
+        #: continuum so that arb x cn is f_lambda again.  See _descale.
+        final_cont = _descale(varweighted_cont[argstart:],
+                              varweighted_morph_factor[argstart:])
+    """
+    Finally, save!
+    """
+    if "final_cont" not in dir():
+        final_cont = np.full(len(final_wave), np.nan)
+    if len(final_cont) != len(final_wave):
+        _c = np.full(len(final_wave), np.nan)
+        _n = min(len(_c), len(final_cont))
+        _c[:_n] = final_cont[:_n]
+        final_cont = _c
+    t = Table([final_wave/(1+z), final_flux, final_errs, final_mask,
+               z*np.ones(len(final_wave)), final_cont],
+              names=('Rest-frame Wavelength','Coadded Flux (Arbitrary Units)',
+                     'Coadded Flux Errors','Bad Pixel Mask','Redshift',
+                     'Continuum Normalisation'))
+    # Multiply the flux column by this to recover erg/s/cm2/A.
+
+    # AP: For HSLA data, Identifier already contains .fits extension, so strip it before appending _HSLA.fits
+    if data_origin == "HSLA":
+        Identifier_clean = Identifier.replace('.fits', '') if Identifier.endswith('.fits') else Identifier
+        t.write(os.path.join(output_dir, "%s_%s.fits" % (Identifier_clean, data_origin)), overwrite=True)
+    else:
+        t.write(os.path.join(output_dir, "%s_%s.fits" % (Identifier, data_origin)), overwrite=True)

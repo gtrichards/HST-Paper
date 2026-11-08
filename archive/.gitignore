@@ -1,0 +1,18 @@
+# The bulk products are BUILD OUTPUT: regenerable by build_archive.py, pinned
+# byte-for-byte by MANIFEST.csv, and checked by verify_archive.py.  Versioning
+# them would add ~140 MB to the repository on every rebuild for no gain.
+#
+# fits/ is ignored for a second reason as well: the AUTHORITATIVE copies of the
+# fit records are already tracked, under finalrun/pipeline_output/chosen_visit/
+# fits/*/records/ and finalrun/iue/fits/*/records/, committed on 2026-11-07
+# precisely because 49 of them hold masks that exist nowhere else.  The copy
+# here is derivative, so tracking it would duplicate 366 files.
+spectra/
+figures/
+fits/
+
+# provenance/ and code/ ARE tracked, though they too are copies.  They are small
+# -- 26 files under 1 MB -- and they are SELECTIONS: which 17 of the project's 81
+# scripts constitute the measurement path, and which 9 tables are hand-made
+# inputs rather than derived output.  Keeping them in the repository lets someone
+# browsing it see what the deposit contains without running the build.

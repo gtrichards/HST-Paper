@@ -1,0 +1,207 @@
+"""Co-add and rebin the IUE exposures through the SAME path as the HST data.
+
+GTR: "Build the full path for me to do the measurements.  That way the HST and
+IUE data will have been analyzed in the same way.  Amogh's work will then be a
+double check."
+
+So this does NOT implement its own co-addition.  It calls rebinning.coadd.rebin,
+the same function the HST pass used, with data_origin="IUE".  Two additions were
+needed in the shared package, both purely additive:
+
+  rebinning/read_spec_data.py   read_iue_flat(), reading MAST's MXLO
+                                single-row tables (WAVE/FLUX/SIGMA/QUALITY) into
+                                the (waves, fluxes, errs, masks) arrays the HST
+                                readers return.  QUALITY != 0 is masked.
+  rebinning/small_pix_filter.py a filter width for IUE (11 px, about 2.7
+                                resolution elements at 1.5 A/px and 6 A
+                                resolution).  The existing widths are empirical,
+                                so this is a judgement -- see the comment there.
+
+`SpecCuts` is imported but never called in coadd.py (0 call sites; the comments
+there say the imports are vestigial), so the missing IUE branch costs nothing.
+
+The products land on the SAME 69.03 km/s log lattice as the HST files, with the
+same six columns including Continuum Normalisation, so iterate_fit.py and the
+manual-fix GUI read them with no special case:
+
+    HSTICA_REBIN=<this output dir> python iterate_fit.py "<NAME>_IUE" ...
+
+Output: iue/rebin/<NAME>_IUE.fits and iue/rebin_log.csv
+"""
+import os, sys, glob, warnings, io, contextlib
+warnings.filterwarnings("ignore")
+import shutil
+
+import numpy as np
+import pandas as pd
+from astropy.io import fits
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, "/Users/gtr/Work/git/HST-Paper")
+from rebinning import coadd as CO
+
+TABLE = "/Users/gtr/Work/git/HST-Paper/Data/CIV_measurements_v23.csv"
+SPECTRA = os.path.join(HERE, "spectra")
+OUTDIR = os.path.join(HERE, "rebin")
+LOG = os.path.join(HERE, "rebin_log.csv")
+CHOSEN = os.path.join(HERE, "iue_chosen_run.csv")
+STAGE = os.path.join(HERE, "chosen_run_work")
+
+
+def safe(name):
+    return "".join(c if (c.isalnum() or c in "+-._") else "_" for c in str(name))
+
+
+def main():
+    os.makedirs(OUTDIR, exist_ok=True)
+    chosen = None
+    if os.path.exists(CHOSEN):
+        chosen = pd.read_csv(CHOSEN).set_index("common_name")
+        print("using the chosen run for %d objects (%s)\n" % (len(chosen), os.path.basename(CHOSEN)))
+    tab = pd.read_csv(TABLE)
+    # Select on the chosen-run file, not on manmask: manmask 1 emptied when the
+    # IUE addendum was merged on 2026-11-06, and nine coverage-gap objects were
+    # added afterwards, so a manmask-1 selection now rebins NOTHING.  The same
+    # change was made in assess_iue.py and choose_run_iue.py.
+    if chosen is not None:
+        m1 = tab[tab["common_name"].isin(set(chosen.index))].sort_values("row_num")
+    else:
+        m1 = tab[tab["CIVgood_manmask"] == 1].sort_values("row_num")
+    only = set(sys.argv[1:])
+    rows = []
+    for _, r in m1.iterrows():
+        name = str(r["common_name"]); z = float(r["z"])
+        if only and name not in only:
+            continue
+        # Only the CHOSEN RUN's exposures, staged into a scratch directory --
+        # the IUE analogue of the single-visit policy (choose_run_iue.py).
+        # Co-adding every exposure averages years of a variable source and, on
+        # 3C 120, produced a spectrum with a negative median where the data are
+        # +8.8e-15.  One run is what the HST pass would have used.
+        if chosen is not None and name in chosen.index:
+            files = str(chosen.loc[name, "files"]).split(";")
+            files = [f for f in files if f and os.path.exists(f)]
+            if not files:
+                print("  %-14s chosen run has no files" % name, flush=True); continue
+            path = os.path.join(STAGE, safe(name))
+            shutil.rmtree(path, ignore_errors=True); os.makedirs(path, exist_ok=True)
+            for f in files:
+                shutil.copy(f, os.path.join(path, os.path.basename(f)))
+        else:
+            path = os.path.join(SPECTRA, safe(name))
+        if not os.path.isdir(path):
+            print("  %-14s no retrieved spectra" % name, flush=True); continue
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                CO.rebin(name, z, "IUE", None, data_path=path,
+                         output_dir=OUTDIR, flat=True)
+        except Exception as exc:
+            print("  %-14s REBIN FAILED: %s: %s"
+                  % (name, type(exc).__name__, str(exc)[:90]), flush=True)
+            rows.append(dict(common_name=name, row_num=int(r["row_num"]), z=z,
+                             ok=0, note="%s: %s" % (type(exc).__name__, str(exc)[:120])))
+            continue
+        out = os.path.join(OUTDIR, "%s_IUE.fits" % name)
+        if not os.path.exists(out):
+            print("  %-14s produced no file" % name, flush=True)
+            rows.append(dict(common_name=name, row_num=int(r["row_num"]), z=z,
+                             ok=0, note="no output file"))
+            continue
+        # --- mask rebinned pixels that have NO native data behind them -------
+        # The rebin interpolates across a flagged stretch instead of leaving a
+        # hole, so swp26578's five bad pixels at 1538.8-1544.5 A rest became the
+        # HIGHEST point of Mrk 1014's C IV line -- 2.801e-14, above the real peak
+        # -- drawn as data with a spike-and-notch the model cannot follow.  GTR:
+        # "Amogh's fit is fine.  Because he simply ignores the missing pixels.
+        # As should we."  Masking them does not change the blueshift (+1643.7
+        # either way; the inflated errors were already discounting them) but it
+        # is the difference between a fit that looks broken and one that is
+        # visibly right, and between plotting invented flux as data and not.
+        # The affected pixels are those with no QUALITY==0 native pixel within
+        # half a native dispersion.
+        try:
+            from astropy.io import fits as _F
+            import numpy as _np
+            nat_w, nat_disp = [], []
+            for _p in files:
+                _d = _F.getdata(_p, 1)
+                _w = _np.asarray(_d["WAVE"][0], float)
+                _q = _np.asarray(_d["QUALITY"][0], float)
+                _f = _np.asarray(_d["FLUX"][0], float)
+                _s = _np.asarray(_d["SIGMA"][0], float)
+                _g = (_q == 0) & _np.isfinite(_f) & _np.isfinite(_s) & (_s > 0)
+                nat_w.append(_w[_g] / (1.0 + z))
+                # the DISPERSION OF THIS EXPOSURE, not of the merged array.
+                # Concatenating several exposures interleaves their samplings,
+                # so the merged spacing is far smaller than either exposure's
+                # and a tolerance built from it rejects almost everything -- on
+                # 3C 120, whose chosen run has five exposures, that masked 2295
+                # of 2332 pixels instead of none.
+                if _w[_g].size > 2:
+                    nat_disp.append(float(_np.median(_np.diff(_np.sort(_w[_g] / (1.0 + z))))))
+            nat_w = _np.sort(_np.concatenate(nat_w)) if nat_w else _np.array([])
+            if nat_w.size:
+                _h = _F.open(out, mode="update")
+                _t = _h[1].data
+                _rw = _np.asarray(_t["Rest-frame Wavelength"], float)
+                _rm = _np.asarray(_t["Bad Pixel Mask"], float)
+                _half = 0.5 * (float(_np.median(nat_disp)) if nat_disp else 1.0)
+                _j = _np.clip(_np.searchsorted(nat_w, _rw), 1, nat_w.size - 1)
+                _near = _np.minimum(_np.abs(_rw - nat_w[_j - 1]),
+                                    _np.abs(_rw - nat_w[_np.minimum(_j, nat_w.size - 1)]))
+                _orphan = (_near > _half) & (_rm == 0)
+                if _orphan.any():
+                    _rm[_orphan] = 1.0
+                    _t["Bad Pixel Mask"] = _rm
+                    _h.flush()
+                    print("  %-14s masked %d rebinned px with no native data behind them"
+                          % (name, int(_orphan.sum())), flush=True)
+                _h.close()
+        except Exception as _exc:
+            print("  %-14s gap-mask step failed: %s" % (name, _exc), flush=True)
+
+        d = fits.open(out)[1].data
+        w = np.asarray(d["Rest-frame Wavelength"], float)
+        f = np.asarray(d["Coadded Flux (Arbitrary Units)"], float)
+        e = np.asarray(d["Coadded Flux Errors"], float)
+        m = np.asarray(d["Bad Pixel Mask"], float)
+        cn = np.asarray(d["Continuum Normalisation"], float)
+        g = np.isfinite(f) & (m == 0) & (e > 0)
+        kc = g & (w >= 1500) & (w <= 1600)
+        ka = g & (w >= 1445) & (w <= 1465)
+        rows.append(dict(
+            common_name=name, row_num=int(r["row_num"]), z=z, ok=1,
+            rest_lo=round(float(w[g].min()), 1), rest_hi=round(float(w[g].max()), 1),
+            civ_px=int(kc.sum()),
+            civ_sn=round(float(np.median(f[kc] / e[kc])), 2) if kc.sum() else np.nan,
+            civ_blue_px=int((kc & (w < 1549.48)).sum()),
+            civ_red_px=int((kc & (w >= 1549.48)).sum()),
+            anchor_px=int(ka.sum()),
+            cont_norm_ok=int((np.isfinite(cn) & (cn > 0)).sum()),
+            note=""))
+        q = rows[-1]
+        print("  %-14s %4d-%4d A | C IV %3d px (%3d blue/%3d red) S/N %5.2f | 1450 %2d px"
+              % (name, q["rest_lo"], q["rest_hi"], q["civ_px"], q["civ_blue_px"],
+                 q["civ_red_px"], q["civ_sn"], q["anchor_px"]), flush=True)
+    pd.DataFrame(rows).to_csv(LOG, index=False)
+    ok = sum(r["ok"] for r in rows)
+    # The fitter labels its object list from index_order.csv in the rebin
+    # directory; without one, every IUE object appeared unnumbered while the HST
+    # objects carried their work-queue index (GTR, 2026-11-06: "It would be
+    # helpful if the interactive fitter had work-queue indices for the IUE
+    # objects as well").  Written here so it cannot drift from the products.
+    try:
+        sys.path.insert(0, os.path.dirname(HERE))
+        from write_index_order import write as _wio
+        _wio(rebin=OUTDIR, quiet=True)
+    except Exception as exc:
+        print("  (index_order.csv not written: %s)" % exc, flush=True)
+
+    print("\n%d of %d rebinned -> %s" % (ok, len(rows), OUTDIR))
+    print("fit one with:")
+    print('  HSTICA_REBIN=%s \\\n    python iterate_fit.py "<NAME>_IUE" --label iue' % OUTDIR)
+
+
+if __name__ == "__main__":
+    main()
