@@ -177,12 +177,31 @@ def main():
     LETTER = {"COS": "C", "FOS": "F", "STIS": "S",
               "SWP": "I", "LWP": "I", "LWR": "I", "IUE": "I"}
 
+    #: Objects measured from IUE whose v22 instrument column does not list an
+    #: IUE camera.  These are NOT listing errors to flag in parentheses: the
+    #: data demonstrably exist, because they were retrieved from MAST,
+    #: co-added, rebinned and fitted here.  The v22 sheet simply predates
+    #: knowing that -- four of the nine gap objects of 2026-11-07 fall here,
+    #: and three others (rows 105, 248, 366) happened to have their cameras
+    #: recorded, so the SAME situation rendered two different ways: a plain
+    #: bold I for three and "CS (I)" for four.  GTR had already ruled that
+    #: "Table 1 should treat IUE data the same way that HST data are treated",
+    #: and on being shown the split agreed the I should be listed alongside
+    #: the HST letters.  So for these the letter is ADDED to the list rather
+    #: than parenthesised.  The parenthesis convention survives for what it
+    #: was built for -- a genuine mismatch between the adopted spectrum and
+    #: the archive listing, as at row 452.
+    IUE_UNLISTED = {5, 45, 260, 313}
+
     def inst_cell(r):
         toks = []
         for x in str(r["instrument"]).split("/"):
             if LETTER.get(x, x) not in toks:
                 toks.append(LETTER.get(x, x))
         spec = str(r["spectrum"])
+        if LETTER.get(spec) == "I" and int(r["row_num"]) in IUE_UNLISTED \
+                and "I" not in toks:
+            toks.append("I")
         bold = set(toks) if spec == "SPLICE" else {LETTER.get(spec, "")}
         cell = "".join(r"\textbf{%s}" % x if x in bold and spec else x
                        for x in toks)
@@ -197,6 +216,8 @@ def main():
     # camera name simply is not spelled "IUE".  LETTER maps both to I.
     def _listed(r):
         toks = [LETTER.get(x, x) for x in str(r["instrument"]).split("/")]
+        if int(r["row_num"]) in IUE_UNLISTED:
+            toks.append("I")          # listed by this work, not by the v22 sheet
         return LETTER.get(str(r["spectrum"]), str(r["spectrum"])) in toks
     odd = t[meas & ~t.apply(_listed, axis=1)]
     if len(odd):
@@ -374,7 +395,7 @@ def main():
                 r" $D_{\rm C\,IV}<0$ (16 objects).") if EXTEND_CURVE else ""
     foot = r"""\enddata
 \tablenotetext{a}{Systemic redshift used in the fits, quoted to five decimals so that the \civ\ velocities are reproducible to $\sim$1.5\,km\,s$^{-1}$, well inside the 69\,km\,s$^{-1}$ quantisation; four decimals would cost up to 15\,km\,s$^{-1}$ at the low-redshift end. No superscript: \citet{WuShen2022} $Z_{\rm SYS}$ (%d objects); $^{\rm S}$: \citet{Sulentic2007} (%d); $^{\rm N}$: NED (%d); $^{\rm B}$: \citet{Barth2015} or \citet{Bentz2015} (%d); $^{\rm K}$: \citet{Kaspi2000} (%d); $^{\rm Z}$: \citet{Zheng2019} (%d); $^{\rm L}$: individual literature values (%d: %s); $^{\rm O}$: revised in this work, see \S2 (%d).}
-\tablenotetext{b}{Every instrument the archive holds for this object: C\,=\,COS, F\,=\,FOS, S\,=\,STIS, I\,=\,IUE. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Two bold letters denote two instruments joined (\S2). Where the adopted spectrum is not among those listed it is given in parentheses (\#452, an instrument-listing error). IUE data are treated exactly as the HST data are: \textbf{I} marks the ten objects measured from IUE, and an unbolded I marks the other objects for which IUE data exist but the measurement came from elsewhere or could not be made.}
+\tablenotetext{b}{Every instrument the archive holds for this object: C\,=\,COS, F\,=\,FOS, S\,=\,STIS, I\,=\,IUE. \textbf{Bold} marks the one the measurement was actually made from, under the single-visit policy (\S2); 135 objects have more than one, and the measured spectrum is not the only one available for 39\%% of them. Two bold letters denote two instruments joined (\S2). Where the adopted spectrum is not among those listed it is given in parentheses (\#452, an instrument-listing error). IUE data are treated exactly as the HST data are: \textbf{I} marks the 17 objects measured from IUE, and an unbolded I marks the other objects for which IUE data exist but the measurement came from elsewhere or could not be made. For four objects (\#5, \#45, \#260, \#313) the I is listed on the authority of this work rather than the input catalogue, which predates the retrieval of their IUE spectra.}
 \tablenotetext{c}{SDSS spectroscopic coverage: 1\,=\,SDSS spectrum available; 2\,=\,SDSS spectrum covers rest-frame Mg\,\textsc{ii}\,$\lambda2798$ [$3800\,\text{\AA}/(1+z) \leq 2798\,\text{\AA}$].}
 \tablenotetext{d}{Bitmask of catalog memberships Sul\,=\,1 (\citealt{Sulentic2007}; odd values are Sulentic objects); K00\,=\,2 (Kaspi+2000); B15\,=\,4 (Barth+2015); D15\,=\,8 (Du+2015); Be15\,=\,16 (Bentz \& Katz 2015); S16\,=\,32 (Shen+2016 SDSS-RM); NLS1\,=\,256 (Rakshit+2017); RK20\,=\,512 (Rakshit+2020 SDSS AGN catalog). Bits 64 (Matthews+2021) and 128 (Rankine+2020) are defined but set for no object here.}
 \tablenotetext{e}{Positive values are blueshifted relative to systemic. Quantised at 69.03\,km\,s$^{-1}$ by construction.}
