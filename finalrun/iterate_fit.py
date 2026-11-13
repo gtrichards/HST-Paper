@@ -762,6 +762,43 @@ def main():
         "redshift_check_kms": zdiag,
         "civ_subcontinuum": sub,
     }
+    # --- refuse to write a record whose reconstruction has collapsed ---------
+    # A scale-collapsed fit is INVISIBLE to the quantities we normally check,
+    # because the blueshift is a position and the EW is a ratio: both are
+    # scale-invariant.  Index 233 (2MASS J11243917+4201450) produced a
+    # reconstruction a MILLION times too faint on 2026-11-12 -- four rebinned
+    # pixels with errors of 1e-7 carried weight ~1e12 and dragged the amplitude
+    # to nothing -- and reported blue=+59.4 and EW=61.8, both perfectly
+    # plausible, while log L1450 read 39.4 instead of 45.3.  The only symptoms
+    # were f2500 coming out exactly 0 and the luminosity being absurd.  GTR:
+    # "I don't understand what is going on in iter12.  BEST_iter10 looked fine."
+    #
+    # So the amplitude is checked directly, against the data the fit was made
+    # from: the reconstruction's median over the 1445-1465 A anchor, divided by
+    # the data's, must be of order unity.  The project's own scale test calls
+    # 0.88-1.00 healthy; anything outside 0.1 to 10 is not a fit, it is a
+    # failure, and writing it would put a wrong luminosity into the ledger.
+    try:
+        _wi, _fi = res["wave_ica"], res["flux_ica"]
+        _wa, _fa, _ma = res["wave_arb"], res["flux_arb"], res["mask_arb"]
+        _k = (_wi >= ANCHOR_WINDOW[0]) & (_wi <= ANCHOR_WINDOW[1])
+        _j = ((_ma == 0) & np.isfinite(_fa)
+              & (_wa >= ANCHOR_WINDOW[0]) & (_wa <= ANCHOR_WINDOW[1]))
+        if _k.sum() > 3 and _j.sum() > 3:
+            _mi, _md = float(np.nanmedian(_fi[_k])), float(np.nanmedian(_fa[_j]))
+            if np.isfinite(_mi) and np.isfinite(_md) and _md != 0:
+                _ratio = _mi / _md
+                if not (0.1 < abs(_ratio) < 10.0):
+                    sys.exit("RECONSTRUCTION AMPLITUDE COLLAPSED: model/data = "
+                             "%.3g over %.0f-%.0f A (f2500 = %s).  Record NOT "
+                             "written -- the blueshift and EW would look fine "
+                             "and the luminosity would be wrong by orders of "
+                             "magnitude.  See index 233, 2026-11-12."
+                             % (_ratio, ANCHOR_WINDOW[0], ANCHOR_WINDOW[1],
+                                res.get("f2500")))
+    except KeyError:
+        pass
+
     json.dump(record, open(os.path.join(d, "records", tag + ".json"), "w"), indent=1)
 
     print("%s  %s" % (args.name, tag))

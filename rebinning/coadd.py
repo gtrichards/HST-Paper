@@ -612,6 +612,44 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         _n = min(len(_c), len(final_cont))
         _c[:_n] = final_cont[:_n]
         final_cont = _c
+    # --- flag pixels whose quoted error is absurdly small -------------------
+    # A rebinned pixel can come out with an error six or seven orders of
+    # magnitude below the rest of the spectrum, carrying a flux of the same
+    # negligible size: the bin had essentially no native data behind it, and
+    # what little arrived divided down to nothing.  Such a pixel holds NO
+    # INFORMATION, but it is unmasked, finite and has a positive error, so every
+    # downstream reader accepts it -- and in an inverse-variance weighted fit an
+    # error of 1e-7 against a median of 0.1 carries a weight of order 1e12,
+    # which lets a handful of empty pixels dictate the whole reconstruction.
+    #
+    # FOUND ON index 233 (2MASS J11243917+4201450), 2026-11-12.  Four pixels at
+    # the blue edge, 1296.65-1297.55 A rest, came out with fluxes of 1e-8 to
+    # 1e-10 and errors of 1e-7 -- the product's minimum error fell from 0.0854
+    # to 8.6e-08 -- and they dragged the ICA reconstruction's amplitude down by
+    # a factor of a million.  Blueshift and EW survived because both are
+    # scale-invariant (+59.4 km/s either way), so NOTHING IN THE USUAL CHECKS
+    # SHOWED IT; what gave it away was f2500 coming out exactly 0 and log L1450
+    # reading 39.4 instead of 45.3.  GTR, looking at the figure: "I don't
+    # understand what is going on in iter12.  BEST_iter10 looked fine."
+    #
+    # The condition is deliberately crude, because the pixels it catches are not
+    # marginal: an error below a hundredth of the spectrum's median error is
+    # four orders of magnitude from anything real.  Measured over the 431
+    # products in the chosen-visit tree, 32 carry at least one such pixel --
+    # including five STIS products untouched by any FOS work (NGC-4051 has 15),
+    # so this is a tree-wide fragility and not a FOS matter.
+    _em = np.isfinite(final_errs) & (final_errs > 0) & (final_mask == 0)
+    if _em.sum() > 50:
+        _floor = np.nanmedian(final_errs[_em]) / 100.0
+        _kill = _em & (final_errs < _floor)
+        if _kill.any():
+            final_mask = np.where(_kill, 1, final_mask)
+            print("   masked %d pixel(s) with an error below 1%% of the median "
+                  "(%.3g < %.3g): no information, but weight ~1e%d in the fit"
+                  % (_kill.sum(), np.nanmin(final_errs[_kill]), _floor,
+                     int(round(2 * np.log10(_floor / max(np.nanmin(final_errs[_kill]), 1e-30))))),
+                  flush=True)
+
     t = Table([final_wave/(1+z), final_flux, final_errs, final_mask,
                z*np.ones(len(final_wave)), final_cont],
               names=('Rest-frame Wavelength','Coadded Flux (Arbitrary Units)',

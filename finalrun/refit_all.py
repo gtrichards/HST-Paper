@@ -32,11 +32,24 @@ def main():
                     help="replay only the BEST_ / REJECT_ALL_ records (the ones the tables are built "
                          "from); the rest of the tree can follow later")
     ap.add_argument("--out", default=None, help="CSV to write (default pipeline_output/refit_<label>.csv)")
+    ap.add_argument("--index", type=int, nargs="+", default=None,
+                    help="replay only these work-queue indices.  Added 2026-11-08 for the FOS "
+                         "accumulation fix, which changed the spectra of 47 objects and left the "
+                         "other 427 untouched: replaying the whole tree would have reported those "
+                         "427 as unchanged at the cost of refitting them, and -- worse -- would have "
+                         "mixed a controlled 47-object diff with any unrelated drift elsewhere.")
     args = ap.parse_args()
+    _want = set(args.index or ())
+    def _in_scope(f):
+        if not _want:
+            return True
+        m = re.search(r"/(\d+)_[^/]*/records/", f)
+        return bool(m) and int(m.group(1)) in _want
     records = sorted(
         f for f in glob.glob(os.path.join(ITERDIR, "*", "records", "*.json"))
         if os.path.basename(f) not in ("trial_z.csv", "gui_overrides.json")
         and "trial_z" not in os.path.basename(f)
+        and _in_scope(f)
         and (not args.adopted_only or os.path.basename(f).startswith(("BEST_", "REJECT_ALL_"))))
 
     rows, failed = [], []

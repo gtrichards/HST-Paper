@@ -145,17 +145,60 @@ def build(index, keep_work=False, quiet=False):
     queue = {int(r["order"]): r for r in csv.DictReader(
         open(os.path.join(HERE, "pipeline_output", "work_queue.csv")))}
     name = queue[index]["name_mast_key"]
-    dec = pd.read_csv(os.path.join(HERE, "pipeline_output", "final",
-                                   "pass_decisions.csv")).set_index("index")
-    z = float(dec.loc[index, "z_adopted"])
+    # pass_decisions.csv carries the adopted redshift, but it is BUILT FROM THE
+    # ADOPTED RECORDS, so an object with no adopted fit is simply absent from it
+    # -- index 362 raised KeyError here.  That is not an edge case any more:
+    # splicing is now a way to RECOVER a manmask-0 object, and such an object by
+    # definition has no adopted record.  So fall back to the work queue, which
+    # covers all 474 rows and is where pass_decisions gets its own redshift
+    # from.  pass_decisions is still preferred when present, because a redshift
+    # revised during the pass lands there first.
+    z = None
+    _pd_path = os.path.join(HERE, "pipeline_output", "final", "pass_decisions.csv")
+    if os.path.exists(_pd_path):
+        try:
+            dec = pd.read_csv(_pd_path).set_index("index")
+            if index in dec.index:
+                z = float(dec.loc[index, "z_adopted"])
+        except Exception:
+            z = None
+    if z is None or not np.isfinite(z):
+        z = float(queue[index]["z"])
+        if not quiet:
+            print("   redshift from work_queue.csv (index %d is not in "
+                  "pass_decisions.csv): z = %.6f" % (index, z))
 
     host_inst = ov.get("inst") or ""
     host_path = None
+    # The donor normally comes from a DIFFERENT instrument, which is why this
+    # loop used to skip any candidate equal to donor_inst.  That guard was too
+    # strong.  Ton 469 (index 362) needs a SAME-INSTRUMENT donor: its chosen
+    # visit is FOS epoch 1 (H27 + two H19, rest 1039-2141 A) and the only
+    # spectrum reaching further red is the 120 s FOS PRISM in epoch 3, rest
+    # 0-6524 A.  Nothing else in the archive reaches past 2141 A rest -- COS and
+    # STIS all stop blueward, and COS G140L's array reaches C IV with 0.625
+    # gross counts in it.  What makes a splice safe is not that the two
+    # spectra come from different instruments but that THE DONOR SUPPLIES ONLY
+    # WAVELENGTHS THE HOST DOES NOT COVER, which is enforced below and is
+    # unaffected by the instrument names being equal.  So the requirement is
+    # now that the host and donor be different EPOCHS, which is what the
+    # override already specifies, and an explicit inst must be given when they
+    # share an instrument so the host is never guessed.
+    _same = bool(host_inst) and host_inst == donor_inst
+    if donor_inst and not host_inst:
+        # an unqualified same-instrument splice would resolve the host to the
+        # donor's own product and splice a spectrum onto itself
+        pass
     for cand in ([host_inst] if host_inst else []) + ["STIS", "COS", "FOS"]:
         p = os.path.join(REBIN, "%s_%s.fits" % (name, cand))
-        if cand and cand != donor_inst and os.path.exists(p):
-            host_path, host_inst = p, cand
-            break
+        if not cand or not os.path.exists(p):
+            continue
+        if cand == donor_inst and not (_same and cand == host_inst):
+            continue
+        host_path, host_inst = p, cand
+        break
+    if _same and not ov.get("donor_epochs", ()):
+        sys.exit("index %d: a same-instrument splice must name donor_epoch" % index)
     if host_path is None:
         sys.exit("no chosen-visit spectrum for %s -- run fit_chosen_visit first" % name)
 
