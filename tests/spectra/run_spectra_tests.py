@@ -19,9 +19,25 @@ WHAT IS FROZEN, and why each entry is there:
       sha256 of each column        any change at all, as a tripwire
       usable pixels per window     coverage and masking decisions
       min error / median error     the near-zero-error pixels of index 233
-      scatter/error per window     the only thing that catches an error array
-                                   that moves the wrong way (index 70, 306);
-                                   flux/error cannot, because both halves move
+      scatter/error per window     catches an error array that moves the wrong
+                                   way (index 70, 306); flux/error cannot,
+                                   because both halves move
+      flux stats per window        median, p05, p95 and ROUGHNESS of the flux
+                                   array, to a 0.1 per cent relative tolerance.
+                                   Until these existed the flux was watched
+                                   only by sha_flux, a tripwire that says
+                                   "changed" and nothing about how much or
+                                   where -- and scatter/error, being a ratio,
+                                   cannot see flux and error moving together.
+      continuum stats per window   the other half of every EW and the whole of
+                                   every luminosity: without it an EW change
+                                   cannot be attributed to flux or continuum
+      C IV data centroid           the half-flux blueshift of the DATA, by the
+                                   measurement's own prescription applied to
+                                   the co-added spectrum instead of to the ICA
+                                   reconstruction.  The centroid is what the
+                                   blueshift IS, and a fit that disagrees with
+                                   its own data (index 70) shows up here
     fit-level
       blueshift                    EXACT: quantised at 69.03 km/s, so any real
                                    change is at least one quantum
@@ -71,6 +87,10 @@ WINDOWS = (("L1450", 1445.0, 1465.0), ("SiIV", 1360.0, 1440.0),
            ("CIII]", 1850.0, 1970.0), ("MgII", 2700.0, 2900.0))
 TOL_EW = 0.1
 TOL_LOGL = 0.01
+#: relative tolerance on the flux and continuum statistics.  0.1 per cent: on a
+#: 40 A line that is 0.04 A of EW, comfortably inside TOL_EW, so a flux change
+#: large enough to trip this is a change that could matter to a measurement.
+TOL_REL = 1e-3
 
 
 def sha(a):
@@ -88,6 +108,74 @@ def scatter_over_error(w, f, e, g, lo, hi):
     if not (er > 0):
         return None
     return round(float((np.nanstd(d2) / np.sqrt(6.0)) / er), 3)
+
+
+def array_stats(w, a, g, lo, hi):
+    """Descriptive statistics of ONE array over one window.
+
+    Why the roughness is here.  scatter_over_error is a RATIO, and a ratio is
+    blind to its two halves moving together: double the flux noise and double
+    the errors and it does not budge.  It was built to catch an error array
+    moving the wrong way and it does that, but it cannot see the flux alone.
+    This freezes the numerator by itself -- the rms second difference over
+    sqrt(6), the pixel-to-pixel roughness of the array with no error in the
+    denominator -- so flux and error are each pinned down independently.
+    """
+    s = g & (w >= lo) & (w <= hi)
+    if s.sum() < 10:
+        return None
+    x = np.asarray(a, float)[s]
+    x = x[np.isfinite(x)]
+    if x.size < 10:
+        return None
+    d2 = x[2:] - 2 * x[1:-1] + x[:-2]
+    sig = lambda v: float("%.6g" % v)
+    return dict(median=sig(np.median(x)), p05=sig(np.percentile(x, 5)),
+                p95=sig(np.percentile(x, 95)),
+                roughness=sig(np.std(d2) / np.sqrt(6.0)))
+
+
+def data_centroid(w, f, g):
+    """The DATA's own C IV half-flux blueshift, in km/s.
+
+    A DIAGNOSTIC, not the published measurement.  It applies the measurement's
+    own shape -- a straight continuum through the 1445-1465 and 1700-1705 A
+    anchors, the clamped cumulative EW integrand, the half-flux point
+    (ica/run_ica.py:140-153) -- to the CO-ADDED DATA instead of to the ICA
+    reconstruction, with the window indexing done straightforwardly.
+
+    It is here because the flux array can move in a way that no summary
+    statistic catches but that the measurement depends on entirely: the
+    centroid is what the blueshift IS.  It also makes a specific disagreement
+    visible as a number.  On index 70 (Mrk 1502, I Zw 1) the data's centroid
+    sits near +1716 km/s on both the old and the new product, agreeing with
+    Amogh, Sulentic and Trevor, while every ICA fit on the corrected product
+    returns +128 to +611 -- a gap between what the data say and what the fit
+    returns that nothing frozen in this record would otherwise show.
+
+    Returns None when the red anchor is empty, which it is for 104 of the 366
+    adopted objects, so a None here is coverage and not a failure.
+    """
+    c1 = g & (w >= 1445) & (w <= 1465)
+    c2 = g & (w >= 1700) & (w <= 1705)
+    ew = g & (w >= 1500) & (w <= 1600)
+    if c1.sum() < 3 or c2.sum() < 3 or ew.sum() < 40:
+        return None
+    sl, ic = np.polyfit(np.concatenate((w[c1], w[c2])),
+                        np.concatenate((f[c1], f[c2])), 1)
+    ww, ff = w[ew], f[ew]
+    cc = ww * sl + ic
+    if not np.all(np.isfinite(cc)) or np.any(cc == 0):
+        return None
+    dw = np.diff(ww, append=ww[-1] + (ww[-1] - ww[-2]))
+    integ = np.clip((ff - cc) / cc, 0, None) * dw
+    cum = np.concatenate(([0.0], np.cumsum(integ)))
+    total = cum[-1]
+    if not (total > 0):
+        return None
+    k = int(np.abs(total / 2.0 - cum).argmin())
+    k = min(k, len(ww) - 1)
+    return round(float((1549.48 - ww[k]) / 1549.48 * 299792.458), 1)
 
 
 def measure(fixture, dump=None):
@@ -145,7 +233,15 @@ def measure(fixture, dump=None):
                 usable=dict((n, int((g & (w >= lo) & (w <= hi)).sum()))
                             for n, lo, hi in WINDOWS),
                 scatter_over_error=dict((n, scatter_over_error(w, f, e, g, lo, hi))
-                                        for n, lo, hi in WINDOWS)))
+                                        for n, lo, hi in WINDOWS),
+                # the FLUX array itself, which until now only sha_flux watched --
+                # a tripwire that says "changed" and nothing about how much or where
+                flux=dict((n, array_stats(w, f, g, lo, hi)) for n, lo, hi in WINDOWS),
+                # the continuum is the other half of every EW and the whole of
+                # every luminosity, so an EW change cannot be attributed without it
+                continuum=dict((n, array_stats(w, cn, g, lo, hi))
+                               for n, lo, hi in WINDOWS),
+                civ_data_centroid=data_centroid(w, f, g)))
 
         # the fit, with no hand masks: the fixture tests the code, not a judgement
         from ica.manual_fix import ICAManualFixProcessor
@@ -210,8 +306,37 @@ def compare(name, old, new):
                 b = b or {}
                 for kk in sorted(set(a) | set(b)):
                     x, y = a.get(kk), b.get(kk)
+                    # the flux and continuum blocks are one level deeper --
+                    # window -> statistic -- and are compared on a RELATIVE
+                    # tolerance so the report says how far something moved and
+                    # not merely that it did
+                    if k in ("flux", "continuum"):
+                        x = x or {}
+                        y = y or {}
+                        for st in sorted(set(x) | set(y)):
+                            u, v = x.get(st), y.get(st)
+                            if _num(u) and _num(v):
+                                sc = max(abs(u), abs(v))
+                                if sc > 0 and abs(u - v) / sc > TOL_REL:
+                                    out.append("product.%s.%s.%s  %.6g -> %.6g"
+                                               "  (%+.2f%%, tolerance %.1f%%)"
+                                               % (k, kk, st, u, v,
+                                                  100.0 * (v - u) / sc,
+                                                  100.0 * TOL_REL))
+                            elif u != v:
+                                out.append("product.%s.%s.%s  %s -> %s"
+                                           % (k, kk, st, u, v))
+                        continue
                     if x != y:
                         out.append("%s.%s.%s  %s -> %s" % (section, k, kk, x, y))
+                continue
+            if k == "civ_data_centroid" and _num(a) and _num(b):
+                # quantised on the same 69.03 km/s lattice as the measurement,
+                # so compared exactly, like the blueshift
+                if a != b:
+                    out.append("product.civ_data_centroid  %.1f -> %.1f km/s"
+                               "  (%+.1f, one lattice pixel is 69.03)"
+                               % (a, b, b - a))
                 continue
             if k == "ew" and _num(a) and _num(b):
                 if abs(a - b) > TOL_EW:

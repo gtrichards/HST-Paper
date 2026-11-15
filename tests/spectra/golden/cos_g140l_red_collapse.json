@@ -25,7 +25,34 @@
    "linefree": null,
    "CIII]": null,
    "MgII": null
-  }
+  },
+  "flux": {
+   "L1450": null,
+   "SiIV": {
+    "median": 0.619388,
+    "p05": -10.887,
+    "p95": 32.3577,
+    "roughness": 17.6867
+   },
+   "CIV": null,
+   "linefree": null,
+   "CIII]": null,
+   "MgII": null
+  },
+  "continuum": {
+   "L1450": null,
+   "SiIV": {
+    "median": 1.39458e-16,
+    "p05": 1.75525e-17,
+    "p95": 2.58966e-16,
+    "roughness": 2.52896e-23
+   },
+   "CIV": null,
+   "linefree": null,
+   "CIII]": null,
+   "MgII": null
+  },
+  "civ_data_centroid": null
  },
  "fit": {
   "blueshift": -839.798,

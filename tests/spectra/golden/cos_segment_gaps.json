@@ -25,7 +25,64 @@
    "linefree": 1.754,
    "CIII]": null,
    "MgII": null
-  }
+  },
+  "flux": {
+   "L1450": {
+    "median": 3.24674,
+    "p05": 0.267211,
+    "p95": 5.33845,
+    "roughness": 1.71861
+   },
+   "SiIV": {
+    "median": 3.30199,
+    "p05": 0.552618,
+    "p95": 6.61288,
+    "roughness": 1.67822
+   },
+   "CIV": {
+    "median": 2.61082,
+    "p05": -0.255398,
+    "p95": 7.3866,
+    "roughness": 1.79057
+   },
+   "linefree": {
+    "median": 1.69097,
+    "p05": -0.913127,
+    "p95": 6.92939,
+    "roughness": 2.49722
+   },
+   "CIII]": null,
+   "MgII": null
+  },
+  "continuum": {
+   "L1450": {
+    "median": 2.78667e-16,
+    "p05": 2.76626e-16,
+    "p95": 2.85143e-16,
+    "roughness": 7.14237e-18
+   },
+   "SiIV": {
+    "median": 2.69624e-16,
+    "p05": 2.17589e-16,
+    "p95": 2.765e-16,
+    "roughness": 1.31721e-17
+   },
+   "CIV": {
+    "median": 3.20206e-16,
+    "p05": 2.98609e-16,
+    "p95": 4.00512e-16,
+    "roughness": 1.37518e-17
+   },
+   "linefree": {
+    "median": 4.22816e-16,
+    "p05": 2.95403e-16,
+    "p95": 4.43891e-16,
+    "roughness": 2.57394e-17
+   },
+   "CIII]": null,
+   "MgII": null
+  },
+  "civ_data_centroid": -541.3
  },
  "fit": {
   "blueshift": -632.051,

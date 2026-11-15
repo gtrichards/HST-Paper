@@ -110,12 +110,26 @@ def main():
               % (b["med_err"], b["ratio"]))
         print("      error ratio one/nine  %.2f      -- should be 3.00 if the co-add "
               "takes the sqrt(N) gain" % (a["med_err"] / b["med_err"]))
+    # CORRECTED 2026-11-14.  This used to say of cartoon_nine_disagreeing that
+    # "its error should EXCEED the agreeing case, because the exposures really
+    # do differ".  They do not.  coadd.py divides each exposure by its OWN
+    # continuum before combining, which removes a pure level offset exactly:
+    # measured, the declared 20 per cent spread becomes 0.7 per cent and
+    # chi2/dof in the line core is 1.01 against 0.96 for the agreeing case.
+    # cartoon_nine_varying_line is the one that actually disagrees.
     c = res.get("cartoon_nine_disagreeing")
     if b and c:
-        print("      nine DISagreeing      median error %.4e   scatter/error %.2f"
+        print("      nine level-offset     median error %.4e   scatter/error %.2f"
               % (c["med_err"], c["ratio"]))
-        print("      its error should EXCEED the agreeing case, because the "
-              "exposures really do differ")
+        print("      its error should MATCH the agreeing case: the per-exposure")
+        print("      continuum division removes a level offset exactly")
+    d = res.get("cartoon_nine_varying_line")
+    if b and d:
+        print("      nine VARYING LINE     median error %.4e   scatter/error %.2f"
+              % (d["med_err"], d["ratio"]))
+        print("      the only cartoon whose exposures still disagree after")
+        print("      normalisation (chi2/dof 19.8 in the core, 1.01 outside), so")
+        print("      the only one that exercises the chi2 arm of _combined_error")
     return 0
 
 

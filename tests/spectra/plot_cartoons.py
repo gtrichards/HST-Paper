@@ -65,14 +65,18 @@ TITLES = {
     "independent_readouts": "20 independent readouts\n(must be averaged)",
     "cumulative_groups": "20 cumulative groups\n(use the last only)",
     "nine_agreeing": "9 identical exposures",
-    "nine_disagreeing": "9 exposures, levels differ 20%",
+    "nine_disagreeing": "9 exposures, levels differ 20%\n(normalisation removes it)",
+    "nine_varying_line": "9 exposures, LINE strength\nEW 30-50 A (a real disagreement)",
     "nine_tilted": "9 exposures, 3 tilted 15%",
     "zero_error_pixel": "4 pixels with no signal\nand a tiny quoted error",
     "two_epochs_offset": "2 gratings, 25% apart\n(different epochs)",
 }
+#: ORDER, not the glob, decides what is drawn -- so a cartoon missing from this
+#: list is silently absent from the figure.  cartoon_nine_varying_line was added
+#: on 2026-11-14 and did not appear here until it was noticed by its timestamp.
 ORDER = ["single_clean", "independent_readouts", "cumulative_groups",
          "zero_error_pixel", "nine_agreeing", "nine_disagreeing",
-         "nine_tilted", "two_epochs_offset"]
+         "nine_varying_line", "nine_tilted", "two_epochs_offset"]
 
 
 def build(name):
