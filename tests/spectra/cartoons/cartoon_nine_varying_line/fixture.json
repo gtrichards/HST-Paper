@@ -1,0 +1,20 @@
+{
+ "name": "cartoon_nine_varying_line",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_nine_varying_line",
+ "synthetic": true,
+ "tests": "9 exposures whose LINE STRENGTH runs EW 30-50 A, a difference the continuum division cannot remove: the combined error must be INFLATED inside C IV and not outside it",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "n_exposures": 9,
+  "ew_lo": 30.0,
+  "ew_hi": 50.0,
+  "expect_inflation": true
+ }
+}

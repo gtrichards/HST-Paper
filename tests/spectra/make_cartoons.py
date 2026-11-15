@@ -49,13 +49,17 @@ ALPHA = -1.5                     # f_lambda power law
 SIGMA_FRAC = 0.05                # per-pixel noise as a fraction of the continuum
 
 
-def truth(wave_rest):
-    """Continuum plus the C IV line, in rest-frame wavelength."""
+def truth(wave_rest, ew=None):
+    """Continuum plus the C IV line, in rest-frame wavelength.
+
+    `ew` overrides TRUE_EW for the exposures that must differ in LINE STRENGTH
+    rather than in level -- see cartoon_nine_varying_line.
+    """
     cont = CONT_1450 * (wave_rest / 1450.0) ** ALPHA
     lam0 = CIV * (1.0 - TRUE_BLUESHIFT / 299792.458)
     sig = lam0 * (TRUE_FWHM / 299792.458) / 2.3548
     # EW is defined against the continuum, so scale the Gaussian to give it
-    peak = TRUE_EW / (sig * np.sqrt(2.0 * np.pi))
+    peak = (TRUE_EW if ew is None else ew) / (sig * np.sqrt(2.0 * np.pi))
     line = peak * np.exp(-0.5 * ((wave_rest - lam0) / sig) ** 2)
     return cont * (1.0 + line)
 
@@ -81,7 +85,8 @@ def write_fos(path_stem, wave_obs, groups_flux, groups_err, nread, grndmode,
             "%s_%s.fits" % (path_stem, ext), overwrite=True)
 
 
-def one_exposure(rng, wave_obs, n_groups, cumulative, level=1.0, sigma_frac=SIGMA_FRAC):
+def one_exposure(rng, wave_obs, n_groups, cumulative, level=1.0,
+                 sigma_frac=SIGMA_FRAC, ew=None):
     """Return (fluxes, errors) for an exposure's groups.
 
     cumulative: group k holds k+1 readouts' worth of time, so its noise falls as
@@ -89,8 +94,7 @@ def one_exposure(rng, wave_obs, n_groups, cumulative, level=1.0, sigma_frac=SIGM
     a test on the flux means cannot tell the two cases apart.
     """
     w_rest = wave_obs / (1.0 + Z)
-    sig_true = truth(w_rest) * 0  # placeholder for shape
-    base = truth(w_rest) * level
+    base = truth(w_rest, ew=ew) * level
     cont = CONT_1450 * (w_rest / 1450.0) ** ALPHA * level
     fl, er = [], []
     for k in range(n_groups):
@@ -168,10 +172,38 @@ def main():
             f, e = one_exposure(rng, wave_obs, 1, False, level=lv)
             write_fos(os.path.join(d, "cart02%02d" % i), wave_obs, f, e, 1,
                       "RAPID-READOUT", "H19", 1000.0, "01/01/95")
+    # WHAT THIS ACTUALLY TESTS, corrected 2026-11-14.  It was built to make the
+    # exposures disagree so that the chi2 inflation in _combined_error would
+    # fire, and it does not: coadd.py divides each exposure by its OWN continuum
+    # before co-adding (coadd.py, "new_binned_fluxes /= continuum"), which
+    # removes a pure multiplicative level difference exactly.  Measured, the
+    # 20 per cent spread becomes 0.7 per cent and chi2/dof is 1.01 -- the same
+    # as cartoon_nine_agreeing at 0.96.  The pipeline is right and the cartoon's
+    # claim was wrong.  It is kept, because "a level offset must NOT inflate the
+    # error" is worth pinning down, and cartoon_nine_varying_line below is the
+    # one that actually exercises the inflation.
     emit("cartoon_nine_disagreeing",
-         "9 exposures whose levels differ by 20 per cent, far beyond their "
-         "errors: the combined error must be INFLATED, not reduced",
-         b_nine_disagree, dict(n_exposures=9, level_spread=0.20))
+         "9 exposures whose levels differ by 20 per cent: the per-exposure "
+         "continuum division removes this exactly, so the error must NOT be "
+         "inflated -- chi2/dof stays at 1",
+         b_nine_disagree, dict(n_exposures=9, level_spread=0.20,
+                               expect_chi2_dof=1.0, expect_inflation=False))
+
+    def b_nine_vary_line(d):
+        rng = np.random.default_rng(9)
+        for i in range(9):
+            # EW 30 -> 50 A across the nine.  Dividing by the continuum cannot
+            # remove this: the continuum is the same and the LINE differs.
+            f, e = one_exposure(rng, wave_obs, 1, False,
+                                ew=30.0 + 20.0 * i / 8.0)
+            write_fos(os.path.join(d, "cart05%02d" % i), wave_obs, f, e, 1,
+                      "RAPID-READOUT", "H19", 1000.0, "01/01/95")
+    emit("cartoon_nine_varying_line",
+         "9 exposures whose LINE STRENGTH runs EW 30-50 A, a difference the "
+         "continuum division cannot remove: the combined error must be "
+         "INFLATED inside C IV and not outside it",
+         b_nine_vary_line, dict(n_exposures=9, ew_lo=30.0, ew_hi=50.0,
+                                ew_A=40.0, expect_inflation=True))
 
     def b_zero_err(d):
         rng = np.random.default_rng(6)

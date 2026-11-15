@@ -4,7 +4,7 @@
  "z": 0.1,
  "obj": "CARTOON cartoon_nine_disagreeing",
  "synthetic": true,
- "tests": "9 exposures whose levels differ by 20 per cent, far beyond their errors: the combined error must be INFLATED, not reduced",
+ "tests": "9 exposures whose levels differ by 20 per cent: the per-exposure continuum division removes this exactly, so the error must NOT be inflated -- chi2/dof stays at 1",
  "truth": {
   "blueshift_kms": 1000.0,
   "ew_A": 40.0,
@@ -13,6 +13,8 @@
   "alpha": -1.5,
   "sigma_fraction": 0.05,
   "n_exposures": 9,
-  "level_spread": 0.2
+  "level_spread": 0.2,
+  "expect_chi2_dof": 1.0,
+  "expect_inflation": false
  }
 }
