@@ -1,0 +1,28 @@
+{
+ "name": "fos_rapid_readout",
+ "inst": "FOS",
+ "z": 0.530018,
+ "obj": "Ton 469",
+ "order": 362,
+ "tests": "NREAD=1 RAPID-READOUT groups that must be AVERAGED, 45 of them; the only exposure covering C IV; no red continuum anchor",
+ "exposures": [
+  "y10q0103t_c0f.fits",
+  "y10q0103t_c1f.fits",
+  "y10q0103t_c2f.fits",
+  "y10q0103t_c4f.fits",
+  "y10q0103t_c5f.fits",
+  "y10q0103t_c7f.fits",
+  "y10q0104t_c0f.fits",
+  "y10q0104t_c1f.fits",
+  "y10q0104t_c2f.fits",
+  "y10q0104t_c4f.fits",
+  "y10q0104t_c5f.fits",
+  "y10q0104t_c7f.fits",
+  "y10q0105t_c0f.fits",
+  "y10q0105t_c1f.fits",
+  "y10q0105t_c2f.fits",
+  "y10q0105t_c4f.fits",
+  "y10q0105t_c5f.fits",
+  "y10q0105t_c7f.fits"
+ ]
+}

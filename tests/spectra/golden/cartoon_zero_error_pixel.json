@@ -1,0 +1,39 @@
+{
+ "product": {
+  "n_rows": 1650,
+  "n_usable": 1646,
+  "rest_lo": 1299.89,
+  "rest_hi": 1899.36,
+  "sha_wave": "7b8264daf5a528a6",
+  "sha_flux": "e06f1fc031415e89",
+  "sha_err": "cc5dd2b8fff63725",
+  "sha_mask": "9b9b7035f244272d",
+  "sha_cont": "0df6c7e5996abfe1",
+  "min_over_median_error": 0.153407,
+  "usable": {
+   "L1450": 60,
+   "SiIV": 248,
+   "CIV": 279,
+   "linefree": 209,
+   "CIII]": 115,
+   "MgII": 0
+  },
+  "scatter_over_error": {
+   "L1450": 0.669,
+   "SiIV": 0.721,
+   "CIV": 0.861,
+   "linefree": 0.894,
+   "CIII]": 0.843,
+   "MgII": null
+  }
+ },
+ "fit": {
+  "blueshift": 887.001,
+  "ew": 41.947,
+  "logL1450": 44.6179,
+  "logL1700": 44.5504,
+  "f2500": 0.56076,
+  "veto_px": 43,
+  "civ_usable": 279
+ }
+}

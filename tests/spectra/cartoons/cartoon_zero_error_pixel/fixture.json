@@ -1,0 +1,17 @@
+{
+ "name": "cartoon_zero_error_pixel",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_zero_error_pixel",
+ "synthetic": true,
+ "tests": "four pixels quoted at 1e-21: no information, but weight ~1e42 unless they are masked",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "n_bad_pixels": 4
+ }
+}

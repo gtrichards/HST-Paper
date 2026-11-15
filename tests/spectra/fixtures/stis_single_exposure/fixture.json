@@ -1,0 +1,11 @@
+{
+ "name": "stis_single_exposure",
+ "inst": "STIS",
+ "z": 0.0809,
+ "obj": "LEDA 50824",
+ "order": 90,
+ "tests": "one G230L exposure: no Si IV at all, two thirds of the L1450 window, splice donor path",
+ "exposures": [
+  "o65617010_x1d.fits"
+ ]
+}

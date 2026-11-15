@@ -1,0 +1,19 @@
+{
+ "name": "cartoon_nine_tilted",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_nine_tilted",
+ "synthetic": true,
+ "tests": "9 exposures, three of them tilted 15 per cent across the band: a SHAPE disagreement that survives continuum normalisation, so the combined error must be inflated",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "n_exposures": 9,
+  "n_tilted": 3,
+  "tilt_fraction": 0.15
+ }
+}

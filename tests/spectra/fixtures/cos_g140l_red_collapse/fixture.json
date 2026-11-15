@@ -1,0 +1,12 @@
+{
+ "name": "cos_g140l_red_collapse",
+ "inst": "COS",
+ "z": 0.4171968473498484,
+ "obj": "2MASS J13304515+2813216",
+ "order": 307,
+ "tests": "G140L array running past 2400 A with zero gross counts; the positive-error usability clause",
+ "exposures": [
+  "lc1c07zpq_x1d.fits",
+  "lc1c07zvq_x1d.fits"
+ ]
+}

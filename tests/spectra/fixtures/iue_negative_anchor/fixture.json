@@ -1,0 +1,11 @@
+{
+ "name": "iue_negative_anchor",
+ "inst": "IUE",
+ "z": 0.0188,
+ "obj": "MKN 6",
+ "order": null,
+ "tests": "negative 1445-1465 A continuum anchor producing negative errors",
+ "exposures": [
+  "swp13545mxlo_vo.fits"
+ ]
+}

@@ -1,0 +1,12 @@
+{
+ "name": "stis_grating_mix",
+ "inst": "STIS",
+ "z": 0.0164,
+ "obj": "Mrk 1044",
+ "order": 17,
+ "tests": "G140M narrow strips alongside G140L; R~10000 mixed with R~1000 across C IV",
+ "exposures": [
+  "o8k401010_x1d.fits",
+  "o8k401020_x1d.fits"
+ ]
+}

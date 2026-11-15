@@ -1037,6 +1037,7 @@ def read_fos_flat(name, path, z):
         wave        = fits.open(os.path.join(path, '%s_c0f.fits' % sn))[0].data
         obs_flux    = fits.open(os.path.join(path, '%s_c1f.fits' % sn))[0].data
         obs_fluxerr = fits.open(os.path.join(path, '%s_c2f.fits' % sn))[0].data
+        _hdr        = fits.getheader(os.path.join(path, '%s_c1f.fits' % sn), 0)
         cqf_path    = os.path.join(path, '%s_cqf.fits' % sn)
         if os.path.exists(cqf_path):
             obs_DQ = fits.open(cqf_path)[0].data
@@ -1057,16 +1058,17 @@ def read_fos_flat(name, path, z):
                     sub_f = np.asarray(obs_flux, float)[gidx]
                     sub_e = np.asarray(obs_fluxerr, float)[gidx]
                     sub_q = np.asarray(obs_DQ, float)[gidx]
-                    entries.append(("%s.%d" % (sn, k), sub_w, sub_f, sub_e, sub_q))
+                    entries.append(("%s.%d" % (sn, k), sub_w, sub_f, sub_e, sub_q,
+                                    _hdr))
                 continue
-        entries.append((sn, wave, obs_flux, obs_fluxerr, obs_DQ))
+        entries.append((sn, wave, obs_flux, obs_fluxerr, obs_DQ, _hdr))
 
     waves     = np.zeros((len(entries), array_len))
     fluxes    = np.zeros((len(entries), array_len))
     flux_errs = np.zeros((len(entries), array_len))
     masks     = np.zeros((len(entries), array_len))
 
-    for i, (sn, wave, obs_flux, obs_fluxerr, obs_DQ) in enumerate(entries):
+    for i, (sn, wave, obs_flux, obs_fluxerr, obs_DQ, _hdr) in enumerate(entries):
         ind = -1
 
         if len(wave.shape) > 1:
@@ -1081,8 +1083,11 @@ def read_fos_flat(name, path, z):
         DQ      = np.zeros(len(wavelength))
 
         if len(wave.shape) > 1:
-            if accum_flag(ind, obs_flux, obs_fluxerr,
-                          fits.getheader(os.path.join(path, '%s_c1f.fits' % sn), 0)):
+            # _hdr, not a filename rebuilt from sn: after a spectropolarimetry
+            # split sn is "<stem>.<channel>" and no such file exists.  That is
+            # how this broke on 2026-11-14 -- and the fixture that should have
+            # caught it contained no spectropolarimetry data.
+            if accum_flag(ind, obs_flux, obs_fluxerr, _hdr):
                 if wave[ind][nzero][0] > wave[ind][nzero][-1]:
                     flux    = obs_flux[ind][::-1]
                     fluxerr = obs_fluxerr[ind][::-1]

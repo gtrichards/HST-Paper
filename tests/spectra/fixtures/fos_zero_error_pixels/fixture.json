@@ -1,0 +1,16 @@
+{
+ "name": "fos_zero_error_pixels",
+ "inst": "FOS",
+ "z": 0.2282,
+ "obj": "2MASS J11243917+4201450",
+ "order": 233,
+ "tests": "rebinned pixels whose error is 1e-7 of the median; amplitude collapse if unguarded",
+ "exposures": [
+  "y29c0302t_c0f.fits",
+  "y29c0302t_c1f.fits",
+  "y29c0302t_c2f.fits",
+  "y29c0302t_c4f.fits",
+  "y29c0302t_c5f.fits",
+  "y29c0302t_c7f.fits"
+ ]
+}

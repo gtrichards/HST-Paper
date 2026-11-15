@@ -1,0 +1,18 @@
+{
+ "name": "cartoon_independent_readouts",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_independent_readouts",
+ "synthetic": true,
+ "tests": "20 independent readouts (NREAD=1) that must be averaged: noise should fall as 1/sqrt(20)",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "n_groups": 20,
+  "expect_noise_gain": 4.47213595499958
+ }
+}

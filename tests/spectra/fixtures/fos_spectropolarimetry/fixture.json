@@ -1,0 +1,22 @@
+{
+ "name": "fos_spectropolarimetry",
+ "inst": "FOS",
+ "z": 0.158339,
+ "obj": "3C 273",
+ "order": 111,
+ "tests": "groups on two wavelength solutions (polarisation channels) that must not be averaged by index",
+ "exposures": [
+  "y0g40106t_c0f.fits",
+  "y0g40106t_c1f.fits",
+  "y0g40106t_c2f.fits",
+  "y0g40106t_c4f.fits",
+  "y0g40106t_c5f.fits",
+  "y0g40106t_c7f.fits",
+  "y0g40209t_c0f.fits",
+  "y0g40209t_c1f.fits",
+  "y0g40209t_c2f.fits",
+  "y0g40209t_c4f.fits",
+  "y0g40209t_c5f.fits",
+  "y0g40209t_c7f.fits"
+ ]
+}

@@ -1,0 +1,11 @@
+{
+ "name": "iue_no_belr",
+ "inst": "IUE",
+ "z": 0.4226,
+ "obj": "4C 10.30",
+ "order": null,
+ "tests": "per-pixel S/N 0.03 with no broad line; must not yield a measurement",
+ "exposures": [
+  "lwp12505mxlo_vo.fits"
+ ]
+}

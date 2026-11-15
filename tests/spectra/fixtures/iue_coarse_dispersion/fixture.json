@@ -1,0 +1,11 @@
+{
+ "name": "iue_coarse_dispersion",
+ "inst": "IUE",
+ "z": 0.0146,
+ "obj": "IR1249-13",
+ "order": null,
+ "tests": "1.676 A native dispersion onto the 69.03 km/s lattice: 4.7x oversampling",
+ "exposures": [
+  "swp30167mxlo_vo.fits"
+ ]
+}

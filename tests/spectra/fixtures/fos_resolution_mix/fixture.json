@@ -1,0 +1,30 @@
+{
+ "name": "fos_resolution_mix",
+ "inst": "FOS",
+ "z": 0.6255,
+ "obj": "PKS2243-123",
+ "order": 150,
+ "tests": "L15 (R~250, reaching 2511 A) co-added with H27 (R~1300, 2222-3277 A) across C IV at 2519 A observed, plus one H19: a factor-of-five resolution mix in the measurement window.  This is the defect that spectrum_overrides.csv drops L15 for on index 150.",
+ "exposures": [
+  "y1450j03t_c0f.fits",
+  "y1450j03t_c1f.fits",
+  "y1450j03t_c2f.fits",
+  "y1450j03t_c4f.fits",
+  "y1450j03t_c5f.fits",
+  "y1450j03t_c7f.fits",
+  "y1450j06t_c0f.fits",
+  "y1450j06t_c1f.fits",
+  "y1450j06t_c2f.fits",
+  "y1450j06t_c4f.fits",
+  "y1450j06t_c5f.fits",
+  "y1450j06t_c7f.fits",
+  "y1450j07t_c0f.fits",
+  "y1450j07t_c1f.fits",
+  "y1450j07t_c2f.fits",
+  "y1450j07t_c4f.fits",
+  "y1450j07t_c5f.fits",
+  "y1450j07t_c7f.fits"
+ ],
+ "trimmed": "3 of the object's 5 exposures: the H27 that carries C IV, the L15 that mixes with it, and one H19.  AN EARLIER TRIM TOOK THE FIRST TWO FILES ALPHABETICALLY, WHICH WERE BOTH H19, SO THE FIXTURE COVERED 1120-1422 A REST AND HELD NO C IV AT ALL -- it could not test what it names.  Found by looking at the spectra rather than the numbers, 2026-11-14.",
+ "note_on_staging": "Taken from the MAST tree, NOT from pipeline_output/chosen_visit/stage, because the staged visit has already had L15 removed by the hand override -- so a fixture built from the staged files could never exercise the mixing it exists to test."
+}

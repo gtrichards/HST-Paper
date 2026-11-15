@@ -1,0 +1,15 @@
+{
+ "name": "cos_segment_gaps",
+ "inst": "COS",
+ "z": 0.012816,
+ "obj": "ESO 499-41",
+ "order": 13,
+ "tests": "COS segment gaps carried as separate rows, never interpolated across",
+ "exposures": [
+  "lccv04aiq_x1d.fits",
+  "lccv04anq_x1d.fits",
+  "lccv04auq_x1d.fits",
+  "lccv04b4q_x1d.fits"
+ ],
+ "trimmed": "exposure set trimmed for the test suite: the complication is exercised by these files and the full set is unnecessary weight"
+}

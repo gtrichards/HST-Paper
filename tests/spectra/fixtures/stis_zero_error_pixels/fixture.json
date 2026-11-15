@@ -1,0 +1,18 @@
+{
+ "name": "stis_zero_error_pixels",
+ "inst": "STIS",
+ "z": 0.002336,
+ "obj": "NGC-4051",
+ "order": 2,
+ "tests": "15 near-zero-error pixels; no C III] anchor; STIS low-dispersion co-add",
+ "exposures": [
+  "o5f001010_x1d.fits",
+  "o5f001020_x1d.fits",
+  "o5f001030_x1d.fits",
+  "o5f001040_x1d.fits",
+  "o5h730010_x1d.fits",
+  "o5h730020_x1d.fits",
+  "o5h730050_x1d.fits",
+  "o5h730060_x1d.fits"
+ ]
+}

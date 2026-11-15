@@ -1,0 +1,18 @@
+{
+ "name": "cartoon_cumulative_groups",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_cumulative_groups",
+ "synthetic": true,
+ "tests": "20 CUMULATIVE groups (NREAD=20): flux level flat, errors fall as 1/sqrt(k+1); the last group alone is the exposure",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "n_groups": 20,
+  "cumulative": true
+ }
+}

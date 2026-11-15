@@ -1,0 +1,19 @@
+{
+ "name": "cartoon_two_epochs_offset",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_two_epochs_offset",
+ "synthetic": true,
+ "tests": "two gratings seven months apart whose overlap differs by 25 per cent: a step in the continuum the ICA keys on",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "level_blue": 0.8,
+  "level_red": 1.0,
+  "overlap_ratio": 1.25
+ }
+}
