@@ -1,0 +1,21 @@
+{
+ "name": "cartoon_foreign_target",
+ "inst": "FOS",
+ "z": 0.1,
+ "obj": "CARTOON cartoon_foreign_target",
+ "synthetic": true,
+ "tests": "3 exposures of this object and 5 of ANOTHER (TARGNAME differs, blueshift +6000, 40 per cent brighter): nothing reads TARGNAME, the intruder is co-added silently, and once it is the MAJORITY the weighted median returns the intruder's answer",
+ "truth": {
+  "blueshift_kms": 1000.0,
+  "ew_A": 40.0,
+  "fwhm_kms": 4000.0,
+  "cont_1450": 1e-14,
+  "alpha": -1.5,
+  "sigma_fraction": 0.05,
+  "n_exposures": 8,
+  "n_foreign": 5,
+  "foreign_targname": "SOME-OTHER-QUASAR",
+  "foreign_blueshift_kms": 6000.0,
+  "expect_rejected": true
+ }
+}

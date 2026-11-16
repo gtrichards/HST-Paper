@@ -518,6 +518,23 @@ def main():
         print("   protected %.0f-%.0f A: removed %d mask ranges" % (plo, phi, before - len(mask_ranges)))
 
     path = WORKDIR if os.path.exists(os.path.join(WORKDIR, args.name + ".fits")) else REBIN
+    # SAY WHICH SPECTRA THESE ARE.  Three trees can win here -- WORKDIR silently
+    # if a matching .fits happens to sit in it, otherwise HSTICA_REBIN, otherwise
+    # the v23 default -- and until 2026-11-15 the script named none of them.
+    # rebin_path.describe() had existed for exactly this purpose since the module
+    # was written and was called by nothing.  On that day four iterations of
+    # Mrk 1502 (index 70) were written against the all-epochs v23 tree while the
+    # adopted product is the hand-restricted epochs 3+4 co-add: S/N 33.2 against
+    # 15.0, blueshift +1643.7 against +542.4.  Nothing on screen or in the record
+    # said so.  GTR: "But the iterative fitter doesn't show the same spectrum as
+    # the plots!"  open_fitter.sh pins the tree for the GUI; this is the other
+    # half, for the script.
+    import rebin_path as _rp
+    if path == WORKDIR:
+        print("rebin directory: %s   (coadd_work override -- a matching .fits "
+              "is present there)" % WORKDIR)
+    else:
+        print(_rp.describe())
 
     import matplotlib
     matplotlib.use("Agg")
@@ -751,6 +768,14 @@ def main():
     record = {
         "name": args.name, "iteration": n, "label": args.label,
         "when_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        # WHICH SPECTRA THIS WAS MEASURED FROM.  A record that states a blueshift
+        # and an EW but not the file they came from cannot be checked by anyone
+        # who was not in the room; provenance could only be recovered by refitting
+        # against each candidate tree and matching the numbers.  Records written
+        # before 2026-11-15 do not carry this field and their tree is unknown.
+        "spectra": {"rebin_dir": os.path.abspath(path),
+                    "file": os.path.abspath(
+                        os.path.join(path, args.name + ".fits"))},
         "override": {"mask_ranges": mask_ranges, "unmask_ranges": unmask_ranges,
                      "mask_pixels": mask_pixels, "unmask_pixels": unmask_pixels,
                      "comps_use": comps},

@@ -53,6 +53,24 @@ from matplotlib.backends.backend_qtagg import (
 
 _UNMASK_COLOR = QtGui.QColor(0, 120, 0)  # list-item text colour for unmask rows
 
+def _tree_label(path):
+    """A short name for a rebin tree that actually distinguishes the trees.
+
+    The bare basename does not: the adopted tree is .../chosen_visit/rebin and
+    renders as "rebin", which names nothing.  Where the last component is a
+    generic word the parent is carried with it.
+    """
+    import os as _os
+    if not path:
+        return "UNSET"
+    p = str(path).rstrip("/")
+    base = _os.path.basename(p)
+    if base.lower() in ("rebin", "spectra", "data", "out", "output", ""):
+        parent = _os.path.basename(_os.path.dirname(p))
+        return "%s/%s" % (parent, base) if parent else (base or "?")
+    return base
+
+
 from ica.manual_fix import ICAManualFixProcessor
 from ica import run_ica
 from ica import civ_bal_regions as CIV_BAL_regions
@@ -331,7 +349,17 @@ class ManualFixWindow(QtWidgets.QMainWindow):
         self._fit_state = None
         self._pending_state = None
 
-        self.setWindowTitle("ICA Manual Fix")
+        # The tree is IN THE TITLE because it was invisible before, and an
+        # invisible spectrum source is how the GUI and the batch scripts came
+        # to be fitting different data on 2026-11-15: four iterations of
+        # Mrk 1502 were written against the all-epochs v23 product while the
+        # adopted product is the hand-restricted epochs 3+4 co-add, S/N 33.2
+        # against 15.0 and blueshift +1643.7 against +542.4.  GTR: "But the
+        # iterative fitter doesn't show the same spectrum as the plots!"
+        # open_fitter.sh already pins the tree; this makes it readable.
+        _rd = getattr(self.proc, "rebin_path", None)
+        self.setWindowTitle("ICA Manual Fix    [spectra: %s]" % _tree_label(_rd))
+        self.setToolTip(str(_rd or ""))
         self.resize(1600, 820)  # landscape, close to the 18:10.5 plot aspect
         self._build_ui()
 
@@ -1585,6 +1613,7 @@ def main(argv=None):
 
     if not args.rebin_dir:
         parser.error("--rebin-dir is required (or set HST_PAPER_REBIN_DIR).")
+    print("rebin directory: %s" % args.rebin_dir)
 
     if args.verify_reproducible:
         # No Qt needed; this is pure numerics on both entry points.

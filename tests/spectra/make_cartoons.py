@@ -69,8 +69,12 @@ def grid(lo_obs, hi_obs, n):
 
 
 def write_fos(path_stem, wave_obs, groups_flux, groups_err, nread, grndmode,
-              grating, exptime, date):
-    """FOS-style c0f/c1f/c2f with one row per group."""
+              grating, exptime, date, targname="CARTOON"):
+    """FOS-style c0f/c1f/c2f with one row per group.
+
+    targname is written because nothing in the pipeline reads it -- which is
+    the point.  See cartoon_foreign_target.
+    """
     for ext, data in (("c0f", np.tile(wave_obs, (len(groups_flux), 1))),
                       ("c1f", np.asarray(groups_flux)),
                       ("c2f", np.asarray(groups_err))):
@@ -81,6 +85,7 @@ def write_fos(path_stem, wave_obs, groups_flux, groups_err, nread, grndmode,
         h["EXPTIME"] = exptime
         h["DATE-OBS"] = date
         h["ROOTNAME"] = os.path.basename(path_stem)
+        h["TARGNAME"] = targname
         fits.PrimaryHDU(np.asarray(data, dtype=">f4"), header=h).writeto(
             "%s_%s.fits" % (path_stem, ext), overwrite=True)
 
@@ -188,6 +193,67 @@ def main():
          "inflated -- chi2/dof stays at 1",
          b_nine_disagree, dict(n_exposures=9, level_spread=0.20,
                                expect_chi2_dof=1.0, expect_inflation=False))
+
+    def b_foreign(d):
+        """Four exposures of this object and ONE of a different quasar.
+
+        WHY THIS EXISTS.  Nothing in the pipeline reads TARGNAME -- grep finds
+        zero mentions in rebinning/ and in finalrun/ -- so coadd combines
+        whatever exposures are in the staging directory and a mis-staged file
+        of another object is co-added silently.  A scan of the 413 staged
+        objects on 2026-11-15 found FIVE with more than one TARGNAME, two of
+        them not plausibly the same source under different catalogue names:
+        index 252 mixes J0833+1005-NUCLEUS with J0833+1005-OFFNUCLEUS, and
+        index 284 mixes the target with five exposures named WAVE, which is a
+        wavelength-calibration lamp and not the quasar at all.
+
+        The intruder is strongly blueshifted (+6000 km/s) and 40 per cent
+        brighter.  FIVE OF THE EIGHT exposures are the intruder, and the
+        fraction is the point: a sweep on 2026-11-15 found the weighted-median
+        co-add shrugs off contamination while the intruder is a minority --
+        1, 2 and 3 of 8 cost only 1.6 to 2.6 lattice quanta -- and then breaks
+        completely once it is the majority, returning +5533.9 against a truth
+        of +1000, an error of 65.7 quanta.  A fixture set below that threshold
+        would have reported the pipeline as robust and taught us nothing.
+
+        The majority case is not hypothetical: index 252 stages ten exposures
+        named J0833+1005-OFFNUCLEUS against five named J0833+1005-NUCLEUS, so
+        two thirds of that co-add is pointed deliberately away from the
+        nucleus.  Both it and index 284 are manmask 0 and outside the adopted
+        sample, which is luck rather than design -- nothing checked.
+
+        THE FIXTURE IS EXPECTED TO FAIL until the pipeline rejects a foreign
+        TARGNAME; the failure is the finding, in the same way
+        cartoon_zero_error_pixel fails on its spike.
+        """
+        rng = np.random.default_rng(21)
+        for i in range(3):
+            f, e = one_exposure(rng, wave_obs, 1, False)
+            write_fos(os.path.join(d, "cart06%02d" % i), wave_obs, f, e, 1,
+                      "RAPID-READOUT", "H19", 1000.0, "01/01/95",
+                      targname="CARTOON")
+        # the intruder: another quasar entirely
+        w_rest = wave_obs / (1.0 + Z)
+        lam0 = CIV * (1.0 - 6000.0 / 299792.458)
+        sig = lam0 * (TRUE_FWHM / 299792.458) / 2.3548
+        cont = CONT_1450 * (w_rest / 1450.0) ** ALPHA * 1.40
+        line = (TRUE_EW / (sig * np.sqrt(2.0 * np.pi))) * np.exp(
+            -0.5 * ((w_rest - lam0) / sig) ** 2)
+        base = cont * (1.0 + line)
+        sd = cont * SIGMA_FRAC
+        for j in range(5):
+            write_fos(os.path.join(d, "cart069%d" % j), wave_obs,
+                      np.array([base + rng.normal(0.0, sd)]), np.array([sd]), 1,
+                      "RAPID-READOUT", "H19", 1000.0, "01/01/95",
+                      targname="SOME-OTHER-QUASAR")
+    emit("cartoon_foreign_target",
+         "3 exposures of this object and 5 of ANOTHER (TARGNAME differs, "
+         "blueshift +6000, 40 per cent brighter): nothing reads TARGNAME, the "
+         "intruder is co-added silently, and once it is the MAJORITY the "
+         "weighted median returns the intruder's answer",
+         b_foreign, dict(n_exposures=8, n_foreign=5,
+                         foreign_targname="SOME-OTHER-QUASAR",
+                         foreign_blueshift_kms=6000.0, expect_rejected=True))
 
     def b_nine_vary_line(d):
         rng = np.random.default_rng(9)

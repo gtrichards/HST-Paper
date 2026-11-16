@@ -67,6 +67,7 @@ TITLES = {
     "nine_agreeing": "9 identical exposures",
     "nine_disagreeing": "9 exposures, levels differ 20%\n(normalisation removes it)",
     "nine_varying_line": "9 exposures, LINE strength\nEW 30-50 A (a real disagreement)",
+    "foreign_target": "8 exposures, 5 of them\nANOTHER QUASAR (TARGNAME ignored)",
     "nine_tilted": "9 exposures, 3 tilted 15%",
     "zero_error_pixel": "4 pixels with no signal\nand a tiny quoted error",
     "two_epochs_offset": "2 gratings, 25% apart\n(different epochs)",
@@ -76,7 +77,8 @@ TITLES = {
 #: on 2026-11-14 and did not appear here until it was noticed by its timestamp.
 ORDER = ["single_clean", "independent_readouts", "cumulative_groups",
          "zero_error_pixel", "nine_agreeing", "nine_disagreeing",
-         "nine_varying_line", "nine_tilted", "two_epochs_offset"]
+         "nine_varying_line", "nine_tilted", "two_epochs_offset",
+         "foreign_target"]
 
 
 def build(name):

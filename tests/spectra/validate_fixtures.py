@@ -32,7 +32,7 @@ def props(d, z):
     out = dict(n_exp=0, gratings=set(), nreads=set(), max_groups=0,
                covers_civ=False, has_cumulative=False, has_independent=False,
                has_zero_error=False, n_grids=0, wave_lo=np.inf, wave_hi=-np.inf,
-               core_chi2=np.nan, wing_chi2=np.nan)
+               core_chi2=np.nan, wing_chi2=np.nan, targnames=set())
     obs = CIV * (1.0 + z) if z else None
     for p0 in sorted(glob.glob(os.path.join(d, "*_c0f.fits"))):
         p1 = p0.replace("_c0f", "_c1f")
@@ -46,6 +46,9 @@ def props(d, z):
              if os.path.exists(p2) else None)
         out["n_exp"] += 1
         out["gratings"].add(str(h.get("FGWA_ID", h.get("OPT_ELEM", "?"))).strip())
+        _tn = str(h.get("TARGNAME", "")).strip().upper()
+        if _tn:
+            out["targnames"].add(_tn)
         nr = h.get("NREAD")
         out["nreads"].add(nr)
         out["max_groups"] = max(out["max_groups"], F.shape[0])
@@ -85,6 +88,9 @@ def props(d, z):
                         out["covers_civ"] = True
             h = fits.getheader(p, 0)
             out["gratings"].add(str(h.get("OPT_ELEM", h.get("DISPERSN", "?"))).strip())
+            _tn = str(h.get("TARGNAME", "")).strip().upper()
+            if _tn:
+                out["targnames"].add(_tn)
         except Exception:
             pass
     _exposure_disagreement(d, z, out)
@@ -165,6 +171,11 @@ REQUIRE = {
                                      lambda p: p["has_independent"] and p["max_groups"] >= 10),
     "cartoon_cumulative_groups": ("NREAD>1, many groups",
                                   lambda p: p["has_cumulative"] and p["max_groups"] >= 10),
+    # the intruder fixture: its exposures MUST disagree on TARGNAME, or it is
+    # not testing what it claims
+    "cartoon_foreign_target": ("8 exposures, 2 distinct TARGNAMEs, intruder in "
+                               "the MAJORITY",
+                               lambda p: p["n_exp"] == 8 and len(p["targnames"]) == 2),
     "cartoon_nine_agreeing": ("9 exposures that really do agree (chi2/dof < 1.3)",
                               lambda p: p["n_exp"] == 9 and p["core_chi2"] < 1.3),
     # a LEVEL offset, which the per-exposure continuum division removes: the
@@ -187,6 +198,7 @@ REQUIRE = {
 
 def main():
     bad = und = 0
+    mixed = []
     for root in ("fixtures", "cartoons"):
         for d in sorted(glob.glob(os.path.join(HERE, root, "*"))):
             if not os.path.isdir(d):
@@ -209,9 +221,27 @@ def main():
                      p["max_groups"], "yes" if p["covers_civ"] else "NO"))
             if not ok:
                 print("  %-30s      requires: %s" % ("", desc))
+            # A STANDING CHECK, not tied to any one fixture's REQUIRE entry.
+            # Nothing in the pipeline reads TARGNAME (zero mentions in
+            # rebinning/ or finalrun/), so a mis-staged exposure of another
+            # object is co-added in silence.  Scanning the 413 staged objects on
+            # 2026-11-15 found five with more than one TARGNAME, including index
+            # 284 which carries five exposures named WAVE -- a wavelength
+            # calibration lamp, not the quasar.  Any fixture that acquires a
+            # foreign exposure should therefore say so out loud here, whatever
+            # its declared property happens to be.
+            tn = sorted(x for x in (p.get("targnames") or set()) if x)
+            if len(tn) > 1 and name != "cartoon_foreign_target":
+                mixed.append((name, tn))
     print()
+    if mixed:
+        print("*** %d fixture(s) contain MORE THAN ONE TARGNAME -- a foreign"
+              " exposure is co-added silently:" % len(mixed))
+        for n, tn in mixed:
+            print("      %-30s %s" % (n, tn))
+        print()
     print("%d fixture(s) do not contain what they claim; %d undeclared" % (bad, und))
-    return 1 if (bad or und) else 0
+    return 1 if (bad or und or mixed) else 0
 
 
 if __name__ == "__main__":

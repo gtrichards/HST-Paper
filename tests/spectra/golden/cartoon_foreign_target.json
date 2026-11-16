@@ -1,0 +1,106 @@
+{
+ "product": {
+  "n_rows": 1650,
+  "n_usable": 1648,
+  "rest_lo": 1299.89,
+  "rest_hi": 1899.36,
+  "sha_wave": "7b8264daf5a528a6",
+  "sha_flux": "1cf7bcf5038d8fc5",
+  "sha_err": "22f85bc88a83128a",
+  "sha_mask": "cffcec6ef5843f60",
+  "sha_cont": "29278469ffea68c9",
+  "min_over_median_error": 0.652943,
+  "usable": {
+   "L1450": 60,
+   "SiIV": 248,
+   "CIV": 281,
+   "linefree": 209,
+   "CIII]": 115,
+   "MgII": 0
+  },
+  "scatter_over_error": {
+   "L1450": 0.317,
+   "SiIV": 0.387,
+   "CIV": 0.521,
+   "linefree": 0.409,
+   "CIII]": 0.437,
+   "MgII": null
+  },
+  "flux": {
+   "L1450": {
+    "median": 3.16639,
+    "p05": 3.07063,
+    "p95": 3.26236,
+    "roughness": 0.0472805
+   },
+   "SiIV": {
+    "median": 3.31017,
+    "p05": 3.16096,
+    "p95": 3.46271,
+    "roughness": 0.0609648
+   },
+   "CIV": {
+    "median": 3.18001,
+    "p05": 2.87734,
+    "p95": 8.29401,
+    "roughness": 0.0704778
+   },
+   "linefree": {
+    "median": 2.8129,
+    "p05": 2.71985,
+    "p95": 2.90669,
+    "roughness": 0.0502859
+   },
+   "CIII]": {
+    "median": 2.20571,
+    "p05": 2.10823,
+    "p95": 2.307,
+    "roughness": 0.0395655
+   },
+   "MgII": null
+  },
+  "continuum": {
+   "L1450": {
+    "median": 4.33089e-15,
+    "p05": 4.3137e-15,
+    "p95": 4.36371e-15,
+    "roughness": 1.18369e-18
+   },
+   "SiIV": {
+    "median": 4.44379e-15,
+    "p05": 4.39822e-15,
+    "p95": 4.45183e-15,
+    "roughness": 6.57782e-20
+   },
+   "CIV": {
+    "median": 4.20647e-15,
+    "p05": 4.14102e-15,
+    "p95": 4.26434e-15,
+    "roughness": 1.76459e-23
+   },
+   "linefree": {
+    "median": 4.02856e-15,
+    "p05": 3.97618e-15,
+    "p95": 4.09537e-15,
+    "roughness": 5.19619e-19
+   },
+   "CIII]": {
+    "median": 4.30885e-15,
+    "p05": 4.23686e-15,
+    "p95": 4.38423e-15,
+    "roughness": 2.25822e-23
+   },
+   "MgII": null
+  },
+  "civ_data_centroid": 5863.7
+ },
+ "fit": {
+  "blueshift": 5466.111,
+  "ew": 36.058,
+  "logL1450": 44.7862,
+  "logL1700": 44.7214,
+  "f2500": 0.52882,
+  "veto_px": 71,
+  "civ_usable": 281
+ }
+}
