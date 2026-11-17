@@ -31,6 +31,7 @@ from astropy.io import fits
 import glob
 
 from rebinning import cut_edge_pix as Cut_Edge_Pix_TVM
+from rebinning import fos_handbook_ranges
 from rebinning import spec_cuts_hsla as SpecCuts_HSLA
 
 
@@ -1118,6 +1119,17 @@ def read_fos_flat(name, path, z):
 
         flux_wmask = flux.copy()
         err_wmask  = fluxerr.copy()
+        # HANDBOOK RANGE (2026-11-17).  The archive delivers the whole diode array; the
+        # FOS Instrument Handbook (v6, Table 1-3) specifies a narrower range per grating
+        # and detector, and the pixels beyond it are not measurements -- on the red
+        # Digicon G190H's first thirteen diodes below 1590 A carry errors 1e-7 of the
+        # median and would outvote every good exposure under 1/sigma^2 weighting.
+        # Zeroing the error here lets the existing err==0 rule below mask them.
+        # See rebinning/fos_handbook_ranges.py for the table and the evidence.
+        _hb_lo, _hb_hi = fos_handbook_ranges.handbook_range(_hdr)
+        if _hb_lo is not None:
+            _hb_out = (wavelength < _hb_lo) | (wavelength > _hb_hi)
+            err_wmask[_hb_out] = 0.0
         masks[i,:len(err_wmask)][err_wmask == 0.] = 1
         # A pixel whose flux is exactly 0.0 is not a measurement of zero flux: it is a
         # dead or unilluminated pixel that the archive flags in DQ, and 43% of

@@ -1,28 +1,28 @@
 {
  "product": {
   "n_rows": 7912,
-  "n_usable": 2159,
+  "n_usable": 2169,
   "rest_lo": 1138.38,
   "rest_hi": 7030.51,
   "sha_wave": "123347f9e7cb550e",
-  "sha_flux": "4890ede3ce9ff056",
-  "sha_err": "4e03f5b5779bb549",
-  "sha_mask": "56c687de109e2162",
-  "sha_cont": "8e44a0b183ace2aa",
-  "min_over_median_error": 0.010827,
+  "sha_flux": "88ccc6d9e5397704",
+  "sha_err": "79e351f71a306149",
+  "sha_mask": "1daede9d752fa94a",
+  "sha_cont": "d393860589320a8c",
+  "min_over_median_error": 0.018991,
   "usable": {
    "L1450": 60,
    "SiIV": 248,
    "CIV": 280,
-   "linefree": 202,
+   "linefree": 208,
    "CIII]": 0,
    "MgII": 0
   },
   "scatter_over_error": {
-   "L1450": 3.998,
+   "L1450": 3.999,
    "SiIV": 6.621,
-   "CIV": 6.215,
-   "linefree": 13.914,
+   "CIV": 6.225,
+   "linefree": 14.855,
    "CIII]": null,
    "MgII": null
   },
@@ -30,8 +30,8 @@
    "L1450": {
     "median": 3.46088,
     "p05": -0.794348,
-    "p95": 5.0874,
-    "roughness": 1.40935
+    "p95": 5.08721,
+    "roughness": 1.40924
    },
    "SiIV": {
     "median": 4.50573,
@@ -40,16 +40,16 @@
     "roughness": 2.31287
    },
    "CIV": {
-    "median": 5.15909,
-    "p05": -0.0571544,
-    "p95": 13.5644,
-    "roughness": 3.51162
+    "median": 5.07723,
+    "p05": -0.0589099,
+    "p95": 13.3729,
+    "roughness": 3.46876
    },
    "linefree": {
-    "median": 4.03043,
-    "p05": -2.05683,
-    "p95": 10.9875,
-    "roughness": 9.57625
+    "median": 3.89078,
+    "p05": -2.06013,
+    "p95": 10.6501,
+    "roughness": 9.93936
    },
    "CIII]": null,
    "MgII": null
@@ -57,9 +57,9 @@
   "continuum": {
    "L1450": {
     "median": 2.86433e-15,
-    "p05": 2.52536e-15,
+    "p05": 2.52728e-15,
     "p95": 3.0433e-15,
-    "roughness": 7.47004e-17
+    "roughness": 7.47096e-17
    },
    "SiIV": {
     "median": 2.87732e-15,
@@ -68,16 +68,16 @@
     "roughness": 2.29648e-17
    },
    "CIV": {
-    "median": 2.51915e-15,
-    "p05": 2.46124e-15,
-    "p95": 2.56102e-15,
-    "roughness": 5.71629e-17
+    "median": 2.54398e-15,
+    "p05": 2.51647e-15,
+    "p95": 2.62048e-15,
+    "roughness": 5.80427e-17
    },
    "linefree": {
-    "median": 2.52241e-15,
-    "p05": 2.4247e-15,
-    "p95": 2.61093e-15,
-    "roughness": 5.45354e-17
+    "median": 2.60735e-15,
+    "p05": 2.51883e-15,
+    "p95": 2.71142e-15,
+    "roughness": 5.61247e-17
    },
    "CIII]": null,
    "MgII": null
@@ -86,11 +86,11 @@
  },
  "fit": {
   "blueshift": -9.681,
-  "ew": 108.869,
-  "logL1450": 41.2244,
-  "logL1700": 41.1337,
-  "f2500": 0.84012,
-  "veto_px": 18,
+  "ew": 107.353,
+  "logL1450": 41.2217,
+  "logL1700": 41.1482,
+  "f2500": 0.80853,
+  "veto_px": 21,
   "civ_usable": 280
  }
 }

@@ -452,6 +452,20 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         #don't include masked points in the final co-add
         em = spec_morph.emission_lines2(old_binned_waves/(1+z))
         my_weights[(old_binned_masks>0)&(~em)] = 0.
+        # PER-EXPOSURE ERROR GUARD (2026-11-17).  A pixel whose error is below 1 per
+        # cent of ITS OWN EXPOSURE's median error is not a measurement; give it no
+        # weight before combining, so only that pixel drops out.  The post-co-add
+        # floor below this block (which masks the COMBINED pixel) stays as a safety
+        # net, but applied there alone it threw away every good exposure covering a
+        # defective one: six pixels of I Zw 1 under fourteen good G130H exposures, and
+        # on LBQS 0100+0205 (index 299) a hijacked pixel at rest 1504 A survived it
+        # with flux -0.29 and an error nine times too small.
+        with np.errstate(invalid="ignore"):
+            for _j in range(old_binned_errs.shape[0]):
+                _e = old_binned_errs[_j, :]
+                _pos = np.isfinite(_e) & (_e > 0)
+                if _pos.sum() > 20:
+                    my_weights[_j, _pos & (_e < 0.01 * np.nanmedian(_e[_pos]))] = 0.
 
         #the masking portion need not be co-added; just mask final pixel if that pixel from all exposures is masked
         for i in range(old_binned_waves.shape[1]):

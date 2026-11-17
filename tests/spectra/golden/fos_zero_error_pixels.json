@@ -1,14 +1,14 @@
 {
  "product": {
-  "n_rows": 1632,
+  "n_rows": 1627,
   "n_usable": 1623,
   "rest_lo": 1295.18,
   "rest_hi": 1881.62,
-  "sha_wave": "00fce3ec3025e2fc",
-  "sha_flux": "5eda850b6505a532",
-  "sha_err": "2f263876e54f4dc1",
-  "sha_mask": "3c9e09e03b4c2712",
-  "sha_cont": "895abedfe6bddfe4",
+  "sha_wave": "0e6351cb2ba84790",
+  "sha_flux": "0983a8cd651e4dda",
+  "sha_err": "0f1c67ef0863b945",
+  "sha_mask": "d7d8ac3c08be858f",
+  "sha_cont": "2ac0215278f68b73",
   "min_over_median_error": 0.412329,
   "usable": {
    "L1450": 60,
@@ -20,7 +20,7 @@
   },
   "scatter_over_error": {
    "L1450": 0.873,
-   "SiIV": 0.749,
+   "SiIV": 0.752,
    "CIV": 1.008,
    "linefree": 0.953,
    "CIII]": 1.054,
@@ -34,10 +34,10 @@
     "roughness": 0.26308
    },
    "SiIV": {
-    "median": 3.67651,
-    "p05": 2.95668,
-    "p95": 4.63682,
-    "roughness": 0.32206
+    "median": 3.60141,
+    "p05": 2.94557,
+    "p95": 4.55905,
+    "roughness": 0.317804
    },
    "CIV": {
     "median": 3.67486,
@@ -67,10 +67,10 @@
     "roughness": 3.54128e-20
    },
    "SiIV": {
-    "median": 2.46339e-15,
-    "p05": 2.4207e-15,
-    "p95": 2.50904e-15,
-    "roughness": 5.18847e-21
+    "median": 2.49726e-15,
+    "p05": 2.42545e-15,
+    "p95": 2.57251e-15,
+    "roughness": 6.92249e-21
    },
    "CIV": {
     "median": 2.43663e-15,
@@ -96,10 +96,10 @@
  },
  "fit": {
   "blueshift": 1024.718,
-  "ew": 53.678,
-  "logL1450": 45.3491,
-  "logL1700": 45.3101,
-  "f2500": 0.55664,
+  "ew": 53.773,
+  "logL1450": 45.3488,
+  "logL1700": 45.3097,
+  "f2500": 0.5591,
   "veto_px": 47,
   "civ_usable": 280
  }
