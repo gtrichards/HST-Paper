@@ -6,10 +6,10 @@
   "rest_hi": 1378.7,
   "sha_wave": "843a3671ec06613d",
   "sha_flux": "d6db98bcaf6a33cc",
-  "sha_err": "10bd230f5ab55c6f",
+  "sha_err": "6afa7ea3d775ba6c",
   "sha_mask": "a5557bd9284b56ac",
   "sha_cont": "de202f0f8716b2dd",
-  "min_over_median_error": 0.50009,
+  "min_over_median_error": 0.54826,
   "usable": {
    "L1450": 0,
    "SiIV": 60,
@@ -55,12 +55,12 @@
   "civ_data_centroid": null
  },
  "fit": {
-  "blueshift": -839.798,
-  "ew": 208.846,
+  "blueshift": -909.073,
+  "ew": 137.192,
   "logL1450": null,
   "logL1700": null,
-  "f2500": -0.77531,
-  "veto_px": 189,
+  "f2500": -1.14054,
+  "veto_px": 192,
   "civ_usable": 0
  }
 }

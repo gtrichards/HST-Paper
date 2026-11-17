@@ -6,10 +6,10 @@
   "rest_hi": 1898.92,
   "sha_wave": "7b8264daf5a528a6",
   "sha_flux": "1ffed4d5c0a8a02d",
-  "sha_err": "a0947af81d4e6a43",
+  "sha_err": "88cc6f129562f2ff",
   "sha_mask": "f783d97906c0f1f9",
   "sha_cont": "9aac23bec519c70a",
-  "min_over_median_error": 0.689531,
+  "min_over_median_error": 0.66148,
   "usable": {
    "L1450": 60,
    "SiIV": 248,
@@ -95,12 +95,12 @@
   "civ_data_centroid": 1019.0
  },
  "fit": {
-  "blueshift": 887.001,
-  "ew": 33.153,
-  "logL1450": 44.5202,
-  "logL1700": 44.5445,
-  "f2500": 0.55458,
-  "veto_px": 77,
+  "blueshift": 955.869,
+  "ew": 32.83,
+  "logL1450": 44.5203,
+  "logL1700": 44.5436,
+  "f2500": 0.55208,
+  "veto_px": 82,
   "civ_usable": 281
  }
 }

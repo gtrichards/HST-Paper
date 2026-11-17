@@ -6,7 +6,7 @@
   "rest_hi": 1899.36,
   "sha_wave": "7b8264daf5a528a6",
   "sha_flux": "95616dae303e9591",
-  "sha_err": "29749f82f75adaca",
+  "sha_err": "fafcda2f92dd7c48",
   "sha_mask": "cffcec6ef5843f60",
   "sha_cont": "80587cdc7ccaeeda",
   "min_over_median_error": 0.662425,
@@ -99,7 +99,7 @@
   "ew": 41.951,
   "logL1450": 44.6182,
   "logL1700": 44.5454,
-  "f2500": 0.56118,
+  "f2500": 0.56117,
   "veto_px": 46,
   "civ_usable": 281
  }

@@ -6,7 +6,7 @@
   "rest_hi": 2353.52,
   "sha_wave": "28ffb283d1563300",
   "sha_flux": "65ea31f3ee299e4b",
-  "sha_err": "2e68e41e58e20f34",
+  "sha_err": "3152c30bf7b7723e",
   "sha_mask": "4991819776594ac5",
   "sha_cont": "25637a9cbd04cc6c",
   "min_over_median_error": 0.306961,
@@ -96,10 +96,10 @@
  },
  "fit": {
   "blueshift": -7989.048,
-  "ew": 12.339,
-  "logL1450": 44.8027,
-  "logL1700": 45.3226,
-  "f2500": 0.70731,
+  "ew": 12.329,
+  "logL1450": 44.8024,
+  "logL1700": 45.3227,
+  "f2500": 0.70728,
   "veto_px": 203,
   "civ_usable": 281
  }

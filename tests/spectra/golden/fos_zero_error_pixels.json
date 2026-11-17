@@ -6,7 +6,7 @@
   "rest_hi": 1881.62,
   "sha_wave": "00fce3ec3025e2fc",
   "sha_flux": "5eda850b6505a532",
-  "sha_err": "c56807cb73a523c8",
+  "sha_err": "2f263876e54f4dc1",
   "sha_mask": "3c9e09e03b4c2712",
   "sha_cont": "895abedfe6bddfe4",
   "min_over_median_error": 0.412329,
@@ -96,7 +96,7 @@
  },
  "fit": {
   "blueshift": 1024.718,
-  "ew": 53.68,
+  "ew": 53.678,
   "logL1450": 45.3491,
   "logL1700": 45.3101,
   "f2500": 0.55664,

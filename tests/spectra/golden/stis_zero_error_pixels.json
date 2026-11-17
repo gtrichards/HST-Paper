@@ -1,28 +1,28 @@
 {
  "product": {
   "n_rows": 7912,
-  "n_usable": 2156,
+  "n_usable": 2159,
   "rest_lo": 1138.38,
   "rest_hi": 7030.51,
   "sha_wave": "123347f9e7cb550e",
   "sha_flux": "4890ede3ce9ff056",
-  "sha_err": "6f7518ba753ec6e7",
-  "sha_mask": "619788257e589932",
+  "sha_err": "4e03f5b5779bb549",
+  "sha_mask": "56c687de109e2162",
   "sha_cont": "8e44a0b183ace2aa",
-  "min_over_median_error": 0.012777,
+  "min_over_median_error": 0.010827,
   "usable": {
    "L1450": 60,
    "SiIV": 248,
-   "CIV": 279,
-   "linefree": 200,
+   "CIV": 280,
+   "linefree": 202,
    "CIII]": 0,
    "MgII": 0
   },
   "scatter_over_error": {
-   "L1450": 2.598,
-   "SiIV": 4.195,
-   "CIV": 4.045,
-   "linefree": 8.856,
+   "L1450": 3.998,
+   "SiIV": 6.621,
+   "CIV": 6.215,
+   "linefree": 13.914,
    "CIII]": null,
    "MgII": null
   },
@@ -40,16 +40,16 @@
     "roughness": 2.31287
    },
    "CIV": {
-    "median": 5.16099,
-    "p05": -0.0378833,
-    "p95": 13.5707,
-    "roughness": 3.50422
+    "median": 5.15909,
+    "p05": -0.0571544,
+    "p95": 13.5644,
+    "roughness": 3.51162
    },
    "linefree": {
-    "median": 4.05842,
-    "p05": -1.93479,
-    "p95": 11.0137,
-    "roughness": 9.58018
+    "median": 4.03043,
+    "p05": -2.05683,
+    "p95": 10.9875,
+    "roughness": 9.57625
    },
    "CIII]": null,
    "MgII": null
@@ -68,16 +68,16 @@
     "roughness": 2.29648e-17
    },
    "CIV": {
-    "median": 2.51905e-15,
-    "p05": 2.46123e-15,
-    "p95": 2.56104e-15,
-    "roughness": 5.72658e-17
+    "median": 2.51915e-15,
+    "p05": 2.46124e-15,
+    "p95": 2.56102e-15,
+    "roughness": 5.71629e-17
    },
    "linefree": {
     "median": 2.52241e-15,
-    "p05": 2.42465e-15,
-    "p95": 2.61111e-15,
-    "roughness": 5.44988e-17
+    "p05": 2.4247e-15,
+    "p95": 2.61093e-15,
+    "roughness": 5.45354e-17
    },
    "CIII]": null,
    "MgII": null
@@ -85,12 +85,12 @@
   "civ_data_centroid": -484.1
  },
  "fit": {
-  "blueshift": -217.002,
-  "ew": 125.85,
-  "logL1450": 41.165,
-  "logL1700": 41.0431,
-  "f2500": 0.70112,
-  "veto_px": 22,
-  "civ_usable": 279
+  "blueshift": -9.681,
+  "ew": 108.869,
+  "logL1450": 41.2244,
+  "logL1700": 41.1337,
+  "f2500": 0.84012,
+  "veto_px": 18,
+  "civ_usable": 280
  }
 }

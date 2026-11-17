@@ -6,10 +6,10 @@
   "rest_hi": 1686.69,
   "sha_wave": "2808ebe7f65fbf41",
   "sha_flux": "427bc633cc14b145",
-  "sha_err": "fd64c4270a1d0eee",
+  "sha_err": "f161471fad6fb735",
   "sha_mask": "8dda588ead4f22c9",
   "sha_cont": "8607b4566e364469",
-  "min_over_median_error": 0.603353,
+  "min_over_median_error": 0.617372,
   "usable": {
    "L1450": 60,
    "SiIV": 248,
@@ -19,10 +19,10 @@
    "MgII": 0
   },
   "scatter_over_error": {
-   "L1450": 0.3,
-   "SiIV": 0.252,
-   "CIV": 0.472,
-   "linefree": 0.459,
+   "L1450": 0.406,
+   "SiIV": 0.344,
+   "CIV": 0.652,
+   "linefree": 0.637,
    "CIII]": null,
    "MgII": null
   },
@@ -86,10 +86,10 @@
  },
  "fit": {
   "blueshift": 266.509,
-  "ew": 75.038,
-  "logL1450": 43.2863,
+  "ew": 74.92,
+  "logL1450": 43.2869,
   "logL1700": null,
-  "f2500": 0.53196,
+  "f2500": 0.53211,
   "veto_px": 0,
   "civ_usable": 280
  }

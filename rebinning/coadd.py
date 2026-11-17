@@ -159,27 +159,53 @@ def _weighted_median_pair(fluxes, errs, weights):
 
 
 def _combined_error(weights):
-    """Uncertainty of the inverse-variance weighted median, inflated by the
-    observed disagreement between the exposures.
+    """Uncertainty of the inverse-variance weighted median.
 
-    The formal part is 1/sqrt(sum w), the inverse-variance weighted-mean error,
-    times 1.2533 from three effective exposures upward because a median is
-    noisier than a mean.
+        err = factor / sqrt(sum w),   w = 1/sigma^2 per contributing exposure
 
-    That alone is too small.  It assumes the exposures differ only by noise, and
-    they do not: measured on the regenerated tree, pixel-to-pixel scatter in the
-    co-added spectra ran 3 to 25 times the propagated error (NGC 5548's COS at
-    20.4, NGC 4151's STIS at 5.4).  The co-add is a weighted median of exposures
-    that disagree beyond their errors -- different epochs of a variable AGN,
-    residual calibration differences between gratings -- so its true uncertainty
-    is set by that disagreement.  Reporting the propagated value made the
-    absorber detector, which flags pixels 3 sigma below a running median, mask
-    25-90 per cent of the C IV window instead of 18-20, and the fits were then
-    drawn through almost no data.
+    with factor = 1.2533 (= sqrt(pi/2)) from three effective exposures upward,
+    because a median is asymptotically that much noisier than a mean, and 1.0
+    below that where the asymptotic value does not apply.  For N equal
+    exposures this is sigma * 1.2533 / sqrt(N): the textbook result.
 
-    The inflation is the usual one: multiply by sqrt(chi2/dof) of the
-    contributing exposures about the combined value, floored at 1 so a genuinely
-    consistent pixel keeps the full sqrt(N) gain.
+    ADOPTED 2026-11-17, replacing `varweighted_errs[i] = _med_err` -- the
+    weighted median of the contributing exposures' errors, i.e. a SINGLE-
+    exposure error however many exposures went in.  That was not merely
+    pessimistic.  Where the exposure count varies across a line, discarding the
+    sqrt(N) gain mis-weights the fit: on I Zw 1 (index 70) the C IV blue wing
+    is covered by 14 exposures and the rest of the line by 3, the old errors
+    inverted which part of the line looked reliable, and the ICA fit landed on
+    whichever branch the prior and masks favoured (+128, +542 or +1850 km/s)
+    instead of on the data's own centroid of +1440.  With this error the
+    solutions collapse to +1162..+1506.  GTR: "I can accept a blueshift as low
+    as 1000 km/s, but no lower.  There still must be an error."
+
+    EVIDENCE.  tests/spectra: 9 of 10 known-truth cartoons bit-identical in
+    blueshift and EW; scatter/error (the data's own noise over the reported
+    error) 0.34 -> 0.82 on nine agreeing exposures; the one-vs-nine error ratio
+    2.39 = 3.00/1.2533, the theoretical value.  Across all 356 adopted objects
+    290 have uniform exposure coverage over C IV, where this is a constant
+    rescaling and cannot move an error-weighted centroid; the 15 with
+    max/min >= 3 were rebuilt and refit from their own adopted masks: 13 move
+    >= 1 lattice pixel, 5 move >= 3, D_CIV moves by a median 0.012 and at most
+    0.025 against a sample IQR of 0.28.  GTR's reason for adopting rather than
+    documenting: no sentence may stand in the paper whose only defence is
+    "because Claude says so", and "errors are single-exposure (conservative)"
+    was such a sentence -- conservative is true only of a uniform inflation.
+
+    WHAT IS NOT HERE.  An earlier version carried, below a bare `return err`
+    and therefore never executed, an inflation by sqrt(chi2/dof) of the
+    exposures about the combined value.  It is removed, not merely dead: on
+    cartoon_nine_varying_line -- the one fixture whose exposures still disagree
+    after the per-exposure continuum division -- it roughly doubled the error
+    against known truth and biased EW low, by down-weighting the line core
+    where the exposures differ most.  The 2026-09-23 note at the call site,
+    that an inverse-variance error made maskNAL strip the C IV window, referred
+    to a version applied before the error floor and the NREAD rule existed; the
+    sqrt(N) replay's diff ledger carries civ_px per object as the check.
+
+    Returns 0.0 when no exposure carries a positive weight; the caller falls
+    back to the single-exposure median error in that case.
     """
     w = np.asarray(weights, float)
     good = np.isfinite(w) & (w > 0)
@@ -187,17 +213,7 @@ def _combined_error(weights):
         return 0.0
     n_eff = (w[good].sum() ** 2) / (w[good] ** 2).sum()
     factor = 1.2533 if n_eff >= 3.0 else 1.0
-    err = factor / np.sqrt(w[good].sum())
-
-    return err
-    f = np.asarray(fluxes, float)[good]
-    if f.size < 2:
-        return err
-    resid2 = w[good] * (f - combined) ** 2          # w = 1/sigma^2
-    chi2_dof = np.nansum(resid2) / (f.size - 1)
-    if np.isfinite(chi2_dof) and chi2_dof > 1.0:
-        err *= np.sqrt(chi2_dof)
-    return err
+    return factor / np.sqrt(w[good].sum())
 
 
 def screen_exposures(binned_fluxes, binned_errs, binned_masks, identifier, origin,
@@ -441,16 +457,17 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         for i in range(old_binned_waves.shape[1]):
             varweighted_flux[i], _med_err = _weighted_median_pair(
                 old_binned_fluxes[:,i], old_binned_errs[:,i], my_weights[:,i])
-            # The error is the weighted median of the contributing exposures'
-            # errors -- a single-exposure error however many exposures went in.
-            # An inverse-variance combination (1/sqrt(sum w), times 1.2533 for a
-            # median) was tried and reverted: the exposures differ by more than
-            # their errors, so the smaller number made maskNAL mask most of the
-            # C IV window.  See _combined_error, kept unused, and the notebook
-            # entry for 2026-09-23.  What matters here is only that flux and
-            # error come from the same set of exposures, which
-            # _weighted_median_pair guarantees.
-            varweighted_errs[i] = _med_err
+            # The error is the inverse-variance combination of the contributing
+            # exposures (see _combined_error for the derivation and the evidence
+            # behind adopting it on 2026-11-17).  Until then this line read
+            # `varweighted_errs[i] = _med_err`, the weighted median of the
+            # exposures' errors -- a single-exposure error however many went in.
+            # Flux and error still come from the same set of exposures with the
+            # same weights, which is what _weighted_median_pair guarantees; the
+            # fallback keeps that single-exposure value only where no exposure
+            # carries a positive weight.
+            _ce = _combined_error(my_weights[:, i])
+            varweighted_errs[i] = _ce if _ce > 0 else _med_err
             # Same exposures, same weights, so the recorded continuum belongs to
             # the flux it normalised.
             _c = old_binned_cont[:, i]
