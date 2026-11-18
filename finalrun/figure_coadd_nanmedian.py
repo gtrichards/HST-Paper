@@ -50,10 +50,13 @@ def place(name, path, z, inst="COS"):
     for i in range(w.shape[0]):
         nw, nf, ne, nm = LR.HSTLowResRebin(w[i, :], f[i, :], e[i, :], m[i, :], name, z)
         cont = spec_morph.cont_filtered(nw, nf, z, name)
-        a = max(0, np.argmin(np.abs(nw[0] - lam)) - 1)
-        F[i, a:a + len(nw)] = nf / cont
-        E[i, a:a + len(nw)] = ne / cont
-        M[i, a:a + len(nw)] = nm
+        # as coadd.rebin now does: the lattice index of nw[0] (the old -1 put
+        # every exposure but the bluest one pixel blueward; fixed 2026-11-17)
+        a = int(round((np.log10(nw[0]) - (c0 + n0 * c1)) / c1))
+        k = min(len(nw), len(lam) - a)   # drop np.arange's extra red-end pixel
+        F[i, a:a + k] = (nf / cont)[:k]
+        E[i, a:a + k] = (ne / cont)[:k]
+        M[i, a:a + k] = nm[:k]
     return lam, F, E, M
 
 

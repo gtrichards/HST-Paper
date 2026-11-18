@@ -396,7 +396,33 @@ def rebin(Identifier, z, data_origin, fn_sdss, data_path=None,
         _cont_keep = np.asarray(continuum, float)
 
         #Save arrays with wavelength "in place"
-        argstart = max(0, np.argmin(np.abs(new_binned_waves[0]-hst_wave_new))-1) #avoid ValueError below
+        # The exposure was rebinned onto the same SDSS lattice as hst_wave_new
+        # (same c0, c1), so its first pixel IS a lattice pixel: place it at that
+        # pixel's index, counted in log-lambda.  This used to be
+        # argmin(|w0 - hst_wave_new|) - 1, which put every exposure (and COS
+        # segment) not starting at the co-add's bluest pixel ONE PIXEL BLUEWARD
+        # of its wavelength -- 69 km/s, measured on Galactic ISM lines
+        # (2026-11-17: COS co-adds -82 km/s median against -10 to -18 in the
+        # raw x1d exposures).  The assertions keep it from coming back.
+        #
+        # Why the -1 was there ("avoid ValueError"): HSTLowResRebin builds its
+        # grid with a floating-point np.arange(start, end + c1, c1), which can
+        # return ONE pixel more than the exposure's own range, past its reddest
+        # datum.  Placed correctly, such an exposure can run one pixel off the
+        # red end of the co-add lattice.  Drop that pixel -- it lies beyond
+        # every exposure's data -- instead of shifting the whole exposure.
+        argstart = int(round((np.log10(new_binned_waves[0]) - loglam_minHST_rebin) / sdss_c1))
+        assert argstart >= 0, "exposure %d starts blueward of the co-add lattice" % i
+        n_fit = min(len(new_binned_waves), len(hst_wave_new) - argstart)
+        assert len(new_binned_waves) - n_fit <= 1, \
+            "exposure %d overruns the co-add lattice by %d pixels" % (i, len(new_binned_waves) - n_fit)
+        new_binned_waves  = new_binned_waves[:n_fit]
+        new_binned_fluxes = new_binned_fluxes[:n_fit]
+        new_binned_errs   = new_binned_errs[:n_fit]
+        new_binned_masks  = new_binned_masks[:n_fit]
+        _cont_keep        = _cont_keep[:n_fit]
+        assert np.allclose(hst_wave_new[argstart:argstart+n_fit], new_binned_waves, rtol=1e-6), \
+            "exposure %d is not on the co-add lattice" % i
         old_binned_waves[i,argstart:argstart+len(new_binned_waves)]   = new_binned_waves
         old_binned_fluxes[i,argstart:argstart+len(new_binned_fluxes)] = new_binned_fluxes
         old_binned_errs[i,argstart:argstart+len(new_binned_errs)]     = new_binned_errs

@@ -1,18 +1,18 @@
 {
  "product": {
   "n_rows": 1968,
-  "n_usable": 904,
+  "n_usable": 905,
   "rest_lo": 1119.88,
-  "rest_hi": 1378.7,
+  "rest_hi": 1379.02,
   "sha_wave": "843a3671ec06613d",
-  "sha_flux": "d6db98bcaf6a33cc",
-  "sha_err": "6afa7ea3d775ba6c",
-  "sha_mask": "a5557bd9284b56ac",
-  "sha_cont": "de202f0f8716b2dd",
-  "min_over_median_error": 0.54826,
+  "sha_flux": "cc5637c75e5b6619",
+  "sha_err": "4a4c3312183e4155",
+  "sha_mask": "9170531fa5412e8a",
+  "sha_cont": "02330cf1ca96020c",
+  "min_over_median_error": 0.552615,
   "usable": {
    "L1450": 0,
-   "SiIV": 60,
+   "SiIV": 61,
    "CIV": 0,
    "linefree": 0,
    "CIII]": 0,
@@ -20,7 +20,7 @@
   },
   "scatter_over_error": {
    "L1450": null,
-   "SiIV": 1.226,
+   "SiIV": 1.237,
    "CIV": null,
    "linefree": null,
    "CIII]": null,
@@ -29,10 +29,10 @@
   "flux": {
    "L1450": null,
    "SiIV": {
-    "median": 0.619388,
-    "p05": -10.887,
-    "p95": 32.3577,
-    "roughness": 17.6867
+    "median": 0.460067,
+    "p05": -10.4028,
+    "p95": 31.5072,
+    "roughness": 17.5323
    },
    "CIV": null,
    "linefree": null,
@@ -42,10 +42,10 @@
   "continuum": {
    "L1450": null,
    "SiIV": {
-    "median": 1.39458e-16,
-    "p05": 1.75525e-17,
-    "p95": 2.58966e-16,
-    "roughness": 2.52896e-23
+    "median": 1.41768e-16,
+    "p05": 1.77892e-17,
+    "p95": 2.63266e-16,
+    "roughness": 2.57319e-23
    },
    "CIV": null,
    "linefree": null,
@@ -55,12 +55,12 @@
   "civ_data_centroid": null
  },
  "fit": {
-  "blueshift": -909.073,
-  "ew": 137.192,
+  "blueshift": -978.367,
+  "ew": 112.935,
   "logL1450": null,
   "logL1700": null,
-  "f2500": -1.14054,
-  "veto_px": 192,
+  "f2500": -1.20751,
+  "veto_px": 187,
   "civ_usable": 0
  }
 }

@@ -145,12 +145,45 @@ def _rows_of(data, stitch=False):
         order = np.argsort(w, kind='stable')
         out.append((w[order], f[order], e[order], q[order]))
     if stitch and len(out) > 1:
-        w = np.concatenate([r[0] for r in out])
-        f = np.concatenate([r[1] for r in out])
-        e = np.concatenate([r[2] for r in out])
-        q = np.concatenate([r[3] for r in out])
+        # Join the orders WITHOUT interleaving them.  Adjacent echelle orders
+        # overlap, and sorting their pixels together interleaves two
+        # wavelength solutions, leaving neighbouring pixels as little as
+        # 0.001 A apart with unrelated fluxes.  The rebinner draws a straight
+        # line through the two nearest native pixels, so such a pair has an
+        # enormous slope and extrapolates to garbage -- NGC 4051 E140M gave
+        # flux 240x the continuum, negative fluxes and negative errors at
+        # 1376 A (found 2026-11-17 once coadd placed exposures correctly).
+        # So, the standard splice: where two adjacent orders overlap, keep
+        # each order only on its own side of the overlap's midpoint.  That also
+        # drops each order's low-throughput edge, where the near-zero errors
+        # sit.
+        out.sort(key=lambda r: np.median(r[0]))
+        lo = [r[0][0] for r in out]
+        hi = [r[0][-1] for r in out]
+        pieces = []
+        for k, (w, f, e, q) in enumerate(out):
+            keep = np.ones(len(w), bool)
+            if k > 0 and lo[k] < hi[k-1]:                 # overlaps the bluer order
+                keep &= w >= 0.5 * (lo[k] + hi[k-1])
+            if k < len(out) - 1 and lo[k+1] < hi[k]:      # overlaps the redder order
+                keep &= w < 0.5 * (lo[k+1] + hi[k])
+            pieces.append((w[keep], f[keep], e[keep], q[keep]))
+        w = np.concatenate([p[0] for p in pieces])
+        f = np.concatenate([p[1] for p in pieces])
+        e = np.concatenate([p[2] for p in pieces])
+        q = np.concatenate([p[3] for p in pieces])
         order = np.argsort(w, kind='stable')
-        return [(w[order], f[order], e[order], q[order])]
+        w, f, e, q = w[order], f[order], e[order], q[order]
+        # At each junction the last pixel of one order can land arbitrarily
+        # close to the first of the next; drop the second of any pair closer
+        # than half the median spacing, for the same reason as above.
+        dw = np.diff(w)
+        keep = np.concatenate([[True], dw >= 0.5 * np.median(dw)])
+        w, f, e, q = w[keep], f[keep], e[keep], q[keep]
+        # Every order must have been bounded only by its immediate
+        # neighbours; anything else would interleave again.
+        assert np.all(np.diff(w) > 0), "echelle orders still interleave after splicing"
+        return [(w, f, e, q)]
     return out
 
 
