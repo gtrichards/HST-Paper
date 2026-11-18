@@ -55,12 +55,12 @@
   "civ_data_centroid": null
  },
  "fit": {
-  "blueshift": -978.367,
-  "ew": 112.935,
+  "blueshift": -493.637,
+  "ew": 149.044,
   "logL1450": null,
   "logL1700": null,
-  "f2500": -1.20751,
-  "veto_px": 187,
+  "f2500": -0.87537,
+  "veto_px": 194,
   "civ_usable": 0
  }
 }

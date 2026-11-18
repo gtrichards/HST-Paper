@@ -92,15 +92,15 @@
    },
    "MgII": null
   },
-  "civ_data_centroid": 950.2
+  "civ_data_centroid": 1019.0
  },
  "fit": {
-  "blueshift": 887.001,
-  "ew": 42.34,
-  "logL1450": 44.6171,
-  "logL1700": 44.5481,
-  "f2500": 0.55581,
-  "veto_px": 46,
+  "blueshift": 955.869,
+  "ew": 43.989,
+  "logL1450": 44.6095,
+  "logL1700": 44.5476,
+  "f2500": 0.56208,
+  "veto_px": 22,
   "civ_usable": 281
  }
 }

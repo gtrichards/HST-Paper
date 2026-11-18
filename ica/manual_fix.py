@@ -516,42 +516,12 @@ class ICAManualFixProcessor:
         CIV_EW : float
             CIV equivalent width in Angstroms
         """
-        # Fit continuum
-        cont1 = ((wave_r>=cont_region[0][0])&(wave_r<=cont_region[0][1]))
-        cont2 = ((wave_r>=cont_region[1][0])&(wave_r<=cont_region[1][1]))
-        
-        m, b = np.polyfit(np.concatenate((wave_r[cont1], wave_r[cont2])), 
-                         np.concatenate((flux_r[cont1], flux_r[cont2])), 1)
-        continuum = wave_r * m + b
-        
-        # Calculate EW
-        EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
-
-        # Index the continuum with the same mask as the flux. Previously this
-        # read continuum[i] while stepping flux_r[EW][i], so the continuum was
-        # taken from the start of the reconstruction instead of from the C IV
-        # window -- on the component grid that is index 757, about 240 A
-        # blueward. The continuum falls redward, so too much was subtracted and
-        # the EW came out low by 13-36% (median 23%) across the objects fit so
-        # far. The blueshift moved with it, by up to one 69 km/s grid pixel,
-        # since it is the half-flux point of the cumulative sum below.
-        continuum_EW = continuum[EW]
-
-        CIV_EW = 0
-        ew_list = [0.]
-        for i in range(len(wave_r[EW])):
-            try:
-                CIV_EW += max(((flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i]) * 
-                             (wave_r[EW][i+1] - wave_r[EW][i]), 0)
-            except IndexError:
-                CIV_EW += max(((flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i]) * 
-                             (wave_r[EW][i] - wave_r[EW][i-1]), 0)
-            ew_list.append(CIV_EW)
-        
-        # Calculate blueshift
-        ind_half_flux = abs((CIV_EW / 2) - np.array(ew_list)).argmin()
-        CIV_blue = ((1549.48 - wave_r[EW][ind_half_flux]) / 1549.48) * 3e5
-        
+        # One measurement, shared with run_ica.get_CIV: power-law continuum through
+        # the 1445-1465 / 1700-1705 A medians (Rankine+20 sec 6.1), clamped
+        # cumulative EW over 1500-1600 A, blueshift from the pixel whose span
+        # contains the half-flux point.  See run_ica.civ_measure for the history.
+        CIV_blue, CIV_EW, _, _, _ = run_ICA_r20_components.civ_measure(
+            np.asarray(wave_r, float), np.asarray(flux_r, float), EW_region, cont_region)
         return CIV_blue, CIV_EW
     
     
@@ -670,25 +640,10 @@ class ICAManualFixProcessor:
         ax.axvspan(cont_region[0][0], cont_region[0][1], alpha=0.5, color='grey')
         ax.axvspan(cont_region[1][0], cont_region[1][1], alpha=0.5, color='grey')
         
-        m, b = np.polyfit(np.concatenate((wave_r[cont1], wave_r[cont2])), 
-                         np.concatenate((flux_r[cont1], flux_r[cont2])), 1)
-        continuum = wave_r * m + b
+        _blue, CIV_EW, ind_half_flux, ew_list, continuum = run_ICA_r20_components.civ_measure(
+            np.asarray(wave_r, float), np.asarray(flux_r, float), EW_region, cont_region)
         ax.plot(wave_r, continuum, "-m")#, label="Continuum")
-        
-        # Show EW region and blueshift
         EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
-        continuum_EW = continuum[EW]   # same alignment fix as get_CIV_parameters
-        CIV_EW = 0
-        ew_list = [0.]
-        for i in range(len(wave_r[EW])):
-            try:
-                CIV_EW += max(( (flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i] ) * ( wave_r[EW][i+1] - wave_r[EW][i] ), 0) #no absorption
-            except IndexError:
-                CIV_EW += max(( (flux_r[EW][i] - continuum_EW[i]) / continuum_EW[i] ) * ( wave_r[EW][i] - wave_r[EW][i-1] ), 0)
-
-            ew_list.append(CIV_EW)
-
-        ind_half_flux = abs((CIV_EW / 2) - np.array(ew_list)).argmin()
 
         ax.fill_between(wave_r[EW], continuum[EW], flux_r[EW], color="blue", alpha=0.2, 
                        label=f"EW = {CIV_EW:.1f} Å")

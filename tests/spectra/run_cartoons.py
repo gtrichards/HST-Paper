@@ -54,19 +54,16 @@ def run(name):
         m = np.asarray(t["Bad Pixel Mask"], float)
         cn = np.asarray(t["Continuum Normalisation"], float)
         g = (m == 0) & np.isfinite(f) & np.isfinite(e) & (e > 0)
-        # measure the line directly off the product, against a local continuum
-        # from windows either side -- no ICA, so this tests the REDUCTION alone
-        sel = g & (w >= 1400) & (w <= 1700)
-        wing = sel & (((w >= 1400) & (w <= 1480)) | ((w >= 1640) & (w <= 1700)))
-        sl, ic = np.polyfit(w[wing], f[wing], 1)
-        k = sel & (w >= 1500) & (w <= 1600)
-        cont = sl * w[k] + ic
-        dl = np.gradient(w[k])
-        ew = float(np.sum((f[k] - cont) / cont * dl))
-        line = np.clip(f[k] - cont, 0, None)
-        cum = np.cumsum(line * dl)
-        lam = float(np.interp(cum[-1] / 2.0, cum, w[k]))
-        blue = (CIV - lam) / CIV * 299792.458
+        # measure the line directly off the product with the measurement's own
+        # prescription (run_ica.civ_measure: power-law continuum through the
+        # 1445-1465 / 1700-1705 A medians, clamped cumulative EW over 1500-1600 A,
+        # half-flux pixel by span) -- no ICA, so this tests the REDUCTION alone.
+        # Until 2026-11-17 this used its own convention (np.interp of the
+        # cumulative at pixel centres, wide 1400-1480 / 1640-1700 wings), which
+        # read +17 to +107 km/s high on a +1000 km/s truth for reasons of its own.
+        from ica.run_ica import civ_measure
+        sel = g & (w >= 1400) & (w <= 1720)
+        blue, ew, _, _, _ = civ_measure(w[sel], f[sel])
         # is the error honest?
         lf = g & (w >= 1640) & (w <= 1700)
         x = f[lf]

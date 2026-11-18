@@ -30,7 +30,7 @@ rsync -a pipeline_output/tables/             "$SNAP/tables/"    2>/dev/null || t
 cp $REPO/rebinning/coadd.py "$SNAP/coadd.py.pre_hb"
 cp $REPO/rebinning/read_spec_data.py "$SNAP/read_spec_data.py.pre_hb"
 git -C $REPO rev-parse HEAD > "$SNAP/HST-Paper.commit"; git -C $REPO status --short >> "$SNAP/HST-Paper.commit"
-ls pipeline_output/chosen_visit/rebin | wc -l > "$SNAP/INDICES.txt"
+ls "$SNAP/fits" | sed -n 's/^\([0-9][0-9][0-9]\)_.*/\1/p' | sort -u | sed 's/^0*//' > "$SNAP/INDICES.txt"   # the index list replay_fits.py reads
 echo "snapshot verify (rebin, fits): $(diff -rq pipeline_output/chosen_visit/rebin "$SNAP/rebin" | wc -l) $(diff -rq pipeline_output/chosen_visit/fits "$SNAP/fits" | wc -l) differing entries (want 0 0)"
 echo "code: $(git -C $REPO rev-parse --short HEAD) $(git -C $REPO status --short rebinning/)"
 echo "== 1. rebuild from stage =="
@@ -46,3 +46,6 @@ $PY diff_nread.py --snap "$SNAP" --label hb --csv pipeline_output/final/hb_diff.
 echo "END $(date)"
 echo ADOPTION_CHAIN_DONE
 } > "$LOG" 2>&1
+# NOTE 2026-11-17: the first run wrote a COUNT to INDICES.txt (ls | wc -l) where replay_fits.py
+# expects the index list; replay therefore ran on index 434 alone.  INDICES.txt was regenerated from
+# the snapshot's fits dir names and steps 4-5 rerun by hand (log: hb_adoption_replay.log).

@@ -111,6 +111,57 @@ def blueshift(wave_half_flux):
     '''
     return ((1549.48 - wave_half_flux) / 1549.48) * 3e5
 
+
+def civ_continuum(wave_r, flux_r, cont_region=((1445.0, 1465.0), (1700.0, 1705.0))):
+    """The C IV continuum of Rankine+20 sec 6.1: a power law f ~ lambda^-alpha
+    through the median F_lambda in 1445-1465 and 1700-1705 A.  Until 2026-11-17
+    this was a straight line through the pixels of the two windows.  Falls back
+    to that line only if a median is not positive (then the power law is undefined)."""
+    wave_r = np.asarray(wave_r, float); flux_r = np.asarray(flux_r, float)
+    c1 = (wave_r >= cont_region[0][0]) & (wave_r <= cont_region[0][1])
+    c2 = (wave_r >= cont_region[1][0]) & (wave_r <= cont_region[1][1])
+    if c1.sum() == 0 or c2.sum() == 0:
+        return np.full(len(wave_r), np.nan)
+    f1, f2 = np.nanmedian(flux_r[c1]), np.nanmedian(flux_r[c2])
+    l1, l2 = np.nanmedian(wave_r[c1]), np.nanmedian(wave_r[c2])
+    if np.isfinite(f1) and np.isfinite(f2) and f1 > 0 and f2 > 0:
+        slope = np.log(f2 / f1) / np.log(l2 / l1)          # = -alpha
+        return f1 * (wave_r / l1) ** slope
+    m, b = np.polyfit(np.concatenate((wave_r[c1], wave_r[c2])),
+                      np.concatenate((flux_r[c1], flux_r[c2])), 1)
+    return wave_r * m + b
+
+
+def civ_measure(wave_r, flux_r, EW_region=(1500.0, 1600.0),
+                cont_region=((1445.0, 1465.0), (1700.0, 1705.0))):
+    """C IV EW and blueshift from a reconstruction on the component grid.
+
+    EW: the continuum-normalised excess summed over EW_region, each pixel's
+    contribution clamped at zero (no absorption counted), times the pixel width.
+    Blueshift: the pixel whose span contains the half-flux point of that clamped
+    cumulative sum, converted with 1549.48 A.  The measurement is quantised at the
+    69.03 km/s pixel by construction.  Until 2026-11-17 the half-flux pixel was
+    the one whose BLUE EDGE cumulative value was nearest to EW/2, read at the
+    pixel centre, which biased the blueshift low by 0-69 km/s (mean ~ -30)
+    depending on where the line sits on the grid.
+    Returns (CIV_blue, CIV_EW, ind_half_flux, ew_list, continuum)."""
+    wave_r = np.asarray(wave_r, float); flux_r = np.asarray(flux_r, float)
+    continuum = civ_continuum(wave_r, flux_r, cont_region)
+    EW = (wave_r >= EW_region[0]) & (wave_r <= EW_region[1])
+    w, f, c = wave_r[EW], flux_r[EW], continuum[EW]
+    n = len(w)
+    if n == 0 or not np.all(np.isfinite(c)) or np.any(c == 0):
+        return 9574.1, 0.0, 0, [0.0], continuum
+    dl = np.empty(n); dl[:-1] = w[1:] - w[:-1]; dl[-1] = w[-1] - w[-2] if n > 1 else 0.0
+    contrib = np.maximum((f - c) / c * dl, 0.0)
+    cum = np.cumsum(contrib)                     # through pixel j, i.e. at its red edge
+    CIV_EW = float(cum[-1]) if n else 0.0
+    ew_list = [0.0] + [float(v) for v in cum]
+    j = int(np.searchsorted(cum, CIV_EW / 2.0, side="left"))   # first pixel whose span reaches EW/2
+    j = min(max(j, 0), n - 1)
+    CIV_blue = float(blueshift(w[j]))
+    return CIV_blue, CIV_EW, j, ew_list, continuum
+
 def get_CIV(wave, flux, wave_r, flux_r, name, ax, EW_region=[1500,1600], cont_region=[[1445,1465],[1700,1705]]):
     #print("Getting CIV")
     #Going to save plots, but not show with magic above
@@ -123,34 +174,14 @@ def get_CIV(wave, flux, wave_r, flux_r, name, ax, EW_region=[1500,1600], cont_re
     ax.plot([1549.48,1549.48], [ylow,yup], "--k", label="CIV Rest Wavelength")
     #"""
 
-    #Fit continuum -- ADD MANUAL HERE
     cont1 = ((wave_r>=cont_region[0][0])&(wave_r<=cont_region[0][1]))
     cont2 = ((wave_r>=cont_region[1][0])&(wave_r<=cont_region[1][1]))
     ax.axvspan(cont_region[0][0], cont_region[0][1], alpha=0.5, color='grey')
     ax.axvspan(cont_region[1][0], cont_region[1][1], alpha=0.5, color='grey')
-
-    m,b = np.polyfit(np.concatenate((wave_r[cont1], wave_r[cont2])), np.concatenate((flux_r[cont1], flux_r[cont2])), 1)
-    continuum = wave_r*m + b
+    CIV_blue, CIV_EW, ind_half_flux, ew_list, continuum = civ_measure(wave_r, flux_r, EW_region, cont_region)
     ax.plot(wave_r, continuum, "-m")
-
-    #Plot EW region under flux_r -- ADD MANUAL HERE
     EW = ((wave_r>=EW_region[0])&(wave_r<=EW_region[1]))
-
-    #And compute the EW
-    CIV_EW = 0
-    ew_list = [0.]
-    for i in range(len(wave_r[EW])):
-        try:
-            CIV_EW += max(( (flux_r[EW][i] - continuum[i]) / continuum[i] ) * ( wave_r[EW][i+1] - wave_r[EW][i] ), 0) #no absorption
-        except IndexError:
-            CIV_EW += max(( (flux_r[EW][i] - continuum[i]) / continuum[i] ) * ( wave_r[EW][i] - wave_r[EW][i-1] ), 0)
-
-        ew_list.append(CIV_EW)
-
     ax.fill_between(wave_r[EW], continuum[EW], flux_r[EW], color="blue", alpha=0.2, label="Equivalent Width = %.1f Å"%CIV_EW)
-
-    ind_half_flux = abs((CIV_EW / 2) - np.array(ew_list)).argmin()
-    CIV_blue = blueshift(wave_r[EW][ind_half_flux])
     #"""
     #for w in np.arange(1450,1530,10): ax.plot([w,w],[ylow,yup],"--",label=str(w))
     #for w in np.arange(1610,1640,10): ax.plot([w,w],[ylow,yup],"--",label=str(w))
@@ -276,7 +307,12 @@ def residual(params, comps, data, eps_data):
     used by minimize() function in ICA_fit()
     '''
     model = sum(params[w].value*comps[n] for (n, w) in enumerate(params))
-    return (data-model)**2 * eps_data
+    # lmfit's scalar minimisers (lbfgsb here) reduce an array residual by the sum
+    # of its squares, so the residual must be chi, not chi^2: returning
+    # (data-model)**2 * ivar, as this did until 2026-11-17, made the objective
+    # sum(chi^4) and redchi -- which chooses the component family -- sum(chi^4)/dof.
+    # Rankine+20 sec 4.3: "non-linear least squares".
+    return (data-model) * np.sqrt(eps_data)
 
 def ICA_fit(components, wave, spectrum, ivar, flags, priors):
     # FIXME: explain this
@@ -334,28 +370,18 @@ def get_ICA(wave, flux, errs, mask, z, ica_path=None, use_priors=True, plot_spec
 
     #print(prior_low)
 
-    # mod EW
-    def _fit_aligned(components, sel, priors):
-        """Fit after truncating spectrum and components to a common length.
+    # Fit on the COMPONENT grid: the spectrum is interpolated onto it (grid_align).
+    # Until 2026-11-17 this truncated spectrum and components to a common length
+    # and paired them by index, which fitted every data pixel against a component
+    # pixel 0-69 km/s redder, by an amount set by the object's redshift.
+    from ica.grid_align import to_component_grid
+    def _fit_on_grid(wave_comp, components, sel, priors):
+        csel, fi, ei, mi = to_component_grid(wave, flux, errs, mask, sel, wave_comp)
+        return ICA_fit(components[:, csel], wave_comp[csel], fi, 1/(ei**2), mi, priors=priors)
 
-        The spectrum and the component grid can differ in length, and previously
-        only a difference of exactly +/-1 pixel was handled: any larger mismatch
-        fell through every branch and left the fit variable unassigned, raising
-        UnboundLocalError further down. That happens as soon as the input grid is
-        shifted or resampled by more than a pixel.
-
-        Truncating both to min(len) reproduces the old +/-1 behaviour exactly --
-        when the spectrum was one pixel short the components were trimmed by one,
-        and when it was one long the spectrum was trimmed by one, which is what
-        taking the shorter length does in each case.
-        """
-        n = min(int(sel.sum()), components.shape[1])
-        return ICA_fit(components[:, :n], wave[sel][:n], flux[sel][:n],
-                       1/(errs[sel][:n]**2), mask[sel][:n], priors=priors)
-
-    fit_mod  = _fit_aligned(components_mod_fit,  mod_mask,  prior_mod)
-    fit_low  = _fit_aligned(components_low_fit,  low_mask,  prior_low)
-    fit_high = _fit_aligned(components_high_fit, high_mask, prior_high)
+    fit_mod  = _fit_on_grid(wave_mod,  components_mod,  mod_mask,  prior_mod)
+    fit_low  = _fit_on_grid(wave_low,  components_low,  low_mask,  prior_low)
+    fit_high = _fit_on_grid(wave_high, components_high, high_mask, prior_high)
 
     #this is what all branches above would look like w/o index problems
     #fit_mod   = ICA_fit(components_mod[:,mod_comp_mask], wave[mod_mask], flux[mod_mask], 1/(errs[mod_mask]**2), mask[mod_mask]) if len(wave[mod_mask])==len(wave_mod) else ICA_fit(components_mod[:,:-1], wave[mod_mask], flux[mod_mask], 1/(errs[mod_mask]**2), mask[mod_mask])

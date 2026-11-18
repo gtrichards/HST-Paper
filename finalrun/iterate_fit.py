@@ -168,23 +168,17 @@ def overlay_sdss(ax, stem, z, wave_ica, flux_ica):
 def civ_continuum(wave_r, flux_r,
                   cont_region=((1445.0, 1465.0), (1700.0, 1705.0)),
                   ew_region=(1500.0, 1600.0)):
-    """The straight continuum under C IV, as get_CIV_parameters defines it.
-
-    Recomputed here rather than imported because the pipeline's version indexes
-    `continuum[i]` while stepping `flux_r[EW][i]` -- the continuum is sampled from
-    the start of the reconstruction (1260 A) instead of the C IV window, 757
-    pixels and roughly 240 A away. This uses the aligned values, so the
-    sub-continuum count below reflects the physical question -- does the
-    reconstruction dip under its own continuum -- rather than the indexing.
-    """
+    """The continuum under C IV, exactly as the measurement defines it: the
+    power law through the 1445-1465 / 1700-1705 A medians (run_ica.civ_continuum,
+    Rankine+20 sec 6.1).  Until 2026-11-17 this was a straight line, recomputed
+    here to avoid an indexing bug in the pipeline's copy that has since been fixed."""
+    from ica.run_ica import civ_continuum as _cc
     c1 = (wave_r >= cont_region[0][0]) & (wave_r <= cont_region[0][1])
     c2 = (wave_r >= cont_region[1][0]) & (wave_r <= cont_region[1][1])
     if c1.sum() < 2 or c2.sum() < 2:
         return None, None
-    m, b = np.polyfit(np.concatenate((wave_r[c1], wave_r[c2])),
-                      np.concatenate((flux_r[c1], flux_r[c2])), 1)
     ew = (wave_r >= ew_region[0]) & (wave_r <= ew_region[1])
-    return ew, wave_r * m + b
+    return ew, _cc(wave_r, flux_r, cont_region)
 
 
 def civ_subcontinuum(res):

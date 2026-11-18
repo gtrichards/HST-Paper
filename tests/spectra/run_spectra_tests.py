@@ -161,10 +161,10 @@ def data_centroid(w, f, g):
     ew = g & (w >= 1500) & (w <= 1600)
     if c1.sum() < 3 or c2.sum() < 3 or ew.sum() < 40:
         return None
-    sl, ic = np.polyfit(np.concatenate((w[c1], w[c2])),
-                        np.concatenate((f[c1], f[c2])), 1)
+    from ica.run_ica import civ_continuum
+    cont = civ_continuum(w, f)          # the measurement's power law (2026-11-17; a line before)
     ww, ff = w[ew], f[ew]
-    cc = ww * sl + ic
+    cc = cont[ew]
     if not np.all(np.isfinite(cc)) or np.any(cc == 0):
         return None
     dw = np.diff(ww, append=ww[-1] + (ww[-1] - ww[-2]))
@@ -173,7 +173,9 @@ def data_centroid(w, f, g):
     total = cum[-1]
     if not (total > 0):
         return None
-    k = int(np.abs(total / 2.0 - cum).argmin())
+    # the pixel whose span contains the half-flux point (cum[j] is the integral
+    # through pixel j-1), as run_ica.civ_measure does since 2026-11-17
+    k = int(np.searchsorted(cum[1:], total / 2.0, side="left"))
     k = min(k, len(ww) - 1)
     return round(float((1549.48 - ww[k]) / 1549.48 * 299792.458), 1)
 
@@ -261,10 +263,9 @@ def measure(fixture, dump=None):
         c2 = (wi >= 1700) & (wi <= 1705)
         veto = None
         if c1.sum() > 3 and c2.sum() > 3:
-            sl, ic = np.polyfit(np.concatenate((wi[c1], wi[c2])),
-                                np.concatenate((fi[c1], fi[c2])), 1)
+            from ica.run_ica import civ_continuum
             win = (wi >= 1500) & (wi <= 1600)
-            veto = int(((fi - (wi * sl + ic)) < 0)[win].sum())
+            veto = int(((fi - civ_continuum(wi, fi)) < 0)[win].sum())
         # the monochromatic luminosities, by the same route iterate_fit uses:
         # the reconstruction's median in the window times the recorded continuum
         def _logl(lo, hi):

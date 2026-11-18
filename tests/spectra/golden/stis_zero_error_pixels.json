@@ -82,14 +82,14 @@
    "CIII]": null,
    "MgII": null
   },
-  "civ_data_centroid": -484.1
+  "civ_data_centroid": -553.2
  },
  "fit": {
-  "blueshift": -78.781,
-  "ew": 120.555,
-  "logL1450": 41.2111,
-  "logL1700": 41.1293,
-  "f2500": 0.85429,
+  "blueshift": -9.681,
+  "ew": 116.551,
+  "logL1450": 41.2275,
+  "logL1700": 41.1632,
+  "f2500": 0.9225,
   "veto_px": 0,
   "civ_usable": 280
  }

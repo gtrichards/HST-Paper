@@ -41,7 +41,8 @@ def residual(params, composite, data, eps_data):
     used by minimize() function in ICA_fit()
     '''
     model = sum(params["A"].value*composite)
-    return (data-model)**2 * eps_data
+    # chi, not chi^2: leastsq squares and sums the residual (see run_ica.residual)
+    return (data-model) * np.sqrt(eps_data)
 
 def fit_comp(composite, wave, spectrum, ivar, flags):
     # FIXME: explain this
@@ -58,23 +59,11 @@ def fit_comp(composite, wave, spectrum, ivar, flags):
 def get_fit(wave, flux, errs, mask, wave_comp, flux_comp):
     #Apply mask and get fits
     wavecoverage_mask  = (wave>=1260)&(wave<=max(wave_comp))
-    comp_mask  = (wave_comp>min(wave[wavecoverage_mask]))&(wave_comp<max(wave[wavecoverage_mask]))
-
-    #Adjust array sizes
-    wave_fit        = wave_comp[comp_mask]
-    composite_fit       = flux_comp[comp_mask]
-
-    # Truncate spectrum and composite to a common length. Previously only a
-    # difference of exactly +/-1 pixel was handled, so any larger mismatch fell
-    # through both branches and left fit_y unassigned (UnboundLocalError below);
-    # that happens as soon as the input grid is shifted by more than a pixel.
-    # The old -1 branch also sliced composite_fit[:,:-1], a two-index slice of a
-    # one-dimensional array, so it could never have run without raising.
-    # Taking the shorter length reproduces the intended behaviour in both cases.
-    sel = wavecoverage_mask
-    n = min(int(sel.sum()), composite_fit.shape[-1])
-    fit_y = fit_comp(composite_fit[..., :n], wave[sel][:n], flux[sel][:n],
-                     1/(errs[sel][:n]**2), mask[sel][:n])
+    # the spectrum interpolated onto the composite's grid (same step as the
+    # component fit; until 2026-11-17 this paired by index, 0-69 km/s off)
+    from ica.grid_align import to_component_grid
+    csel, fi, ei, mi = to_component_grid(wave, flux, errs, mask, wavecoverage_mask, wave_comp)
+    fit_y = fit_comp(flux_comp[csel], wave_comp[csel], fi, 1/(ei**2), mi)
 
     #compute weights
     weight  = fit_y.params["A"].value
