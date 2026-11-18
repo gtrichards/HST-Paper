@@ -138,9 +138,10 @@ def civ_measure(wave_r, flux_r, EW_region=(1500.0, 1600.0),
 
     EW: the continuum-normalised excess summed over EW_region, each pixel's
     contribution clamped at zero (no absorption counted), times the pixel width.
-    Blueshift: the pixel whose span contains the half-flux point of that clamped
-    cumulative sum, converted with 1549.48 A.  The measurement is quantised at the
-    69.03 km/s pixel by construction.  Until 2026-11-17 the half-flux pixel was
+    Blueshift: the half-flux point of that clamped cumulative sum, found by
+    linear interpolation across the pixel whose span contains it, converted with
+    1549.48 A (not quantised; the quantised value is the centre of pixel
+    ind_half_flux).  Until 2026-11-17 the half-flux pixel was
     the one whose BLUE EDGE cumulative value was nearest to EW/2, read at the
     pixel centre, which biased the blueshift low by 0-69 km/s (mean ~ -30)
     depending on where the line sits on the grid.
@@ -159,7 +160,17 @@ def civ_measure(wave_r, flux_r, EW_region=(1500.0, 1600.0),
     ew_list = [0.0] + [float(v) for v in cum]
     j = int(np.searchsorted(cum, CIV_EW / 2.0, side="left"))   # first pixel whose span reaches EW/2
     j = min(max(j, 0), n - 1)
-    CIV_blue = float(blueshift(w[j]))
+    # lambda_half by linear interpolation of the cumulative EW across pixel j
+    # (GTR, 2026-11-17: report the interpolated blueshift; the spectra stay on
+    # the 69.03 km/s grid).  Pixel j spans w[j] -/+ dl[j]/2; the cumulative is
+    # cum[j-1] at its blue edge and cum[j] at its red edge.
+    lo_cum = cum[j - 1] if j > 0 else 0.0
+    if contrib[j] > 0:
+        frac = (CIV_EW / 2.0 - lo_cum) / contrib[j]
+        lam_half = w[j] - 0.5 * dl[j] + float(np.clip(frac, 0.0, 1.0)) * dl[j]
+    else:
+        lam_half = w[j]
+    CIV_blue = float(blueshift(lam_half))
     return CIV_blue, CIV_EW, j, ew_list, continuum
 
 def get_CIV(wave, flux, wave_r, flux_r, name, ax, EW_region=[1500,1600], cont_region=[[1445,1465],[1700,1705]]):

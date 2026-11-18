@@ -177,7 +177,11 @@ def data_centroid(w, f, g):
     # through pixel j-1), as run_ica.civ_measure does since 2026-11-17
     k = int(np.searchsorted(cum[1:], total / 2.0, side="left"))
     k = min(k, len(ww) - 1)
-    return round(float((1549.48 - ww[k]) / 1549.48 * 299792.458), 1)
+    # interpolated within pixel k, as run_ica.civ_measure reports it
+    lo, hi = cum[k], cum[k + 1]
+    frac = (total / 2.0 - lo) / (hi - lo) if hi > lo else 0.5
+    lam = ww[k] - 0.5 * dw[k] + float(np.clip(frac, 0.0, 1.0)) * dw[k]
+    return round(float((1549.48 - lam) / 1549.48 * 299792.458), 1)
 
 
 def measure(fixture, dump=None):

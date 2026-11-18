@@ -82,10 +82,10 @@
     "roughness": 7.8547e-23
    }
   },
-  "civ_data_centroid": -3212.1
+  "civ_data_centroid": -3240.9
  },
  "fit": {
-  "blueshift": -2855.371,
+  "blueshift": -2836.79,
   "ew": 46.984,
   "logL1450": 44.6334,
   "logL1700": 44.6754,

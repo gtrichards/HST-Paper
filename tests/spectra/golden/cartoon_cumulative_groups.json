@@ -92,10 +92,10 @@
    },
    "MgII": null
   },
-  "civ_data_centroid": 1019.0
+  "civ_data_centroid": 1000.3
  },
  "fit": {
-  "blueshift": 887.001,
+  "blueshift": 901.721,
   "ew": 43.427,
   "logL1450": 44.6117,
   "logL1700": 44.5451,
