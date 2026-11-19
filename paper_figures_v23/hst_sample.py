@@ -26,6 +26,7 @@ from astropy.cosmology import FlatLambdaCDM
 
 cosmo = FlatLambdaCDM(Om0=0.3, H0=70)
 C_ANG = 2.998e18           # speed of light in Angstrom/s
+DEREDDEN_L1450 = True   # correct log L1450 for Galactic extinction (False = undo)
 
 
 def designation_to_coord(des):
@@ -86,6 +87,20 @@ def add_logL1450(hst, data_dir):
     fnu1450 = hst["F1450"].values * 1450. / (C_ANG / 1450.)
     hst["logLnu1450"] = (np.log10(4. * np.pi) + np.log10(fnu1450) +
                          2 * np.log10(DLcm) + np.log10(1. + z))
+
+    # Galactic extinction (GTR, 2026-11-19): add 0.4 A_lambda at the observed
+    # wavelength 1450(1+z) A, with E(B-V) from Schlafly & Finkbeiner (2011) and
+    # the Fitzpatrick (1999) R_V = 3.1 curve -- see galactic_extinction.py.
+    # The SDSS comparison luminosities (Wu & Shen 2022) are corrected for
+    # Galactic extinction in their spectral fits (map and curve to be
+    # confirmed; GNIRS-DQS not yet checked).  Set DEREDDEN_L1450 = False to undo.
+    if DEREDDEN_L1450:
+        from galactic_extinction import dlogL_1450
+        ebv = pd.read_csv(os.path.join(data_dir, "EBV_SandF_v23.csv"))
+        hst = hst.merge(ebv[["row_num", "ebv_sandf"]], on="row_num", how="left")
+        assert hst["ebv_sandf"].notna().all(), "an object has no E(B-V)"
+        hst["dlogL_ext"] = dlogL_1450(hst["ebv_sandf"].values, z)
+        hst["logLnu1450"] = hst["logLnu1450"] + hst["dlogL_ext"]
     return hst
 
 
