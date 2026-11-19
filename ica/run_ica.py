@@ -109,7 +109,7 @@ def blueshift(wave_half_flux):
     compute blueshift given wavelength where half the EW
     of CIV has been accumulated; units Angstroms
     '''
-    return ((1549.48 - wave_half_flux) / 1549.48) * 3e5
+    return ((1549.48 - wave_half_flux) / 1549.48) * 299792.458   # was 3e5 (0.07% low) until 2026-11-19
 
 
 def civ_continuum(wave_r, flux_r, cont_region=((1445.0, 1465.0), (1700.0, 1705.0))):
