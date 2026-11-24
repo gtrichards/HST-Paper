@@ -1,0 +1,339 @@
+<title>Systemic Redshift Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,500&display=swap">
+<style>
+/* Layout: a working checklist -- summary strip, filter bar, one dense sortable table; rows expand to NED's published redshifts. */
+:root{
+  --ink:#1d2430; --ink-2:#4b5566; --ink-3:#7a8495;
+  --paper:#f6f7f9; --panel:#ffffff; --rule:#dde1e8; --rule-2:#eceff3;
+  --accent:#2d5d8a; --accent-soft:#e3ecf5;
+  --ok:#2f7a4f; --ok-soft:#e2f1e8; --warn:#a86a10; --warn-soft:#f8eedb; --bad:#b03a3a; --bad-soft:#f7e1e1;
+  --f-display:"Newsreader",Georgia,"Times New Roman",serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --ink:#e4e8ef; --ink-2:#aab3c2; --ink-3:#7f8899;
+  --paper:#12161c; --panel:#1a2029; --rule:#2c3440; --rule-2:#232a35;
+  --accent:#7fb0de; --accent-soft:#1e3044;
+  --ok:#6fc596; --ok-soft:#173226; --warn:#e2ae55; --warn-soft:#382a12; --bad:#ec8686; --bad-soft:#3a1d1d;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ink:#e4e8ef; --ink-2:#aab3c2; --ink-3:#7f8899;
+  --paper:#12161c; --panel:#1a2029; --rule:#2c3440; --rule-2:#232a35;
+  --accent:#7fb0de; --accent-soft:#1e3044;
+  --ok:#6fc596; --ok-soft:#173226; --warn:#e2ae55; --warn-soft:#382a12; --bad:#ec8686; --bad-soft:#3a1d1d;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--f-body);margin:0;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font:500 1.9rem/1.15 var(--f-display);margin:0;text-wrap:balance}
+.lede{color:var(--ink-2);max-width:72ch;margin:4px 0 0}
+.lede code,td code{font-family:var(--f-mono);font-size:.92em}
+.strip{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;padding:10px 14px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
+.strip .k{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.strip .v{font:500 1.05rem var(--f-mono);font-variant-numeric:tabular-nums}
+.save{margin-left:auto;font-size:.82rem;color:var(--ink-3)}
+.save.err{color:var(--bad)}
+.bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.bar label{font-size:.82rem;color:var(--ink-2);display:flex;gap:6px;align-items:center}
+select,input[type=search],input[type=text]{font:inherit;font-size:.86rem;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:4px 6px}
+input[type=search]{min-width:14rem}
+button{font:inherit;cursor:pointer}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--rule-2);text-align:left;vertical-align:top;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel);font-weight:600;font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--rule);cursor:pointer;user-select:none}
+th.nosort{cursor:default}
+th .dir{color:var(--accent)}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+td.name{white-space:normal;min-width:11rem}
+td.name a{color:var(--ink);text-decoration:none;font-weight:500}
+td.name a:hover{text-decoration:underline}
+.sub{display:block;font:400 .74rem var(--f-mono);color:var(--ink-3)}
+.pill{display:inline-block;font:500 .7rem var(--f-mono);padding:1px 6px;border-radius:9px;background:var(--accent-soft);color:var(--accent);margin-left:4px}
+.dv{font-weight:500}
+.dv.s1{color:var(--ink-2)} .dv.s2{color:var(--warn)} .dv.s3{color:var(--bad)}
+.ev{font-family:var(--f-mono);font-size:.8rem;color:var(--ink-2)}
+.ev b{font-weight:500;color:var(--ink)}
+tr.main:hover td{background:var(--rule-2)}
+tr.main td:first-child{border-left:3px solid transparent}
+tr.st-ok td:first-child{border-left-color:var(--ok)}
+tr.st-fix td:first-child{border-left-color:var(--bad)}
+tr.st-look td:first-child{border-left-color:var(--warn)}
+.exp{background:none;border:1px solid var(--rule);border-radius:4px;width:1.6rem;height:1.6rem;color:var(--ink-2)}
+.exp:focus-visible,.seg button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:var(--panel);color:var(--ink-2);font-size:.76rem;padding:3px 7px;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true].ok{background:var(--ok-soft);color:var(--ok);font-weight:600}
+.seg button[aria-pressed=true].fix{background:var(--bad-soft);color:var(--bad);font-weight:600}
+.seg button[aria-pressed=true].look{background:var(--warn-soft);color:var(--warn);font-weight:600}
+.seg button:disabled{cursor:not-allowed;opacity:.55}
+td.check{min-width:15rem}
+td.check input[type=text]{width:100%;margin-top:4px}
+td.check .znew{width:7.5rem}
+tr.detail td{background:var(--paper);white-space:normal;padding:10px 14px 14px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 24px;margin-bottom:10px;font-size:.84rem}
+.dgrid .k{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.pubs{width:100%;font-size:.8rem}
+.pubs th{position:static;cursor:default;background:transparent}
+.pubs td{white-space:normal}
+.pubs a{color:var(--accent)}
+.empty{padding:24px;color:var(--ink-3);text-align:center}
+.speclegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.78rem;color:var(--ink-2);margin:2px 0 8px}
+.speclegend span{display:inline-flex;align-items:center;gap:6px}
+.speclegend i{display:inline-block;width:22px;height:0;border-top:2px solid var(--ink)}
+.speclegend i.ned{border-top:2px dashed var(--accent)} .speclegend i.sdss{border-top:2px dotted var(--ok)} .speclegend i.pub{border-top:1px solid var(--ink-3)}
+.specgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;margin-bottom:12px}
+.specgrid figure{margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:6px 6px 2px}
+.specgrid figcaption{font-size:.76rem;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px}
+.specgrid canvas{width:100%;height:150px;display:block}
+.specnote{font-size:.78rem;color:var(--ink-3);margin:0 0 6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Systemic Redshift Check</h1>
+    <p class="lede">The redshift each measured object uses (Table&nbsp;1), against NED and against what our own fits say. Velocity differences are <code>c(z<sub>other</sub>&nbsp;&minus;&nbsp;z<sub>ours</sub>)/(1+z<sub>ours</sub>)</code> in km&nbsp;s<sup>&minus;1</sup>; one spectrum pixel is 69&nbsp;km&nbsp;s<sup>&minus;1</sup>. Fit evidence is from each object's adopted fit: the C&nbsp;III] peak and cross-correlation and the Mg&nbsp;II cross-correlation, positive meaning the data sit redward of the model. Expand an object (+) to see its line regions with the candidate redshifts drawn: SDSS optical where it exists, and from our UV co-add only the C III] peak and Mg II (Si IV, C IV and He II can be blueshifted, which is what we measure). Mark each object and your marks are saved with this page.</p>
+  </header>
+
+  <div class="strip" id="strip"></div>
+
+  <div class="bar">
+    <label>Show <select id="f-status">
+      <option value="all">all objects</option><option value="none">not yet marked</option>
+      <option value="ok">marked OK</option><option value="fix">marked fix</option><option value="look">marked look again</option></select></label>
+    <label>|Δv NED| at least <select id="f-dv">
+      <option value="0">any</option><option value="100">100</option><option value="300" selected>300</option><option value="1000">1000</option></select></label>
+    <label>Spectra <select id="f-spec"><option value="all">any</option><option value="opt">with an SDSS optical spectrum</option><option value="lit" selected>with a literature optical or H I spectrum</option><option value="noopt">no optical spectrum yet</option></select></label>
+    <label>Source <select id="f-src"><option value="all">any</option></select></label>
+    <label><input type="search" id="f-q" placeholder="Search name, row or designation" aria-label="Search"></label>
+  </div>
+
+  <div class="tablebox">
+    <table>
+      <thead><tr>
+        <th class="nosort" aria-label="Expand"></th>
+        <th data-k="row">Row</th>
+        <th data-k="name">Object</th>
+        <th data-k="z">z used</th>
+        <th data-k="nedz">NED z</th>
+        <th data-k="adv">Δv NED</th>
+        <th data-k="pubn">Published range</th>
+        <th class="nosort">Our fit (km/s)</th>
+        <th class="nosort">Your check</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No objects match these filters.</div>
+  </div>
+</div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script type="application/json" id="spec">__SPEC__</script>
+<script>
+(function(){
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const SPEC = JSON.parse(document.getElementById("spec").textContent);
+const CKMS = 299792.458;
+const SRC = {"":"Wu & Shen 2022 (DR16Q)",S:"Sulentic+07",N:"NED, as recorded in the 2018 compilation (NED\u2019s preferred value may have changed since)",O:"revised in the fitting pass",B:"RM compilations",K:"Kaspi+2000",Z:"Zheng",L:"individual literature value"};
+const checks = {};            // row -> {status, note, z_new}
+let canWrite = false, db = null, sortKey = "adv", sortDir = -1;
+const open = new Set();
+
+function srcCode(r){ const c = (r.zcode===null||r.zcode===undefined||r.zcode!==r.zcode||r.zcode==="nan")?"":String(r.zcode); return c; }
+function fmt(v, d){ return (v===null||v===undefined||Number.isNaN(v)) ? "—" : (d!==undefined ? Number(v).toFixed(d) : String(v)); }
+function dvClass(v){ const a=Math.abs(v); return a>=1000?"s3":a>=300?"s2":"s1"; }
+function sgn(v){ return (v>0?"+":"")+Math.round(v); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// source filter options
+const fsrc = document.getElementById("f-src");
+[...new Set(DATA.map(srcCode))].sort().forEach(c=>{ const o=document.createElement("option"); o.value=c===""?"W":c; o.textContent=(c===""?"W":c)+" — "+SRC[c]; fsrc.appendChild(o); });
+
+function key(r,k){
+  if(k==="adv") return r.dv_ned===undefined?-1:Math.abs(r.dv_ned);
+  if(k==="nedz") return r.ned&&r.ned.z!=null?r.ned.z:-1;
+  if(k==="pubn") return r.pub_n||0;
+  if(k==="name") return String(r.name).toLowerCase();
+  return r[k];
+}
+function visible(){
+  const st=document.getElementById("f-status").value, dv=+document.getElementById("f-dv").value,
+        sc=fsrc.value, q=document.getElementById("f-q").value.trim().toLowerCase(),
+        fs=document.getElementById("f-spec").value;
+  return DATA.filter(r=>{
+    const c=checks[r.row]; const s=c&&c.status?c.status:"none";
+    if(st!=="all" && s!==st) return false;
+    if(dv>0 && !(r.dv_ned!==undefined && Math.abs(r.dv_ned)>=dv)) return false;
+    if(sc!=="all" && (srcCode(r)===""?"W":srcCode(r))!==sc) return false;
+    if(fs!=="all"){ const P=SPEC[r.row]?SPEC[r.row].panels:[]; const sd=P.some(p=>p.src==="SDSS"), lit=P.some(p=>p.lam||p.v);
+      const kind=sd?"opt":lit?"lit":"noopt"; if(kind!==fs) return false; }
+    if(q && !(String(r.name).toLowerCase().includes(q)||String(r.row)===q||String(r.des).toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a,b)=>{ const x=key(a,sortKey), y=key(b,sortKey); return (x<y?-1:x>y?1:0)*sortDir || a.row-b.row; });
+}
+function fitCell(f, r){
+  if(!f) return '<span class="ev">—</span>';
+  const p=[];
+  if(f.ciii_peak_dv!=null) p.push('C III] peak <b>'+sgn(f.ciii_peak_dv)+'</b>');
+  if(f.ciii_xcorr_dv!=null) p.push('xcorr <b>'+sgn(f.ciii_xcorr_dv)+'</b>'+(f.ciii_xcorr_snr!=null?' (S/N '+fmt(f.ciii_xcorr_snr,0)+')':''));
+  if(f.mgii_xcorr_dv!=null) p.push('Mg II <b>'+sgn(f.mgii_xcorr_dv)+'</b>'+(f.mgii_xcorr_snr!=null?' (S/N '+fmt(f.mgii_xcorr_snr,0)+')':''));
+  return '<span class="ev">'+(p.length?p.join("<br>"):"no anchors covered")+'</span>'+(r&&r.fit_note?'<span class="sub">'+esc(r.fit_note)+'</span>':'');
+}
+function checkCell(r){
+  const c=checks[r.row]||{}; const dis=canWrite?"":" disabled";
+  const b=(v,l)=>'<button type="button" class="'+v+'" data-row="'+r.row+'" data-st="'+v+'" aria-pressed="'+(c.status===v)+'"'+dis+'>'+l+'</button>';
+  return '<div class="seg" role="group" aria-label="Status for '+esc(r.name)+'">'+b("ok","OK")+b("look","Look again")+b("fix","Fix")+'</div>'+
+    '<input type="text" class="note" id="note-'+r.row+'" data-row="'+r.row+'" placeholder="Note" value="'+esc(c.note||"")+'"'+dis+'>'+
+    '<input type="text" class="znew" id="znew-'+r.row+'" data-row="'+r.row+'" placeholder="Corrected z" value="'+esc(c.z_new||"")+'"'+dis+'>';
+}
+function detail(r){
+  const o=r.override, n=r.ned||{};
+  let h='<div class="dgrid">'+
+    '<div><div class="k">Designation</div><code>'+esc(r.des)+'</code> · row '+r.row+(r.idx?' · fit index '+r.idx:'')+' · '+esc(r.inst)+' · Q='+r.q+(r.sdss?' · SDSS spectrum':'')+'</div>'+
+    '<div><div class="k">Redshift used</div>'+r.z+' — '+esc(SRC[srcCode(r)])+(r.zsrc?' ('+esc(r.zsrc)+')':'')+(r.z_table!==undefined&&r.z_table!==r.z?' · was '+r.z_table+' in Table 1 until the refit':'')+'</div>'+
+    '<div><div class="k">NED match</div>'+(n.name?esc(n.name)+' by '+esc(n.how||"")+(n.sep!=null?', '+n.sep+'″':'')+' · z = '+fmt(n.z):'not found in NED')+'</div>';
+  if(o) h+='<div style="grid-column:1/-1"><div class="k">Override in use</div>z = '+o.z+' ('+esc(o.source)+'): '+esc(o.note)+'</div>';
+  h+='</div>';
+  h+=specBlock(r);
+  if(r.pubs&&r.pubs.length){
+    h+='<table class="pubs"><thead><tr><th>z</th><th>±</th><th>Δv</th><th>Band</th><th>Method</th><th>Reference</th><th>Name in publication</th></tr></thead><tbody>'+
+      r.pubs.slice().sort((a,b)=>Math.abs(a.dv)-Math.abs(b.dv)).map(p=>'<tr><td class="num">'+p["Published Redshift"]+'</td><td class="num">'+fmt(p["Published Redshift Uncertainty"])+'</td><td class="num"><span class="dv '+dvClass(p.dv)+'">'+sgn(p.dv)+'</span></td><td>'+esc(p["Frequency Targeted"]||p["Spectral Range"]||"")+'</td><td>'+esc([p["Measurement Mode Features"],p["Measurement Mode Technique"],p["Qualifiers"]].filter(Boolean).join("; "))+'</td><td>'+(p.Refcode?'<a href="https://ui.adsabs.harvard.edu/abs/'+encodeURIComponent(p.Refcode)+'" target="_blank" rel="noopener">'+esc(p.Refcode)+'</a>':'')+'</td><td>'+esc(p["Name in publication"]||"")+'</td></tr>').join("")+'</tbody></table>';
+  } else h+='<p class="sub">NED lists no published redshifts for this object.</p>';
+  return h;
+}
+function specBlock(r){
+  const sp=SPEC[r.row]; if(!sp||!sp.panels.length) return '<p class="specnote">No optical spectrum yet, and the UV spectrum covers neither C III] nor Mg II, so no line here can test the redshift. Optical spectra from the literature are still to be gathered.</p>';
+  const has={}; sp.cands.forEach(c=>has[c.kind]=true);
+  let lg='<div class="speclegend"><span><i></i>z used ('+Number(r.z).toFixed(5)+')</span>';
+  const dvOf=k=>{ const c=sp.cands.find(x=>x.kind===k); return c?c.dv:null; };
+  const same=(a,b)=>a!==null&&b!==null&&Math.abs(a-b)<20;
+  const dN=dvOf("ned"), dP=dvOf("sdss");
+  const tag=dv=>dv===null?'':' ('+(dv>0?'+':'')+Math.round(dv)+' km/s'+(same(dv,0)?', = z used':'')+')';
+  if(has.ned) lg+='<span><i class="ned"></i>N: NED preferred today'+tag(dN)+'</span>';
+  if(has.sdss) lg+='<span><i class="sdss"></i>P: SDSS pipeline'+tag(dP)+(same(dP,dN)&&!same(dP,0)?', = N':'')+'</span>';
+  if(has.pub) lg+='<span><i class="pub"></i>other published values</span>';
+  lg+='</div>';
+  const optical=sp.panels.some(p=>p.src==="SDSS"||p.lam||p.v);
+  return '<p class="specnote">Velocity relative to the redshift used; narrow lines ([O III], [O II], the cores of Hβ/Hα) mark the systemic redshift'+(optical?(sp.panels.some(p=>p.lam)?'. Literature spectra come from NED, SDSS, LAMOST, the ESO archive and HST\u2019s own optical gratings; air wavelengths are converted to vacuum and ESO spectra corrected to barycentric, as labelled':''):'. No optical spectrum yet: UV only, where the C III] peak and Mg II are the usable lines')+'. Candidates outside a panel are shown as arrows at its edge.</p>'+lg+
+    '<div class="specgrid">'+sp.panels.map((p,i)=>'<figure><figcaption><span>'+esc(p.line)+'</span><span>'+(p.src==="SDSS"?"SDSS":esc(p.src))+'</span></figcaption><canvas data-row="'+r.row+'" data-p="'+i+'" aria-label="'+esc(p.line)+' spectrum with candidate redshifts"></canvas></figure>').join("")+'</div>';
+}
+function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||"#888"; }
+function drawSpectra(row){
+  const sp=SPEC[row], r=DATA.find(x=>x.row===row); if(!sp||!r) return;
+  document.querySelectorAll('canvas[data-row="'+row+'"]').forEach(cv=>{
+    const p=sp.panels[+cv.dataset.p], dpr=window.devicePixelRatio||1; if(!p) return;
+    const W=cv.clientWidth||270, H=cv.clientHeight||150; cv.width=W*dpr; cv.height=H*dpr;
+    const g=cv.getContext("2d"); g.scale(dpr,dpr);
+    const L=30,R=6,T=6,B=20, hw=p.hw;
+    // SDSS and our UV co-adds share a log grid (l0, step); literature spectra
+    // carry their own wavelengths (lam); H I profiles arrive as velocities (v).
+    const v=p.v ? p.v : p.f.map((_,i)=>CKMS*((p.lam?p.lam[i]:Math.pow(10,p.l0+i*p.step))/(p.lam0*(1+r.z))-1));
+    const fin=p.f.filter(x=>x!==null).slice().sort((a,b)=>a-b);
+    let lo=fin[Math.floor(.01*(fin.length-1))], hi=fin[Math.ceil(.99*(fin.length-1))]; const pad=(hi-lo)*.08||1; lo-=pad; hi+=pad;
+    const X=x=>L+(x+hw)/(2*hw)*(W-L-R), Y=y=>T+(hi-y)/(hi-lo)*(H-T-B);
+    g.font="10px "+cssv("--f-mono"); g.fillStyle=cssv("--ink-3"); g.strokeStyle=cssv("--rule"); g.lineWidth=1;
+    g.beginPath(); g.moveTo(L,T); g.lineTo(L,H-B); g.lineTo(W-R,H-B); g.stroke();
+    const step=hw>=6000?3000:1500;
+    for(let t=-hw;t<=hw;t+=step){ const x=X(t); g.beginPath(); g.moveTo(x,H-B); g.lineTo(x,H-B+3); g.stroke(); g.textAlign="center"; g.fillText((t/1000)+"k",x,H-6); }
+    g.textAlign="right"; g.fillText(hi.toFixed(1),L-3,T+8); g.fillText(lo.toFixed(1),L-3,H-B);
+    // candidates
+    const style={ours:[cssv("--ink"),[],1.6],ned:[cssv("--accent"),[5,3],1.4],sdss:[cssv("--ok"),[2,2],2.2],pub:[cssv("--ink-3"),[],0.8]};
+    const order={pub:0,ned:1,sdss:2,ours:3};
+    sp.cands.slice().sort((a,b)=>order[a.kind]-order[b.kind]).forEach(c=>{
+      const st=style[c.kind]; g.strokeStyle=st[0]; g.fillStyle=st[0]; g.setLineDash(st[1]); g.lineWidth=st[2];
+      if(Math.abs(c.dv)<=hw){ const x=X(c.dv); g.beginPath(); g.moveTo(x,T); g.lineTo(x,H-B); g.stroke(); }
+      else if(c.kind!=="pub"){ const x=c.dv>0?W-R-1:L+1, d=c.dv>0?-5:5; g.setLineDash([]); g.beginPath(); g.moveTo(x,T+4); g.lineTo(x+d,T); g.lineTo(x+d,T+8); g.closePath(); g.fill(); g.textAlign=c.dv>0?"right":"left"; g.fillText(({ned:"N ",sdss:"P "}[c.kind]||"")+(c.dv>0?"+":"")+Math.round(c.dv),x+d*2,T+16); }
+    });
+    g.setLineDash([]);
+    // spectrum
+    g.strokeStyle=cssv("--ink"); g.lineWidth=1; g.beginPath(); let pen=false;
+    p.f.forEach((y,i)=>{ if(y===null||v[i]<-hw||v[i]>hw){ pen=false; return; } const x=X(v[i]), yy=Y(Math.max(lo,Math.min(hi,y))); if(!pen){ g.moveTo(x,yy); pen=true; } else g.lineTo(x,yy); });
+    g.stroke();
+  });
+}
+function render(){
+  const rows=visible(), tb=document.getElementById("tb");
+  document.getElementById("empty").hidden = rows.length>0;
+  tb.innerHTML = rows.map(r=>{
+    const c=checks[r.row]; const st=c&&c.status?" st-"+c.status:"";
+    const code=srcCode(r)===""?"W":srcCode(r);
+    const nedLink='https://ned.ipac.caltech.edu/byname?objname='+encodeURIComponent(r.ned&&r.ned.name?r.ned.name:r.name);
+    let main='<tr class="main'+st+'"><td><button type="button" class="exp" data-row="'+r.row+'" aria-expanded="'+open.has(r.row)+'" aria-label="Published redshifts for '+esc(r.name)+'">'+(open.has(r.row)?"−":"+")+'</button></td>'+
+      '<td class="num">'+r.row+'</td>'+
+      '<td class="name"><a href="'+nedLink+'" target="_blank" rel="noopener">'+esc(r.name)+'</a>'+(r.override?'<span class="pill">override</span>':'')+'<span class="sub">'+esc(r.des)+'</span></td>'+
+      '<td class="num">'+Number(r.z).toFixed(5)+'<span class="pill" title="'+esc(SRC[srcCode(r)])+'">'+code+'</span></td>'+
+      '<td class="num">'+fmt(r.ned&&r.ned.z)+(r.ned&&r.ned.how&&r.ned.how!=="name"?'<span class="sub">by position</span>':'')+'</td>'+
+      '<td class="num">'+(r.dv_ned===undefined?'—':'<span class="dv '+dvClass(r.dv_ned)+'">'+sgn(r.dv_ned)+'</span>')+'</td>'+
+      '<td class="num">'+(r.pub_n?sgn(r.pub_lo)+' … '+sgn(r.pub_hi)+'<span class="sub">'+r.pub_n+' values, median '+sgn(r.pub_med)+'</span>':'—')+'</td>'+
+      '<td>'+fitCell(r.fit, r)+'</td>'+
+      '<td class="check">'+checkCell(r)+'</td></tr>';
+    if(open.has(r.row)) main+='<tr class="detail"><td colspan="9">'+detail(r)+'</td></tr>';
+    return main;
+  }).join("");
+  open.forEach(drawSpectra);
+  document.querySelectorAll("th[data-k]").forEach(th=>{ const k=th.dataset.k; th.querySelector(".dir")?.remove(); if(k===sortKey){ const s=document.createElement("span"); s.className="dir"; s.textContent=sortDir>0?" ▲":" ▼"; th.appendChild(s);} });
+  strip();
+}
+function strip(){
+  const n=DATA.length, by={ok:0,fix:0,look:0}; Object.values(checks).forEach(c=>{ if(by[c.status]!==undefined) by[c.status]++; });
+  const big=DATA.filter(r=>r.dv_ned!==undefined&&Math.abs(r.dv_ned)>=300).length;
+  const s=document.getElementById("strip");
+  s.innerHTML=[["Objects",n],["Δv ≥ 300 km/s",big],["Marked OK",by.ok],["Look again",by.look],["Fix",by.fix],["Not yet marked",n-by.ok-by.fix-by.look]]
+    .map(([k,v])=>'<div><div class="k">'+k+'</div><div class="v">'+v+'</div></div>').join("")+'<div class="save" id="save"></div>';
+  setSave(saveMsg, saveErr);
+}
+let saveMsg="Connecting to saved checks…", saveErr=false;
+function setSave(m,e){ saveMsg=m; saveErr=!!e; const el=document.getElementById("save"); if(el){ el.textContent=m; el.className="save"+(e?" err":""); } }
+
+// --- saving -------------------------------------------------------------
+const pending={}, timers={};
+async function write(row){
+  if(!db||!canWrite) return;
+  const c=checks[row]||{};
+  try{ await db.collection("zchecks").doc("r"+row).set({row:row,status:c.status||"",note:c.note||"",z_new:c.z_new||"",updated:new Date().toISOString()}); setSave("Saved"); }
+  catch(e){ setSave("Could not save ("+(e&&e.code||"error")+"). Your mark is shown but not stored.", true); }
+}
+function queue(row){ clearTimeout(timers[row]); timers[row]=setTimeout(async()=>{ await write(row); delete timers[row]; },700); }
+
+document.addEventListener("click",e=>{
+  const ex=e.target.closest(".exp"); if(ex){ const r=+ex.dataset.row; open.has(r)?open.delete(r):open.add(r); render(); return; }
+  const b=e.target.closest(".seg button"); if(b&&!b.disabled){ const r=+b.dataset.row; const c=checks[r]=Object.assign({},checks[r]); c.status=(c.status===b.dataset.st)?"":b.dataset.st; render(); write(r); return; }
+  const th=e.target.closest("th[data-k]"); if(th){ const k=th.dataset.k; if(sortKey===k) sortDir=-sortDir; else { sortKey=k; sortDir=(k==="adv"||k==="pubn")?-1:1; } render(); }
+});
+document.addEventListener("input",e=>{
+  const t=e.target; if(!t.dataset||!t.dataset.row) return; const r=+t.dataset.row;
+  if(t.classList.contains("note")||t.classList.contains("znew")){ const c=checks[r]=Object.assign({},checks[r]); if(t.classList.contains("note")) c.note=t.value; else c.z_new=t.value; queue(r); }
+  if(t.id==="f-q") render();
+});
+["f-status","f-dv","f-src","f-spec"].forEach(id=>document.getElementById(id).addEventListener("change",render));
+document.getElementById("f-q").addEventListener("input",render);
+
+render();
+
+// --- connect to the saved checks (subscribe once) ------------------------
+(async()=>{
+  const timer=setTimeout(()=>setSave("Saved checks can't be reached yet; marks won't be stored until they load.", true),10000);
+  try{
+    db = await (window.claude&&window.claude.use?window.claude.use("db"):null);
+    const user = await (window.claude&&window.claude.use?window.claude.use("user"):null);
+    if(!db){ clearTimeout(timer); setSave("Saving is unavailable in this view; marks are not stored.", true); return; }
+    canWrite = user ? (user.can ? (user.can("data.write")!==false) : true) : true;
+    db.collection("zchecks").onSnapshot(snap=>{
+      clearTimeout(timer);
+      const focus=document.activeElement&&document.activeElement.id;
+      snap.docs.forEach(d=>{ const v=d.data(); if(v&&v.row!==undefined && !timers[v.row]) checks[v.row]={status:v.status||"",note:v.note||"",z_new:v.z_new||""}; });
+      if(!snap.metadata.fromCache) setSave(canWrite?"Marks are saved with this page.":"Read-only: you can view marks but not change them.", !canWrite);
+      // do not re-render under someone typing in a note
+      if(focus && (focus.startsWith("note-")||focus.startsWith("znew-"))) { strip(); return; }
+      render();
+    }, err=>{ clearTimeout(timer); setSave("Saved checks unavailable ("+(err&&err.code||"error")+").", true); });
+  }catch(e){ clearTimeout(timer); setSave("Saving is unavailable in this view.", true); }
+})();
+})();
+</script>
