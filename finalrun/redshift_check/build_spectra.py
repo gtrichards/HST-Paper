@@ -71,10 +71,10 @@ for r in rows:
         zp = float(np.nanmedian(t["Redshift"]))
         lobs = np.log10(np.asarray(t["Rest-frame Wavelength"], float) * (1 + zp))
         panels += windows(lobs, np.asarray(t["Coadded Flux (Arbitrary Units)"], float), np.asarray(t["Bad Pixel Mask"]) == 0, z, inst); nuv += 1
-    cands = [{"label": "z used", "dv": 0.0, "kind": "ours"}]
-    # a redshift revised during the check: draw where it used to be
-    if r.get("z_table") is not None and abs(r["z_table"] - z) > 1e-7:
-        cands.append({"label": "previous z (Table 1)", "dv": round(C * (r["z_table"] - z) / (1 + z)), "kind": "prev"})
+    cands = [{"label": "z used in Table 1", "dv": 0.0, "kind": "ours"}]
+    # a redshift revised during the check (override not yet in Table 1)
+    if r.get("z_rev") is not None:
+        cands.append({"label": "revised z", "dv": round(C * (r["z_rev"] - z) / (1 + z)), "kind": "rev"})
     if r.get("dv_ned") is not None: cands.append({"label": "NED preferred", "dv": r["dv_ned"], "kind": "ned"})
     if r["row"] in man.index and pd.notna(man.loc[r["row"], "z_sdss"]):
         cands.append({"label": "SDSS pipeline", "dv": round(C * (float(man.loc[r["row"], "z_sdss"]) - z) / (1 + z)), "kind": "sdss"})

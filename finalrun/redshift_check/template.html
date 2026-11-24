@@ -86,7 +86,7 @@ tr.detail td{background:var(--paper);white-space:normal;padding:10px 14px 14px}
 .speclegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.78rem;color:var(--ink-2);margin:2px 0 8px}
 .speclegend span{display:inline-flex;align-items:center;gap:6px}
 .speclegend i{display:inline-block;width:22px;height:0;border-top:2px solid var(--ink)}
-.speclegend i.ned{border-top:2px dashed var(--accent)} .speclegend i.prev{border-top:2px dashed var(--warn)} .speclegend i.sdss{border-top:2px dotted var(--ok)} .speclegend i.pub{border-top:1px solid var(--ink-3)}
+.speclegend i.ned{border-top:2px dashed var(--accent)} .speclegend i.rev{border-top:2px dashed var(--warn)} .speclegend i.sdss{border-top:2px dotted var(--ok)} .speclegend i.pub{border-top:1px solid var(--ink-3)}
 .specgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;margin-bottom:12px}
 .specgrid figure{margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:6px 6px 2px}
 .specgrid figcaption{font-size:.76rem;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px}
@@ -196,7 +196,7 @@ function detail(r){
   const o=r.override, n=r.ned||{};
   let h='<div class="dgrid">'+
     '<div><div class="k">Designation</div><code>'+esc(r.des)+'</code> · row '+r.row+(r.idx?' · fit index '+r.idx:'')+' · '+esc(r.inst)+' · Q='+r.q+(r.sdss?' · SDSS spectrum':'')+'</div>'+
-    '<div><div class="k">Redshift used</div>'+r.z+' — '+esc(SRC[srcCode(r)])+(r.zsrc?' ('+esc(r.zsrc)+')':'')+(r.z_table!==undefined&&r.z_table!==r.z?' · was '+r.z_table+' in Table 1 until the refit':'')+'</div>'+
+    '<div><div class="k">Redshift used</div>'+r.z+' — '+esc(SRC[srcCode(r)])+(r.zsrc?' ('+esc(r.zsrc)+')':'')+(r.z_rev!==undefined?' · revised to '+r.z_rev+' (override; enters Table 1 after the refit)':'')+'</div>'+
     '<div><div class="k">NED match</div>'+(n.name?esc(n.name)+' by '+esc(n.how||"")+(n.sep!=null?', '+n.sep+'″':'')+' · z = '+fmt(n.z):'not found in NED')+'</div>';
   if(o) h+='<div style="grid-column:1/-1"><div class="k">Override in use</div>z = '+o.z+' ('+esc(o.source)+'): '+esc(o.note)+'</div>';
   h+='</div>';
@@ -210,7 +210,7 @@ function detail(r){
 function specBlock(r){
   const sp=SPEC[r.row]; if(!sp||!sp.panels.length) return '<p class="specnote">No optical spectrum yet, and the UV spectrum covers neither C III] nor Mg II, so no line here can test the redshift. Optical spectra from the literature are still to be gathered.</p>';
   const has={}; sp.cands.forEach(c=>has[c.kind]=true);
-  let lg='<div class="speclegend"><span><i></i>z used ('+Number(r.z).toFixed(5)+')</span>';
+  let lg='<div class="speclegend"><span><i></i>z used in Table 1: '+Number(r.z).toFixed(5)+'</span>';
   const dvOf=k=>{ const c=sp.cands.find(x=>x.kind===k); return c?c.dv:null; };
   const same=(a,b)=>a!==null&&b!==null&&Math.abs(a-b)<20;
   const dN=dvOf("ned"), dP=dvOf("sdss");
@@ -218,7 +218,7 @@ function specBlock(r){
   if(has.ned) lg+='<span><i class="ned"></i>N: NED preferred today'+tag(dN)+'</span>';
   if(has.sdss) lg+='<span><i class="sdss"></i>P: SDSS pipeline'+tag(dP)+(same(dP,dN)&&!same(dP,0)?', = N':'')+'</span>';
   if(has.pub) lg+='<span><i class="pub"></i>other published values</span>';
-  if(has.prev){ const dp=dvOf("prev"); lg+='<span><i class="prev"></i>previous z, before this check ('+(dp>0?'+':'')+Math.round(dp)+' km/s from the new one)</span>'; }
+  if(has.rev){ const dr=dvOf("rev"); lg+='<span><i class="rev"></i>revised z (new, not yet in Table 1): '+Number(r.z_rev).toFixed(5)+' ('+(dr>0?'+':'')+Math.round(dr)+' km/s)</span>'; }
   lg+='</div>';
   const optical=sp.panels.some(p=>p.src==="SDSS"||p.lam||p.v);
   return '<p class="specnote">Velocity relative to the redshift used; narrow lines ([O III], [O II], the cores of Hβ/Hα) mark the systemic redshift'+(optical?(sp.panels.some(p=>p.lam)?'. Literature spectra come from NED, SDSS, LAMOST, the ESO archive and HST\u2019s own optical gratings; air wavelengths are converted to vacuum and ESO spectra corrected to barycentric, as labelled':''):'. No optical spectrum yet: UV only, where the C III] peak and Mg II are the usable lines')+'. Candidates outside a panel are shown as arrows at its edge.</p>'+lg+
@@ -244,12 +244,12 @@ function drawSpectra(row){
     for(let t=-hw;t<=hw;t+=step){ const x=X(t); g.beginPath(); g.moveTo(x,H-B); g.lineTo(x,H-B+3); g.stroke(); g.textAlign="center"; g.fillText((t/1000)+"k",x,H-6); }
     g.textAlign="right"; g.fillText(hi.toFixed(1),L-3,T+8); g.fillText(lo.toFixed(1),L-3,H-B);
     // candidates
-    const style={ours:[cssv("--ink"),[],1.6],ned:[cssv("--accent"),[5,3],1.4],sdss:[cssv("--ok"),[2,2],2.2],pub:[cssv("--ink-3"),[],0.8],prev:[cssv("--warn"),[7,3,2,3],2.0]};
-    const order={pub:0,ned:1,sdss:2,prev:3,ours:4};
+    const style={ours:[cssv("--ink"),[],1.6],ned:[cssv("--accent"),[5,3],1.4],sdss:[cssv("--ok"),[2,2],2.2],pub:[cssv("--ink-3"),[],0.8],rev:[cssv("--warn"),[7,3,2,3],2.0]};
+    const order={pub:0,ned:1,sdss:2,ours:3,rev:4};
     sp.cands.slice().sort((a,b)=>order[a.kind]-order[b.kind]).forEach(c=>{
       const st=style[c.kind]; g.strokeStyle=st[0]; g.fillStyle=st[0]; g.setLineDash(st[1]); g.lineWidth=st[2];
       if(Math.abs(c.dv)<=hw){ const x=X(c.dv); g.beginPath(); g.moveTo(x,T); g.lineTo(x,H-B); g.stroke(); }
-      else if(c.kind!=="pub"){ const x=c.dv>0?W-R-1:L+1, d=c.dv>0?-5:5; g.setLineDash([]); g.beginPath(); g.moveTo(x,T+4); g.lineTo(x+d,T); g.lineTo(x+d,T+8); g.closePath(); g.fill(); g.textAlign=c.dv>0?"right":"left"; g.fillText(({ned:"N ",sdss:"P ",prev:"was "}[c.kind]||"")+(c.dv>0?"+":"")+Math.round(c.dv),x+d*2,T+16); }
+      else if(c.kind!=="pub"){ const x=c.dv>0?W-R-1:L+1, d=c.dv>0?-5:5; g.setLineDash([]); g.beginPath(); g.moveTo(x,T+4); g.lineTo(x+d,T); g.lineTo(x+d,T+8); g.closePath(); g.fill(); g.textAlign=c.dv>0?"right":"left"; g.fillText(({ned:"N ",sdss:"P ",rev:"new "}[c.kind]||"")+(c.dv>0?"+":"")+Math.round(c.dv),x+d*2,T+16); }
     });
     g.setLineDash([]);
     // spectrum
@@ -268,7 +268,7 @@ function render(){
     let main='<tr class="main'+st+'"><td><button type="button" class="exp" data-row="'+r.row+'" aria-expanded="'+open.has(r.row)+'" aria-label="Published redshifts for '+esc(r.name)+'">'+(open.has(r.row)?"−":"+")+'</button></td>'+
       '<td class="num">'+r.row+'</td>'+
       '<td class="name"><a href="'+nedLink+'" target="_blank" rel="noopener">'+esc(r.name)+'</a>'+(r.override?'<span class="pill">override</span>':'')+'<span class="sub">'+esc(r.des)+'</span></td>'+
-      '<td class="num">'+Number(r.z).toFixed(5)+'<span class="pill" title="'+esc(SRC[srcCode(r)])+'">'+code+'</span>'+(r.z_table!==undefined&&Math.abs(r.z_table-r.z)>1e-7?'<span class="pill" style="background:var(--warn-soft);color:var(--warn)" title="was '+r.z_table+'">revised</span>':'')+'</td>'+
+      '<td class="num">'+Number(r.z).toFixed(5)+'<span class="pill" title="'+esc(SRC[srcCode(r)])+'">'+code+'</span>'+(r.z_rev!==undefined?'<span class="pill" style="background:var(--warn-soft);color:var(--warn)" title="revised to '+r.z_rev+', not yet in Table 1">revised \u2192 '+Number(r.z_rev).toFixed(5)+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(r.ned&&r.ned.z)+(r.ned&&r.ned.how&&r.ned.how!=="name"?'<span class="sub">by position</span>':'')+'</td>'+
       '<td class="num">'+(r.dv_ned===undefined?'—':'<span class="dv '+dvClass(r.dv_ned)+'">'+sgn(r.dv_ned)+'</span>')+'</td>'+
       '<td class="num">'+(r.pub_n?sgn(r.pub_lo)+' … '+sgn(r.pub_hi)+'<span class="sub">'+r.pub_n+' values, median '+sgn(r.pub_med)+'</span>':'—')+'</td>'+

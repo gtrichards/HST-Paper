@@ -17,9 +17,10 @@ are shown (Si IV, C IV, He II can be blueshifted -- that is the measurement).
    from the NED fetch; that cache was lost, so `zcheck_data.json` here is the
    preserved build product -- rerunning build_data needs the NED fetch redone).
    **To apply new redshift overrides, use `apply_overrides.py WD/zcheck`, NOT
-   build_data.py**: it updates the preserved zcheck_data.json in place (new z,
-   code O, previous value kept as z_table, all offsets recomputed), and the
-   page then draws the previous z as an amber dash-dot line.
+   build_data.py**: it updates the preserved zcheck_data.json in place.  The
+   page's reference (solid black, velocity zero) is always the current Table 1
+   redshift; an override that differs from it is stored as z_rev and drawn as
+   an amber dash-dot "revised (new)" line until Table 1 is rebuilt with it.
 2. `build_spectra.py WD/zcheck` -- SDSS optical and UV (C III], Mg II) panels.
 3. `ned_spectra.py WD` then `build_optical.py WD` -- NED-archive optical / H I
    spectra.  Excluded: Boroson & Green (1992) files (de-redshifted with their
